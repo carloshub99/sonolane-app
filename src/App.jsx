@@ -20,16 +20,50 @@ function useStablePanel(render) {
   return stableRef.current;
 }
 
-// In-memory storage shim (artifacts can't use real localStorage — this persists
-// for the session only, resetting on refresh)
+// Persisted storage — backed by real browser localStorage wherever it's
+// available (a real deployed app on a phone or in a normal browser tab),
+// with an in-memory fallback for sandboxes that block it (e.g. the Claude
+// Artifact preview iframe). This keeps things like points, achievements,
+// and car customization saved across closing and reopening the app, while
+// still never crashing anywhere localStorage access throws.
 const memStore = (() => {
-  const store = {};
+  const fallback = {};
+  let hasLS = false;
+  try {
+    const testKey = "__sl_ls_test__";
+    window.localStorage.setItem(testKey, "1");
+    window.localStorage.removeItem(testKey);
+    hasLS = true;
+  } catch { hasLS = false; }
   return {
-    getItem: (k) => (k in store ? store[k] : null),
-    setItem: (k, v) => { store[k] = String(v); },
-    removeItem: (k) => { delete store[k]; },
+    getItem: (k) => {
+      if (hasLS) { try { return window.localStorage.getItem(k); } catch { /* fall through */ } }
+      return k in fallback ? fallback[k] : null;
+    },
+    setItem: (k, v) => {
+      const s = String(v);
+      if (hasLS) { try { window.localStorage.setItem(k, s); return; } catch { /* fall through */ } }
+      fallback[k] = s;
+    },
+    removeItem: (k) => {
+      if (hasLS) { try { window.localStorage.removeItem(k); return; } catch { /* fall through */ } }
+      delete fallback[k];
+    },
   };
 })();
+
+// A useState that automatically saves to (and loads from) memStore under
+// `key`, so profile/car customization survives closing and reopening the
+// app — not just refreshing within the same open tab.
+function usePersistedState(key, initial) {
+  const [value, setValue] = useState(() => {
+    const raw = memStore.getItem(key);
+    if (raw === null) return initial;
+    try { return JSON.parse(raw); } catch { return initial; }
+  });
+  useEffect(() => { memStore.setItem(key, JSON.stringify(value)); }, [key, value]);
+  return [value, setValue];
+}
 
 const OR = "#f97316";
 const F = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
@@ -704,7 +738,7 @@ function AuthScreen() {
 
   if (checkEmail) {
     return (
-      <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24,textAlign:"center"}}>
+      <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24,paddingTop:"calc(24px + env(safe-area-inset-top, 0px))",paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))",textAlign:"center",boxSizing:"border-box"}}>
         <div style={{fontSize:44,marginBottom:16}}>📬</div>
         <div style={{fontSize:17,fontWeight:800,color:"#111",marginBottom:8}}>Check your email</div>
         <div style={{fontSize:13,color:"#666",maxWidth:280,lineHeight:1.6}}>We sent a confirmation link to <b>{email}</b>. Tap it, then come back and log in.</div>
@@ -714,7 +748,7 @@ function AuthScreen() {
   }
 
   return (
-    <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24}}>
+    <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24,paddingTop:"calc(24px + env(safe-area-inset-top, 0px))",paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))",boxSizing:"border-box"}}>
       <div style={{width:"100%",maxWidth:320}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{fontSize:36,marginBottom:8}}>🚗</div>
@@ -770,24 +804,27 @@ export default function SonoLane() {
   const [aiThinking,   setAiThinking]   = useState(false);
   const [aiPalId,      setAiPalId]      = useState("nova");
   const [subPanel,     setSubPanel]     = useState(null);
-  const [carName,      setCarName]      = useState("");
-  const [carColor,     setCarColor]     = useState("#f97316");
-  const [carModel,     setCarModel]     = useState("Sedan");
-  const [carBodyStyle, setCarBodyStyle] = useState("sedan");
-  const [carBrand,     setCarBrand]     = useState(null); // id from CAR_BRANDS, or null = unset
-  const [carMods,      setCarMods]      = useState({});
-  const [carSaved,     setCarSaved]     = useState(false);
+  // Car customization — persisted via usePersistedState so it survives
+  // closing and reopening the app (a phone install, not just this tab),
+  // instead of silently resetting to defaults every time.
+  const [carName,      setCarName]      = usePersistedState("sl_carName", "");
+  const [carColor,     setCarColor]     = usePersistedState("sl_carColor", "#f97316");
+  const [carModel,     setCarModel]     = usePersistedState("sl_carModel", "Sedan");
+  const [carBodyStyle, setCarBodyStyle] = usePersistedState("sl_carBodyStyle", "sedan");
+  const [carBrand,     setCarBrand]     = usePersistedState("sl_carBrand", null); // id from CAR_BRANDS, or null = unset
+  const [carMods,      setCarMods]      = usePersistedState("sl_carMods", {});
+  const [carSaved,     setCarSaved]     = usePersistedState("sl_carSaved", false);
   const [activeModCat, setActiveModCat] = useState("Wheels");
-  const [carAvatarMode,  setCarAvatarMode]  = useState("avatar"); // "avatar" (custom CarSVG) | "photo" (uploaded pic)
-  const [carAvatarPhoto, setCarAvatarPhoto] = useState(null); // base64 data URL
-  const [carBannerPhoto, setCarBannerPhoto] = useState(null); // base64 data URL, overrides preset if set
-  const [carBannerPreset,setCarBannerPreset]= useState("midnight");
-  const [carShowInfoHome,setCarShowInfoHome]= useState(false); // show car name/model text on the home hero avatar window
-  const [carBio,       setCarBio]       = useState(""); // free-text description (mods done, build notes, etc.) — shown on the car details page, above Photos
-  const [carPlate,     setCarPlate]     = useState(""); // private — license plate
-  const [carRegDate,   setCarRegDate]   = useState(""); // private — registration date
-  const [carMileage,   setCarMileage]   = useState(""); // private — current odometer reading
-  const [carPrivateNotes, setCarPrivateNotes] = useState(""); // private — any other handy info (VIN, insurance, service reminders, etc.)
+  const [carAvatarMode,  setCarAvatarMode]  = usePersistedState("sl_carAvatarMode", "avatar"); // "avatar" (custom CarSVG) | "photo" (uploaded pic)
+  const [carAvatarPhoto, setCarAvatarPhoto] = usePersistedState("sl_carAvatarPhoto", null); // base64 data URL
+  const [carBannerPhoto, setCarBannerPhoto] = usePersistedState("sl_carBannerPhoto", null); // base64 data URL, overrides preset if set
+  const [carBannerPreset,setCarBannerPreset]= usePersistedState("sl_carBannerPreset", "midnight");
+  const [carShowInfoHome,setCarShowInfoHome]= usePersistedState("sl_carShowInfoHome", false); // show car name/model text on the home hero avatar window
+  const [carBio,       setCarBio]       = usePersistedState("sl_carBio", ""); // free-text description (mods done, build notes, etc.) — shown on the car details page, above Photos
+  const [carPlate,     setCarPlate]     = usePersistedState("sl_carPlate", ""); // private — license plate
+  const [carRegDate,   setCarRegDate]   = usePersistedState("sl_carRegDate", ""); // private — registration date
+  const [carMileage,   setCarMileage]   = usePersistedState("sl_carMileage", ""); // private — current odometer reading
+  const [carPrivateNotes, setCarPrivateNotes] = usePersistedState("sl_carPrivateNotes", ""); // private — any other handy info (VIN, insurance, service reminders, etc.)
   const carAvatarPhotoRef = useRef(null);
   const carBannerPhotoRef = useRef(null);
   const [userName,     setUserName]     = useState("");
@@ -1032,7 +1069,7 @@ export default function SonoLane() {
   const [leftWidget,   setLeftWidget]   = useState("weather");
   const [rightWidget,  setRightWidget]  = useState("dashcam");
   const [widgetEdit,   setWidgetEdit]   = useState(null);
-  const [appRadius,    setAppRadius]    = useState(null); // global radius in miles (null = any)
+  const [appRadius,    setAppRadius]    = usePersistedState("sl_radius", null); // global radius in miles (null = any)
   const [widgetAction, setWidgetAction] = useState(null); // 'weather'|'music'|'points'|'friends'
   // Reset voice counter when page state changes
   useEffect(() => { voiceCounter.current = 10; voiceActions.current = {}; }, [panel, subPanel]);
@@ -2930,6 +2967,27 @@ export default function SonoLane() {
           <div style={SEC}>BIO</div>
           <input value={userBio} onChange={e=>setUserBio(e.target.value)} placeholder="Short bio" style={{...INP,marginBottom:14}}/>
 
+          {/* Discovery Radius — the only place this can be changed; every
+              other screen just displays the current value and links here. */}
+          <div style={SEC}>DISCOVERY RADIUS</div>
+          <div style={{...CARD,marginBottom:14}}>
+            <div style={{fontSize:11,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
+              <span style={{fontSize:10,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
+            </div>
+            <input
+              type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
+              value={radiusDraft}
+              onChange={e=>setRadiusDraft(Number(e.target.value))}
+              onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
+              style={{width:"100%",accentColor:OR,height:20,cursor:"pointer"}}
+            />
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111"}}>
+              <span>{RADIUS_MIN} mi</span>
+              <span>100+ mi</span>
+            </div>
+          </div>
 
           {/* AI Co-Pilot */}
           <div style={SEC}>AI CO-PILOT</div>
@@ -3015,19 +3073,18 @@ export default function SonoLane() {
 
           <div style={SEC}>LOCATION RADIUS</div>
           <div style={{...CARD,marginBottom:12}}>
-            <div style={{fontSize:11,color:"#111",marginBottom:12,lineHeight:1.5}}>Sets how far to look for events, CB radio lanes, and route feeds near you.</div>
-            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+              <div style={{fontSize:11,color:"#111",lineHeight:1.5}}>Sets how far to look for events, CB radio lanes, and route feeds near you.</div>
+            </div>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6,marginTop:8}}>
               <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
               <span style={{fontSize:10,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
             </div>
-            <input
-              type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
-              value={radiusDraft}
-              onChange={e=>setRadiusDraft(Number(e.target.value))}
-              onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
-              style={{width:"100%",accentColor:OR,height:20,cursor:"pointer"}}
-            />
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111"}}>
+            <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:8}}>
+              <div style={{height:"100%",borderRadius:3,background:OR,width:(Math.min(100,Math.max(0,(radiusDraft-RADIUS_MIN)/(RADIUS_MAX-RADIUS_MIN)*100)))+"%"}}/>
+            </div>
+            <button onClick={()=>{setSubPanel("edit");}} style={{width:"100%",padding:"8px",borderRadius:9,background:"#fff",border:"1px solid "+OR+"44",color:OR,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change in Edit Profile</button>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111",marginTop:8}}>
               <span>{RADIUS_MIN} mi</span>
               <span>100+ mi</span>
             </div>
@@ -3382,22 +3439,21 @@ export default function SonoLane() {
         {/* ── Tile grid ── */}
         <div style={{padding:"14px 14px 28px",display:"flex",flexDirection:"column"}}>
 
-          {/* ── Discovery radius ── */}
+          {/* ── Discovery radius — display only; change it from Edit Profile ── */}
           <div style={{flexShrink:0,background:"#fff",borderRadius:16,border:"1px solid #ebebeb",padding:"14px",marginBottom:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-            <div style={{fontSize:12,fontWeight:800,color:"#111",marginBottom:2}}>Discovery Radius</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#111"}}>Discovery Radius</div>
+              <button onClick={()=>setSubPanel("edit")} style={{background:"none",border:"none",color:OR,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,padding:0}}>Edit</button>
+            </div>
             <div style={{fontSize:11,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
               <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
               <span style={{fontSize:10,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
             </div>
-            <input
-              type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
-              value={radiusDraft}
-              onChange={e=>setRadiusDraft(Number(e.target.value))}
-              onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
-              style={{width:"100%",accentColor:OR,height:20,cursor:"pointer"}}
-            />
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111"}}>
+            <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:3,background:OR,width:(Math.min(100,Math.max(0,(radiusDraft-RADIUS_MIN)/(RADIUS_MAX-RADIUS_MIN)*100)))+"%"}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111",marginTop:4}}>
               <span>{RADIUS_MIN} mi</span>
               <span>100+ mi</span>
             </div>
@@ -5117,17 +5173,17 @@ export default function SonoLane() {
     {id:"discover", label:"Discover", iconId: discoverTab==="events" ? "event" : "road"},
   ];
   const TopNav = () => (
-    <div style={{flexShrink:0,display:"flex",gap:4,padding:"6px 8px",background:"#fff",borderBottom:"1px solid #ebebeb",zIndex:100}}>
+    <div style={{flexShrink:0,display:"flex",gap:4,padding:"12px 8px",background:"#fff",borderBottom:"1px solid #ebebeb",zIndex:100}}>
       {TOPNAV_ITEMS.map(it=>{
         const active = panel===it.id;
         const color = DPAD_COLORS[it.iconId];
         return (
           <button key={it.id} onClick={()=>go(it.id)} style={{
             flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-            padding:"8px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,
+            padding:"12px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,
             background:active?color+"14":"transparent",
           }}>
-            {it.id==="profile" ? <CompassStar size={16} color={color}/> : <DPadIcon id={it.iconId} color={color} size={16}/>}
+            {it.id==="profile" ? <CompassStar size={17} color={color}/> : <DPadIcon id={it.iconId} color={color} size={17}/>}
             <span style={{fontSize:11,fontWeight:active?800:600,color:active?color:"#888"}}>{it.label}</span>
           </button>
         );
@@ -5140,7 +5196,7 @@ export default function SonoLane() {
   // (isSupabaseConfigured === false) skips all of this entirely.
   if (isSupabaseConfigured && !authChecked) {
     return (
-      <div style={{width:"100%",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F}}>
+      <div style={{width:"100%",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
         <div style={{fontSize:36}}>🚗</div>
       </div>
     );
@@ -5151,7 +5207,7 @@ export default function SonoLane() {
 
   return (
     <div
-      style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",background:"#fff",fontFamily:F,position:"fixed",top:0,left:0,right:0,bottom:0}}>
+      style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",background:"#fff",fontFamily:F,position:"fixed",top:0,left:0,right:0,bottom:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}}>
       <style>{"@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}"}</style>
 
       {panel!=="drive" && <TopNav/>}
