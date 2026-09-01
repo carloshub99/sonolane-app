@@ -66,6 +66,7 @@ function usePersistedState(key, initial) {
 }
 
 const OR = "#f97316";
+const STAR_LOGO = "data:image/png;base64,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"; // golden compass-star app logo (sign-up header, PWA icon match)
 const F = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 const AI_PALS = [
   { id:"nova", name:"Nova", emoji:"🔵", color:"#6366f1", desc:"Calm & intelligent" },
@@ -689,6 +690,20 @@ const ACHIEVEMENTS = [
   {id:"night_owl",     cat:"bonus",     icon:"🦉", title:"Night Owl",          desc:"Complete a drive after midnight",                   pts:80,  check:(s)=>s.hadNightDrive},
 ];
 
+/* ── FriendAvatar — a friend's circle: their saved profile photo when
+   they have one (`fr.photo`, hydrated from Supabase in real-backend mode),
+   falling back to the initials-on-color-circle every avatar used before. ── */
+function FriendAvatar({ fr, size, fontSize, style }) {
+  if (fr?.photo) {
+    return <img src={fr.photo} alt="" style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,...style}}/>;
+  }
+  return (
+    <div style={{width:size,height:size,borderRadius:"50%",background:fr?fr.color:"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fontSize||Math.round(size*0.38),fontWeight:800,color:fr?"#fff":"#ccc",flexShrink:0,fontFamily:F,...style}}>
+      {fr?fr.initials:"＋"}
+    </div>
+  );
+}
+
 /* ── GhostCard ── */
 function GhostCard() {
   return (
@@ -708,6 +723,8 @@ function GhostCard() {
    the app just opens straight in, exactly as it always has. ── */
 function AuthScreen() {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [name, setName] = useState("");
+  const [region, setRegion] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -717,12 +734,20 @@ function AuthScreen() {
 
   const submit = async () => {
     setError("");
+    if (mode === "signup" && !name.trim()) { setError("Enter your name."); return; }
     if (!email.trim() || !password) { setError("Enter an email and password."); return; }
     if (password.length < 6) { setError("Password needs to be at least 6 characters."); return; }
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error: err } = await supabase.auth.signUp({ email: email.trim(), password });
+        // name/region ride along as auth user metadata — the profiles-table
+        // trigger (see supabase/schema.sql) picks them up and pre-fills the
+        // new profile row, so Edit Profile isn't blank on first log-in.
+        const { error: err } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { name: name.trim(), region: region.trim() } },
+        });
         if (err) throw err;
         setCheckEmail(true);
       } else {
@@ -751,10 +776,16 @@ function AuthScreen() {
     <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24,paddingTop:"calc(24px + env(safe-area-inset-top, 0px))",paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))",boxSizing:"border-box"}}>
       <div style={{width:"100%",maxWidth:320}}>
         <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:36,marginBottom:8}}>🚗</div>
+          <img src={STAR_LOGO} alt="" style={{width:44,height:44,marginBottom:8,borderRadius:10}}/>
           <div style={{fontSize:20,fontWeight:900,color:"#111"}}>SonoLane</div>
           <div style={{fontSize:12,color:"#888",marginTop:4}}>{mode==="signup" ? "Create your account" : "Welcome back"}</div>
         </div>
+        {mode==="signup" && (
+          <>
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your name" style={{...inp,marginBottom:10}}/>
+            <input value={region} onChange={e=>setRegion(e.target.value)} placeholder="Region (e.g. Los Angeles, CA)" style={{...inp,marginBottom:10}}/>
+          </>
+        )}
         <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" type="email" autoCapitalize="none" style={{...inp,marginBottom:10}}/>
         <input value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" type="password"
           onKeyDown={e=>{if(e.key==="Enter")submit();}}
@@ -827,8 +858,9 @@ export default function SonoLane() {
   const [carPrivateNotes, setCarPrivateNotes] = usePersistedState("sl_carPrivateNotes", ""); // private — any other handy info (VIN, insurance, service reminders, etc.)
   const carAvatarPhotoRef = useRef(null);
   const carBannerPhotoRef = useRef(null);
-  const [userName,     setUserName]     = useState("");
-  const [userBio,      setUserBio]      = useState("");
+  const [userName,     setUserName]     = usePersistedState("sl_userName", "");
+  const [userBio,      setUserBio]      = usePersistedState("sl_userBio", "");
+  const [userRegion,   setUserRegion]   = usePersistedState("sl_userRegion", ""); // e.g. "Los Angeles, CA" — collected at sign-up
   const [editMode,     setEditMode]     = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null); // base64 data URL
   const profilePhotoRef = useRef(null);
@@ -853,17 +885,19 @@ export default function SonoLane() {
       if (prof) {
         setUserName(prof.name || "");
         setUserBio(prof.bio || "");
+        setUserRegion(prof.region || "");
         setProfilePhoto(prof.photo_url || null);
       }
       const { data: rows } = await supabase
         .from("friends")
-        .select("friend_id, created_at, profiles:friend_id(id, name, handle, initials, color)")
+        .select("friend_id, created_at, profiles:friend_id(id, name, handle, initials, color, photo_url)")
         .eq("owner_id", currentUserId)
         .order("created_at", { ascending: true });
       if (rows) {
         setFriends(rows.filter(r=>r.profiles).map(r => ({
           id: r.profiles.id, name: r.profiles.name || "Unnamed", handle: r.profiles.handle || "",
           initials: r.profiles.initials || "??", color: r.profiles.color || "#f97316",
+          photo: r.profiles.photo_url || null,
         })));
       }
     })();
@@ -872,7 +906,7 @@ export default function SonoLane() {
   // Persists name/bio/photo to your real profile row — no-op in local demo mode.
   const saveProfileToSupabase = async () => {
     if (!isSupabaseConfigured || !currentUserId) return;
-    await supabase.from("profiles").update({ name: userName, bio: userBio, photo_url: profilePhoto }).eq("id", currentUserId);
+    await supabase.from("profiles").update({ name: userName, bio: userBio, region: userRegion, photo_url: profilePhoto }).eq("id", currentUserId);
   };
   // Adds/removes a row in the real friends table — no-op in local demo mode
   // (each call site also updates the local `friends` array either way, so
@@ -889,9 +923,28 @@ export default function SonoLane() {
   // for the local demo mode's SAMPLE_PEOPLE/followers search.
   const searchProfilesSupabase = async (query) => {
     if (!isSupabaseConfigured || !query.trim() || !currentUserId) return [];
-    const { data } = await supabase.from("profiles").select("id,name,handle,initials,color")
+    const { data } = await supabase.from("profiles").select("id,name,handle,initials,color,photo_url")
       .ilike("name", "%"+query.trim()+"%").neq("id", currentUserId).limit(20);
     return data || [];
+  };
+  // Sends a real 1:1 message row — the Lanes Direct Messages backend.
+  const sendMessageSupabase = async (recipientId, text) => {
+    if (!isSupabaseConfigured || !currentUserId || !recipientId || !text.trim()) return;
+    await supabase.from("messages").insert({ sender_id: currentUserId, recipient_id: recipientId, text: text.trim() });
+  };
+  // Loads the full 1:1 history with one friend, both directions.
+  const fetchMessagesSupabase = async (otherUserId) => {
+    if (!isSupabaseConfigured || !currentUserId || !otherUserId) return [];
+    const { data } = await supabase.from("messages").select("*")
+      .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`)
+      .order("created_at", { ascending: true }).limit(300);
+    return data || [];
+  };
+  // Drops a notification row into someone else's feed — friend-adds and new
+  // messages both use this so the OTHER person actually finds out.
+  const sendNotificationSupabase = async (recipientId, icon, text) => {
+    if (!isSupabaseConfigured || !currentUserId || !recipientId) return;
+    await supabase.from("notifications").insert({ recipient_id: recipientId, actor_id: currentUserId, icon, text });
   };
 
   // Live location sharing — a Top 3 Friend perk. Ids of friends it's on for;
@@ -1062,6 +1115,31 @@ export default function SonoLane() {
     {id:3, icon:"👥", text:"Mia Chen started following you.", ts:"2h", read:false},
     {id:4, icon:"👥", text:"SoCalDrifter started following you.", ts:"1d", read:false},
   ]);
+  // Real backend — pull in notifications other real users actually sent you
+  // (friend-adds, messages) and keep polling for new ones. These merge in
+  // alongside the local sample/self-toast notifications above by id, so
+  // nothing existing breaks; real rows use their Supabase UUID as id (a
+  // string), the local ones use a number, so the two never collide.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    let cancelled = false;
+    const fetchNotifs = async () => {
+      const { data } = await supabase.from("notifications").select("*")
+        .eq("recipient_id", currentUserId).order("created_at", { ascending: false }).limit(50);
+      if (cancelled || !data) return;
+      setNotifications(prev => {
+        const known = new Set(prev.map(n=>String(n.id)));
+        const fresh = data.filter(r=>!known.has(String(r.id))).map(r => ({
+          id: r.id, icon: r.icon || "🔔", text: r.text,
+          ts: timeAgo(new Date(r.created_at).getTime()), read: r.read,
+        }));
+        return fresh.length ? [...fresh, ...prev] : prev;
+      });
+    };
+    fetchNotifs();
+    const iv = setInterval(fetchNotifs, 8000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [currentUserId]);
   const [noteText,     setNoteText]     = useState("");
   const [sonoMode,     setSonoMode]     = useState("notes");
   const [aiInput,      setAiInput]      = useState("");
@@ -1572,9 +1650,7 @@ export default function SonoLane() {
     const CallOverlay = () => !callingFriend ? null : (
       <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
         <div style={{fontSize:10,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>{callingFriend.status==="ringing"?"CALLING":"LIVE CALL"}</div>
-        <div style={{width:96,height:96,borderRadius:"50%",background:callingFriend.friend.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,fontWeight:800,marginBottom:18,animation:callingFriend.status==="ringing"?"pulse 1.4s ease-in-out infinite":"none"}}>
-          {callingFriend.friend.initials}
-        </div>
+        <FriendAvatar fr={callingFriend.friend} size={96} fontSize={32} style={{marginBottom:18,animation:callingFriend.status==="ringing"?"pulse 1.4s ease-in-out infinite":"none"}}/>
         <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>{callingFriend.friend.name}</div>
         <div style={{fontSize:12,color:"#aaa",marginBottom:48}}>
           {callingFriend.status==="ringing" ? "Ringing…" : String(Math.floor(callingFriend.secs/60)).padStart(2,"0")+":"+String(callingFriend.secs%60).padStart(2,"0")}
@@ -1861,7 +1937,7 @@ export default function SonoLane() {
                   const picked = newGarageInvitees.includes(fr.id);
                   return (
                     <button key={fr.id} onClick={()=>setNewGarageInvitees(p=>picked?p.filter(x=>x!==fr.id):[...p,fr.id])} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:picked?"1.5px solid "+OR:"1px solid #ebebeb",background:picked?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                      <div style={{width:30,height:30,borderRadius:"50%",background:fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{fr.initials}</div>
+                      <FriendAvatar fr={fr} size={30} fontSize={11}/>
                       <div style={{flex:1,fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div>
                       <div style={{width:18,height:18,borderRadius:5,border:picked?"none":"1.5px solid #ddd",background:picked?OR:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>{picked?"✓":""}</div>
                     </button>
@@ -1949,7 +2025,7 @@ export default function SonoLane() {
               return (
                 <div key={fr.id} style={{...CARD,marginBottom:10}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:v?10:0}}>
-                    <div style={{width:40,height:40,borderRadius:"50%",background:fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff",flexShrink:0}}>{fr.initials}</div>
+                    <FriendAvatar fr={fr} size={40} fontSize={14}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:800,color:"#111"}}>{fr.name}</div>
                       <div style={{fontSize:10,color:"#111"}}>{v ? v.name : "Invited · waiting to add their vehicle…"}</div>
@@ -1971,7 +2047,7 @@ export default function SonoLane() {
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {invitableFriends.map(fr=>(
                     <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
-                      <div style={{width:30,height:30,borderRadius:"50%",background:fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{fr.initials}</div>
+                      <FriendAvatar fr={fr} size={30} fontSize={11}/>
                       <div style={{flex:1,fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div>
                       <button onClick={()=>{
                         setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:[...x.memberIds,fr.id]}:x));
@@ -2772,8 +2848,8 @@ export default function SonoLane() {
               return (
                 <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                   <button onClick={()=>fr?setSelFriend(selFriend?.id===fr.id?null:fr):setShowAddFriend(true)}
-                    style={{width:72,height:72,borderRadius:"50%",background:fr?fr.color:"#f3f3f3",border:fr?(selFriend?.id===fr.id?"3px solid "+OR:"2px solid "+fr.color+"44"):"2px dashed #ddd",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?24:26,color:fr?"#fff":"#ccc",fontWeight:800,fontFamily:F}}>
-                    {fr?fr.initials:"＋"}
+                    style={{width:72,height:72,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?(selFriend?.id===fr.id?"3px solid "+OR:"2px solid "+fr.color+"44"):"2px dashed #ddd",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?24:26,color:fr?"#fff":"#ccc",fontWeight:800,fontFamily:F,overflow:"hidden",padding:0}}>
+                    {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
                   </button>
                   <div style={{fontSize:10,fontWeight:fr?700:400,color:fr?"#111":"#bbb"}}>{fr?fr.name:"Open slot"}</div>
                 </div>
@@ -2859,7 +2935,7 @@ export default function SonoLane() {
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {list.map(fr=>(
                     <button key={fr.id} onClick={()=>setSelFriend(selFriend?.id===fr.id?null:fr)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,border:selFriend?.id===fr.id?"1.5px solid "+OR:"1px solid #ebebeb",background:selFriend?.id===fr.id?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                      <div style={{width:34,height:34,borderRadius:"50%",background:fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>{fr.initials}</div>
+                      <FriendAvatar fr={fr} size={34} fontSize={12}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div>
                         <div style={{fontSize:9,color:"#8a8f98"}}>@{fr.handle}</div>
@@ -2889,14 +2965,16 @@ export default function SonoLane() {
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {results.map(p=>(
                         <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px"}}>
-                          <div style={{width:36,height:36,borderRadius:"50%",background:p.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff",flexShrink:0}}>{p.initials}</div>
+                          <FriendAvatar fr={{...p, photo:p.photo_url}} size={36} fontSize={13}/>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{p.name||"Unnamed"}</div>
                             <div style={{fontSize:9,color:"#8a8f98"}}>@{p.handle||"—"}</div>
                           </div>
                           <button onClick={()=>{
+                            const friendObj = {...p, photo:p.photo_url};
                             addFriendSupabase(p.id);
-                            setFriends(f=>{const nf=[...f,p]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
+                            sendNotificationSupabase(p.id, "🤝", (userName||"Someone")+" added you as a friend.");
+                            setFriends(f=>{const nf=[...f,friendObj]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
                             setNotifications(n=>[{id:Date.now(),icon:"🤝",text:(p.name||"Your friend")+" was added to your friends.",ts:"now",read:false},...n]);
                             setAddFriendSearch("");setShowAddFriend(false);
                           }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</button>
@@ -2961,9 +3039,11 @@ export default function SonoLane() {
             </div>
           </div>
 
-          {/* Name & bio */}
+          {/* Name, region & bio */}
           <div style={SEC}>NAME</div>
           <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name" style={{...INP,marginBottom:10}}/>
+          <div style={SEC}>REGION</div>
+          <input value={userRegion} onChange={e=>setUserRegion(e.target.value)} placeholder="Region (e.g. Los Angeles, CA)" style={{...INP,marginBottom:10}}/>
           <div style={SEC}>BIO</div>
           <input value={userBio} onChange={e=>setUserBio(e.target.value)} placeholder="Short bio" style={{...INP,marginBottom:14}}/>
 
@@ -3552,8 +3632,8 @@ export default function SonoLane() {
               const fr=friends[i];
               return (
                 <button key={i} onClick={()=>{setSubPanel("friends");setSelFriend(fr||null);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:i<2?"1px solid #ebebeb":"none",cursor:"pointer",fontFamily:F}}>
-                  <div style={{width:42,height:42,borderRadius:"50%",background:fr?fr.color:"#f3f3f3",border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?15:18,color:fr?"#fff":"#ccc",fontWeight:800}}>
-                    {fr?fr.initials:"＋"}
+                  <div style={{width:42,height:42,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?15:18,color:fr?"#fff":"#ccc",fontWeight:800,overflow:"hidden"}}>
+                    {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
                   </div>
                   <div style={{fontSize:10,fontWeight:fr?700:400,color:fr?"#111":"#bbb",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr?fr.name:"Add Friend"}</div>
                 </button>
@@ -4246,6 +4326,36 @@ export default function SonoLane() {
     const toggleTranscript = id => setOpenTranscripts(p=>({...p,[id]:!p[id]}));
     useEffect(() => { setChatInputMode("voice"); }, [activeChan]);
 
+    // Real backend — load this friend's message history when their DM is
+    // opened, then keep polling so incoming messages actually show up
+    // without needing to close and reopen the chat.
+    useEffect(() => {
+      if (!isSupabaseConfigured || !currentUserId || !curFriend) return;
+      let cancelled = false;
+      const load = async () => {
+        const rows = await fetchMessagesSupabase(curFriend.id);
+        if (cancelled || !rows.length) return;
+        setFriendMsgs(m => {
+          const known = new Set((m[curFriend.id]||[]).map(x=>String(x.id)));
+          const mapped = rows.filter(r=>!known.has(String(r.id))).map(r => ({
+            id: r.id, text: r.text, mine: r.sender_id === currentUserId,
+            user: r.sender_id === currentUserId ? (userName||"You") : curFriend.name,
+            initials: r.sender_id === currentUserId
+              ? (userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?")
+              : curFriend.initials,
+            color: r.sender_id === currentUserId ? OR : curFriend.color,
+            ts: new Date(r.created_at).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+            isVoice: false, voiceSeconds: 0,
+          }));
+          if (!mapped.length) return m;
+          return { ...m, [curFriend.id]: [...(m[curFriend.id]||[]), ...mapped] };
+        });
+      };
+      load();
+      const iv = setInterval(load, 4000);
+      return () => { cancelled = true; clearInterval(iv); };
+    }, [curFriend?.id, currentUserId]);
+
     const sendChanMsg = (text, isVoice=false, voiceSecs=0) => {
       if(!text.trim() && !isVoice) return;
       if(curCityLane && curCityLane.id!==currentFreewayId) return; // must be on this freeway to talk
@@ -4266,6 +4376,13 @@ export default function SonoLane() {
       } else {
         setLaneMsgs(m=>({...m,[activeChan]:[...(m[activeChan]||[]),msg]}));
         setFriendMsgs(m=>({...m,[activeChan]:[...(m[activeChan]||[]),msg]}));
+        // Real backend + this is an actual friend DM (not a custom lane) —
+        // send it for real so the other person actually receives it, and
+        // drop a notification in their feed.
+        if (isSupabaseConfigured && curFriend && !isVoice) {
+          sendMessageSupabase(curFriend.id, text);
+          sendNotificationSupabase(curFriend.id, "💬", (userName||"Someone")+" sent you a message.");
+        }
       }
       setChanInput("");
     };
@@ -4394,7 +4511,7 @@ export default function SonoLane() {
                   background:activeChan===fr.id?"#42464d":"transparent",marginBottom:1,
                 }}>
                   <div style={{position:"relative",flexShrink:0}}>
-                    <div style={{width:22,height:22,borderRadius:"50%",background:fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,color:"#fff"}}>{fr.initials}</div>
+                    <FriendAvatar fr={fr} size={22} fontSize={8}/>
                     <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #2f3136"}}/>
                   </div>
                   <span style={{flex:1,fontSize:11,fontWeight:activeChan===fr.id?600:400,color:activeChan===fr.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</span>
@@ -4458,7 +4575,7 @@ export default function SonoLane() {
               <><span style={{fontSize:14}}>#</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Sono AI · {pal.name}</div><div style={{fontSize:9,color:pal.color}}>{pal.desc}</div></div>
               <div style={{display:"flex",gap:4}}>{AI_PALS.map(p=><button key={p.id} onClick={()=>setAiPalId(p.id)} title={p.name} style={{width:20,height:20,borderRadius:"50%",border:"none",cursor:"pointer",background:aiPalId===p.id?p.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}><CompassStar size={aiPalId===p.id?14:11} color={p.color}/></button>)}</div></>
             ) : curFriend ? (
-              <><div style={{width:26,height:26,borderRadius:"50%",background:curFriend.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#fff",flexShrink:0}}>{curFriend.initials}</div>
+              <><FriendAvatar fr={curFriend} size={26} fontSize={10}/>
               <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{curFriend.name}</div><div style={{fontSize:9,color:"#23a55a"}}>● Online</div></div></>
             ) : null}
             {/* Voice chat indicator in header */}
@@ -4478,7 +4595,15 @@ export default function SonoLane() {
               notifications.length===0
                 ? (<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:36,marginBottom:8}}>🔔</div><div style={{fontSize:12}}>No notifications</div></div>)
                 : notifications.map(n=>(
-                  <div key={n.id} onClick={()=>setNotifications(ns=>ns.map(x=>x.id===n.id?{...x,read:true}:x))}
+                  <div key={n.id} onClick={()=>{
+                    setNotifications(ns=>ns.map(x=>x.id===n.id?{...x,read:true}:x));
+                    // Real (Supabase-backed) notifications have a UUID string
+                    // id — the seeded/local ones use a plain number, so this
+                    // only ever touches the backend for real rows.
+                    if (isSupabaseConfigured && typeof n.id === "string") {
+                      supabase.from("notifications").update({read:true}).eq("id", n.id);
+                    }
+                  }}
                     style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:n.read?"transparent":"#5865f222",border:n.read?"none":"1px solid #5865f222",cursor:"pointer"}}>
                     <div style={{fontSize:18,flexShrink:0}}>{n.icon}</div>
                     <div style={{flex:1}}><div style={{fontSize:12,color:n.read?"#72767d":"#dcddde",lineHeight:1.5}}>{n.text}</div><div style={{fontSize:9,color:"#72767d",marginTop:2}}>{n.ts}</div></div>
@@ -4520,7 +4645,7 @@ export default function SonoLane() {
                 <div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}>
                   {curCityLane&&<><div style={{fontSize:28,marginBottom:6}}>📡</div><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:11,color:"#4f545c",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
                   {curCustomLane&&<><div style={{fontSize:28,marginBottom:6}}>{curCustomLane.garageId?"🚗":"🛣️"}</div><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>#{curLane.name}</div><div style={{fontSize:11,color:"#4f545c"}}>{curCustomLane.garageId ? "Your Shared Garage's group chat." : curCustomLane.host ? "A public lane hosted by "+curCustomLane.host+"." : curCustomLane.visibility==="public" ? "Your public lane — anyone can join." : "Your friends-only lane."} Hold mic to voice message.</div></>}
-                  {curFriend&&<><div style={{width:44,height:44,borderRadius:"50%",background:curFriend.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"#fff",margin:"0 auto 8px"}}>{curFriend.initials}</div><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
+                  {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
                 </div>
               )}
               {allMsgs.map(msg=>(
@@ -5207,7 +5332,18 @@ export default function SonoLane() {
 
   return (
     <div
-      style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",background:"#fff",fontFamily:F,position:"fixed",top:0,left:0,right:0,bottom:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}}>
+      // No explicit width/height here on purpose: with position:fixed and
+      // top/left/right/bottom all set to 0, the box is fully sized by those
+      // four insets alone. Adding an explicit height:"100vh" on top of that
+      // over-constrains it — CSS then derives `bottom` FROM top+height
+      // instead of honoring bottom:0, so on any device/browser where 100vh
+      // doesn't exactly equal the real visible viewport (a well-known iOS
+      // Safari quirk that varies by screen size), the box's true bottom
+      // edge falls short of the actual screen bottom — clipping whatever
+      // sits at the bottom of the current page (a chat input bar, a
+      // bottom toggle, etc.), inconsistently across phone models. Insets
+      // alone track the real viewport on every device instead.
+      style={{display:"flex",flexDirection:"column",background:"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
       <style>{"@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}"}</style>
 
       {panel!=="drive" && <TopNav/>}
@@ -5300,7 +5436,7 @@ export default function SonoLane() {
                   </div>
                 ):friends.map(fr=>(
                   <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <div style={{width:36,height:36,borderRadius:"50%",background:fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff"}}>{fr.initials}</div>
+                    <FriendAvatar fr={fr} size={36} fontSize={14}/>
                     <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div><div style={{fontSize:9,color:"#111"}}>@{fr.handle}</div></div>
                   </div>
                 ))}
