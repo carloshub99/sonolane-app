@@ -52,6 +52,64 @@ const memStore = (() => {
   };
 })();
 
+// Dashcam footage storage. Recorded clips are real video Blobs — localStorage
+// can only hold strings, and the URL.createObjectURL() address used to play
+// a clip back dies the instant the page reloads — so the actual video data
+// lives in IndexedDB (the one browser storage that can hold binary Blobs),
+// and every time the app opens we regenerate a fresh playback URL from what's
+// stored there. Clips older than the retention window get purged on load
+// (and periodically while the app stays open) so recordings don't quietly
+// fill up the device's storage forever.
+const CLIP_RETENTION_MS = 72 * 60 * 60 * 1000; // 72 hours
+const clipsDB = (() => {
+  const DB_NAME = "sonolane_dashcam", STORE = "clips";
+  let dbPromise = null;
+  const open = () => {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") { reject(new Error("no indexedDB")); return; }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(STORE, { keyPath: "id" }); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  };
+  return {
+    async put(record) {
+      try {
+        const db = await open();
+        await new Promise((res, rej) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put(record);
+          tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+        });
+      } catch { /* IndexedDB unavailable (e.g. sandboxed preview) — clip just won't survive a reload */ }
+    },
+    async getAll() {
+      try {
+        const db = await open();
+        return await new Promise((res, rej) => {
+          const tx = db.transaction(STORE, "readonly");
+          const req = tx.objectStore(STORE).getAll();
+          req.onsuccess = () => res(req.result || []);
+          req.onerror = () => rej(req.error);
+        });
+      } catch { return []; }
+    },
+    async remove(id) {
+      try {
+        const db = await open();
+        await new Promise((res, rej) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).delete(id);
+          tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+        });
+      } catch { /* nothing to clean up if the DB never opened */ }
+    },
+  };
+})();
+
 // A useState that automatically saves to (and loads from) memStore under
 // `key`, so profile/car customization survives closing and reopening the
 // app — not just refreshing within the same open tab.
@@ -846,6 +904,7 @@ export default function SonoLane() {
   const [carMods,      setCarMods]      = usePersistedState("sl_carMods", {});
   const [carSaved,     setCarSaved]     = usePersistedState("sl_carSaved", false);
   const [activeModCat, setActiveModCat] = useState("Wheels");
+  const [carEditTab,   setCarEditTab]   = useState("banner"); // which Edit Car appearance tab is showing: banner|bodystyle|color|brand|mods
   const [carAvatarMode,  setCarAvatarMode]  = usePersistedState("sl_carAvatarMode", "avatar"); // "avatar" (custom CarSVG) | "photo" (uploaded pic)
   const [carAvatarPhoto, setCarAvatarPhoto] = usePersistedState("sl_carAvatarPhoto", null); // base64 data URL
   const [carBannerPhoto, setCarBannerPhoto] = usePersistedState("sl_carBannerPhoto", null); // base64 data URL, overrides preset if set
@@ -856,18 +915,70 @@ export default function SonoLane() {
   const [carRegDate,   setCarRegDate]   = usePersistedState("sl_carRegDate", ""); // private — registration date
   const [carMileage,   setCarMileage]   = usePersistedState("sl_carMileage", ""); // private — current odometer reading
   const [carPrivateNotes, setCarPrivateNotes] = usePersistedState("sl_carPrivateNotes", ""); // private — any other handy info (VIN, insurance, service reminders, etc.)
+  const [carPrivatePhotos, setCarPrivatePhotos] = usePersistedState("sl_carPrivatePhotos", []); // private — [{id,url}] snapshots of insurance card, registration, etc.
   const carAvatarPhotoRef = useRef(null);
   const carBannerPhotoRef = useRef(null);
+  const carPrivatePhotoRef = useRef(null);
   const [userName,     setUserName]     = usePersistedState("sl_userName", "");
   const [userBio,      setUserBio]      = usePersistedState("sl_userBio", "");
   const [userRegion,   setUserRegion]   = usePersistedState("sl_userRegion", ""); // e.g. "Los Angeles, CA" — collected at sign-up
   const [editMode,     setEditMode]     = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null); // base64 data URL
   const profilePhotoRef = useRef(null);
-  const [carExteriorPhotos, setCarExteriorPhotos] = useState([]); // [{id,url}] — garage exterior shots
-  const [carInteriorPhotos, setCarInteriorPhotos] = useState([]); // [{id,url}] — garage interior shots
+  const [carExteriorPhotos, setCarExteriorPhotos] = usePersistedState("sl_carExteriorPhotos", []); // [{id,url}] — up to 4 garage exterior shots
+  const [carInteriorPhotos, setCarInteriorPhotos] = usePersistedState("sl_carInteriorPhotos", []); // [{id,url}] — up to 4 garage interior shots
   const carExteriorPhotoRef = useRef(null);
   const carInteriorPhotoRef = useRef(null);
+
+  // My Garage — up to 3 cars total. Whichever car's data currently lives in
+  // the carName/carColor/... fields above is the "active" one — every other
+  // screen in the app (home hero avatar, profile header, drive mode, etc.)
+  // just reads those same fields, so it always shows whichever car is
+  // active without needing any changes. myCars holds snapshots of the
+  // OTHER (inactive) cars; switching cars just swaps which snapshot is
+  // loaded into the live fields vs. parked in this array.
+  const [myCars, setMyCars] = usePersistedState("sl_myCars", []); // [{id,name,color,model,bodyStyle,brand,mods,saved,avatarMode,avatarPhoto,bannerPhoto,bannerPreset,showInfoHome,bio,plate,regDate,mileage,privateNotes,privatePhotos,exteriorPhotos,interiorPhotos}]
+  const [activeCarId, setActiveCarId] = usePersistedState("sl_activeCarId", "car_1");
+  const snapshotActiveCar = (id) => ({
+    id, name:carName, color:carColor, model:carModel, bodyStyle:carBodyStyle, brand:carBrand,
+    mods:carMods, saved:carSaved, avatarMode:carAvatarMode, avatarPhoto:carAvatarPhoto,
+    bannerPhoto:carBannerPhoto, bannerPreset:carBannerPreset, showInfoHome:carShowInfoHome,
+    bio:carBio, plate:carPlate, regDate:carRegDate, mileage:carMileage,
+    privateNotes:carPrivateNotes, privatePhotos:carPrivatePhotos,
+    exteriorPhotos:carExteriorPhotos, interiorPhotos:carInteriorPhotos,
+  });
+  const applyCarSnapshot = (car) => {
+    setCarName(car.name||""); setCarColor(car.color||"#f97316"); setCarModel(car.model||"Sedan");
+    setCarBodyStyle(car.bodyStyle||"sedan"); setCarBrand(car.brand??null); setCarMods(car.mods||{});
+    setCarSaved(!!car.saved); setCarAvatarMode(car.avatarMode||"avatar"); setCarAvatarPhoto(car.avatarPhoto||null);
+    setCarBannerPhoto(car.bannerPhoto||null); setCarBannerPreset(car.bannerPreset||"midnight");
+    setCarShowInfoHome(!!car.showInfoHome); setCarBio(car.bio||""); setCarPlate(car.plate||"");
+    setCarRegDate(car.regDate||""); setCarMileage(car.mileage||""); setCarPrivateNotes(car.privateNotes||"");
+    setCarPrivatePhotos(car.privatePhotos||[]); setCarExteriorPhotos(car.exteriorPhotos||[]); setCarInteriorPhotos(car.interiorPhotos||[]);
+  };
+  // Swap another saved car into the live fields (and park the current one
+  // in its place) — pure data, no navigation, so callers decide what to
+  // show afterward.
+  const switchToCar = (id) => {
+    if(id===activeCarId) return;
+    const target = myCars.find(c=>c.id===id);
+    if(!target) return;
+    const current = snapshotActiveCar(activeCarId);
+    setMyCars(list => [...list.filter(c=>c.id!==id), current]);
+    applyCarSnapshot(target);
+    setActiveCarId(id);
+  };
+  const MAX_CARS = 3;
+  // Park the current car and load a blank one into the live fields —
+  // capped at MAX_CARS total between the active car + myCars.
+  const addNewCar = () => {
+    if(myCars.length+1 >= MAX_CARS) return;
+    const current = snapshotActiveCar(activeCarId);
+    const newId = "car_"+Date.now();
+    setMyCars(list => [...list, current]);
+    applyCarSnapshot({id:newId});
+    setActiveCarId(newId);
+  };
   const [friends,      setFriends]      = useState([]);
   const [showAddFriend,setShowAddFriend]= useState(false);
   const [newFriend,    setNewFriend]    = useState({name:"",handle:""});
@@ -989,6 +1100,37 @@ export default function SonoLane() {
   const [chatIn,       setChatIn]       = useState("");
   const [showAgent,    setShowAgent]    = useState(false);
   const [clips,        setClips]        = useState([]);
+  // Load saved dashcam footage from IndexedDB the moment the app opens —
+  // purging anything past the 72-hour retention window first — and keep
+  // rechecking every so often while the app stays open so a clip that
+  // crosses that mark mid-session gets cleared out too, not just on the
+  // next launch.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const records = await clipsDB.getAll();
+      if (cancelled) return;
+      const cutoff = Date.now() - CLIP_RETENTION_MS;
+      const fresh = [], stale = [];
+      records.forEach(r => (r.id < cutoff ? stale : fresh).push(r));
+      stale.forEach(r => clipsDB.remove(r.id));
+      fresh.sort((a, b) => b.id - a.id);
+      // Keep the Blob only in IndexedDB, not in React state too — the state
+      // copy just needs a playback URL derived from it.
+      setClips(fresh.map(({ blob, ...meta }) => ({ ...meta, url: URL.createObjectURL(blob) })));
+    })();
+    const iv = setInterval(() => {
+      const cutoff = Date.now() - CLIP_RETENTION_MS;
+      setClips(prev => {
+        const keep = [], drop = [];
+        prev.forEach(c => (c.id < cutoff ? drop : keep).push(c));
+        if (!drop.length) return prev;
+        drop.forEach(c => { try { URL.revokeObjectURL(c.url); } catch {} clipsDB.remove(c.id); });
+        return keep;
+      });
+    }, 60 * 60 * 1000); // recheck hourly
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
   const [tripHistory,  setTripHistory]  = useState([]); // [{id,date,time,dist,dur,pts,startAddr,endAddr,path}]
   const [selTrip,      setSelTrip]      = useState(null); // selected trip in history view
   const [unlockedAch,  setUnlockedAch]  = useState(()=>JSON.parse(memStore.getItem("sl_ach")||"[]")); // [id,...]
@@ -1212,7 +1354,12 @@ export default function SonoLane() {
     }
   };
 
-  const go = p => {
+  // `forceDashcamConsent` lets a caller that just this instant flipped the
+  // consent flag (e.g. the "I Agree" button) start recording right away —
+  // setDashcamConsent(true) doesn't take effect until the next render, so
+  // the `dashcamConsent` closed over here would otherwise still read false
+  // for the rest of this same click handler.
+  const go = (p, { forceDashcamConsent } = {}) => {
     // Exiting Drive mode while the dashcam is recording stops & saves the
     // clip — recording runs continuously for the whole drive regardless of
     // momentary speed, and only ends when Drive mode itself ends.
@@ -1222,13 +1369,17 @@ export default function SonoLane() {
     setPanel(p); setSubPanel(null); setShowAgent(false); setMapInteractive(false);
     // Using the Dashcam widget? Start recording the instant Drive mode opens,
     // rather than waiting for the speed-based auto-start threshold.
-    if(p==="drive" && dashcamConsent && !dashOn && (leftWidget==="dashcam"||rightWidget==="dashcam")){
-      startDrive();
+    if(p==="drive" && (dashcamConsent||forceDashcamConsent) && !dashOn && (leftWidget==="dashcam"||rightWidget==="dashcam")){
+      startDrive(forceDashcamConsent);
     }
   };
 
   // ── Swipe carousel — Lanes ↔ Home ↔ Discover (Drive mode is not part of it) ──
-  const CAROUSEL = ["discover","profile","create"];
+  // Order matches the TopNav's actual left-to-right tab layout (Lanes | Home
+  // | Discover — see TOPNAV_ITEMS below), NOT the order pages were coded in.
+  // Swipe direction is read against THIS order, so it has to match what's
+  // literally on screen or "swipe left" and "swipe right" end up backwards.
+  const CAROUSEL = ["create","profile","discover"];
   const onSwipeStart = e => {
     if(!CAROUSEL.includes(panel)) { swipeStartRef.current=null; return; }
     const t = e.touches ? e.touches[0] : e;
@@ -1252,8 +1403,8 @@ export default function SonoLane() {
     if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)*1.4) return; // require a deliberate horizontal drag
     const idx = CAROUSEL.indexOf(panel);
     if(idx===-1) return;
-    if(dx < 0 && idx < CAROUSEL.length-1) go(CAROUSEL[idx+1]);      // swipe left → next (Home→Lanes, Discover→Home)
-    else if(dx > 0 && idx > 0) go(CAROUSEL[idx-1]);                  // swipe right → prev (Home→Discover, Lanes→Home)
+    if(dx < 0 && idx < CAROUSEL.length-1) go(CAROUSEL[idx+1]);      // swipe left → move right (Lanes→Home, Home→Discover)
+    else if(dx > 0 && idx > 0) go(CAROUSEL[idx-1]);                  // swipe right → move left (Discover→Home, Home→Lanes)
   };
 
   /* voice */
@@ -1323,16 +1474,40 @@ export default function SonoLane() {
     else{setVoiceOn(false);setVoiceText("");try{recogRef.current?.stop();}catch{}}
   };
 
+  // Picks a video format the CURRENT browser can actually both record AND
+  // play back. Safari/iOS never supported the plain `new MediaRecorder(st)`
+  // default the way Chrome does — it either throws or silently produces
+  // data that doesn't match the "video/webm" label we used to hard-code on
+  // the saved Blob, so the file would save fine but the <video> player
+  // would refuse to decode it. Asking MediaRecorder itself which of these
+  // it supports, then tagging the saved Blob with that *same* exact type,
+  // is what makes playback actually work on every device.
+  const pickRecorderMime = () => {
+    if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
+    const candidates = [
+      "video/mp4;codecs=h264,aac", // Safari/iOS
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ];
+    return candidates.find(c => { try { return MediaRecorder.isTypeSupported(c); } catch { return false; } }) || "";
+  };
+
   /* drive — fully automatic: no manual Start/Stop UI. See the background
-     automation effects below for what triggers these. */
-  const startDrive = async () => {
-    if(!dashcamConsent || dashOn) return;
+     automation effects below for what triggers these. `forceConsent` lets
+     go() start recording in the same click that just granted consent,
+     before the dashcamConsent state update has actually re-rendered. */
+  const startDrive = async (forceConsent = false) => {
+    if((!dashcamConsent && !forceConsent) || dashOn) return;
     playStartupSound(startupSound);
     try{
       const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:true});
       streamRef.current=st;
       if(videoRef.current){videoRef.current.srcObject=st;videoRef.current.muted=true;videoRef.current.playsInline=true;videoRef.current.play().catch(()=>{});}
-      const mr=new MediaRecorder(st); mediaRecRef.current=mr; recChunks.current=[];
+      const mime = pickRecorderMime();
+      const mr = mime ? new MediaRecorder(st, {mimeType:mime}) : new MediaRecorder(st);
+      mediaRecRef.current=mr; recChunks.current=[];
       mr.ondataavailable=e=>recChunks.current.push(e.data);
       mr.start(5000);
     }catch{}
@@ -1377,16 +1552,27 @@ export default function SonoLane() {
       if(mr && mr.state !== "inactive") {
         mr.onstop = () => {
           if(!recChunks.current.length) return;
-          const blob = new Blob(recChunks.current, {type:"video/webm"});
-          const url = URL.createObjectURL(blob);
-          setClips(p => [{
-            id: Date.now(), url,
+          // Tag the Blob with the SAME type MediaRecorder actually used
+          // (mr.mimeType), not a hard-coded "video/webm" — a mismatch here
+          // is exactly what made saved footage refuse to play back on
+          // Safari/iOS, which records mp4 rather than webm.
+          const usedMime = mr.mimeType || "video/webm";
+          const blob = new Blob(recChunks.current, {type:usedMime});
+          const id = Date.now();
+          const record = {
+            id,
             sizeMB: (blob.size/1024/1024).toFixed(1),
             duration: dur,
             dist: dist.toFixed(1),
-            date: new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),
-            time: new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-          }, ...p].slice(0, 20));
+            date: new Date(id).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),
+            time: new Date(id).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+            ext: usedMime.includes("mp4") ? ".mp4" : ".webm",
+          };
+          // Persist the actual video Blob to IndexedDB so this clip is still
+          // there — and gets its 72-hour retention countdown — the next
+          // time the app opens; see clipsDB near the top of this file.
+          clipsDB.put({ ...record, blob });
+          setClips(p => [{ ...record, url: URL.createObjectURL(blob) }, ...p]);
           recChunks.current = [];
         };
         mr.stop();
@@ -1878,8 +2064,10 @@ export default function SonoLane() {
       );
     }
 
-    /* garage sub — menu/list grid of saved cars (currently a single car);
-       tap a tile's avatar to open its full detail view (banner, stats, photos). */
+    /* garage sub — grid of your saved cars (up to MAX_CARS, currently 3),
+       plus shared garages; tap a car tile to make it active and open its
+       full detail view (banner, stats, photos), or "Add Another Car" to
+       park the current one and start a new blank one. */
     if(subPanel==="garage") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
@@ -1887,7 +2075,12 @@ export default function SonoLane() {
           <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DefaultAvatar size={18} color="#555"/> My Profile</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 28px"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <span style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
+            <span style={{fontSize:9,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+            {/* Active car — reads the live carName/carColor/etc. fields, same as every other screen that shows "your car". */}
             <button onClick={()=>{setCarDetailFrom("garage");setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
                 {carAvatarMode==="photo" && carAvatarPhoto
@@ -1897,12 +2090,35 @@ export default function SonoLane() {
               {carName && <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{carName}</div>}
               <div style={{fontSize:9,color:"#111",marginTop:carName?2:0}}>{carSaved?"✓ saved":carModel}</div>
             </button>
-            <button onClick={()=>setShowCreateSharedGarage(true)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
-              <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,flexShrink:0,fontSize:28,color:"#ccc"}}>＋</div>
-              <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center"}}>Create Shared Garage</div>
-              <div style={{fontSize:9,color:"#111",marginTop:2}}>Invite friends</div>
-            </button>
+            {/* Other saved cars — tap to make one active and open its details. */}
+            {myCars.map(car=>(
+              <button key={car.id} onClick={()=>{switchToCar(car.id);setCarDetailFrom("garage");setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:car.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:car.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
+                  {car.avatarMode==="photo" && car.avatarPhoto
+                    ? <img src={car.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                    : <CarSVG color={car.color} mods={car.mods} size={62} styleId={car.bodyStyle}/>}
+                </div>
+                {car.name && <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{car.name}</div>}
+                <div style={{fontSize:9,color:"#111",marginTop:car.name?2:0}}>{car.saved?"✓ saved":car.model}</div>
+              </button>
+            ))}
+            {/* Add another car — up to MAX_CARS total. */}
+            {(1+myCars.length) < MAX_CARS && (
+              <button onClick={()=>{addNewCar();setCarDetailFrom("garage");setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
+                <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,flexShrink:0,fontSize:28,color:"#ccc"}}>＋</div>
+                <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center"}}>Add Another Car</div>
+                <div style={{fontSize:9,color:"#111",marginTop:2}}>{MAX_CARS-1-myCars.length} slot{MAX_CARS-1-myCars.length===1?"":"s"} left</div>
+              </button>
+            )}
           </div>
+
+          <button onClick={()=>setShowCreateSharedGarage(true)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:14,border:"1.5px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,textAlign:"left",marginBottom:14}}>
+            <div style={{width:40,height:40,borderRadius:10,background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#ccc",flexShrink:0}}>＋</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
+              <div style={{fontSize:9,color:"#111",marginTop:1}}>Invite friends to add their own vehicle, chat, and call.</div>
+            </div>
+          </button>
 
           {sharedGarages.length>0 && (
             <>
@@ -2132,10 +2348,10 @@ export default function SonoLane() {
             </>)}
 
             <div style={SEC}>PHOTOS</div>
-            <div style={{fontSize:10,color:"#111",fontWeight:700,marginBottom:6}}>EXTERIOR</div>
-            {PhotoGallery(carExteriorPhotos, setCarExteriorPhotos, carExteriorPhotoRef)}
-            <div style={{fontSize:10,color:"#111",fontWeight:700,marginTop:10,marginBottom:6}}>INTERIOR</div>
-            {PhotoGallery(carInteriorPhotos, setCarInteriorPhotos, carInteriorPhotoRef)}
+            <div style={{fontSize:10,color:"#111",fontWeight:700,marginBottom:6}}>EXTERIOR (UP TO 4)</div>
+            {PhotoGallery(carExteriorPhotos, setCarExteriorPhotos, carExteriorPhotoRef, 4)}
+            <div style={{fontSize:10,color:"#111",fontWeight:700,marginTop:10,marginBottom:6}}>INTERIOR (UP TO 4)</div>
+            {PhotoGallery(carInteriorPhotos, setCarInteriorPhotos, carInteriorPhotoRef, 4)}
 
             <div style={{...SEC,marginTop:16}}>DRIVING STATS</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
@@ -2157,13 +2373,24 @@ export default function SonoLane() {
               ))}
             </div>
 
-            {(carPlate||carRegDate||carMileage||carPrivateNotes)&&<>
+            {(carPlate||carRegDate||carMileage||carPrivateNotes||carPrivatePhotos.length>0)&&<>
               {/* Private car info — only visible to the owner here on their
                   own device; never shown on posts, the home hero, or anywhere
-                  else public. Quick-reference card, edited from Edit Car. */}
+                  else public. Quick-reference card, edited from Edit Car.
+                  Tinted (instead of the plain white every other card uses)
+                  so it visually reads as "not like the rest of this page". */}
               <div style={{...SEC,display:"flex",alignItems:"center",gap:5}}><span>🔒</span> PRIVATE CAR INFO</div>
-              <div style={{...CARD,marginBottom:14}}>
+              <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0",marginBottom:14}}>
                 <div style={{fontSize:9,color:"#111",fontWeight:700,marginBottom:8}}>Only visible to you.</div>
+                {carPrivatePhotos.length>0 && (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:carPlate||carRegDate||carMileage||carPrivateNotes?10:0}}>
+                    {carPrivatePhotos.map(p=>(
+                      <div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#f0e6c8"}}>
+                        <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {carPlate && (
                   <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
                     <span style={{fontSize:10,color:"#111"}}>License Plate</span>
@@ -2261,35 +2488,98 @@ export default function SonoLane() {
             </div>
           )}
 
-          {/* Banner — sets the background behind the car avatar on this page and the home hero.
-              The avatar preview box above updates live as you browse options, before you Save. */}
-          <div style={SEC}>BANNER</div>
-          <div style={{...CARD,marginBottom:14}}>
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>SELECT A BANNER</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <button onClick={()=>carBannerPhotoRef.current?.click()} style={{
-                height:56,borderRadius:12,cursor:"pointer",position:"relative",overflow:"hidden",
-                border:carBannerPhoto?"2.5px solid "+OR:"1.5px dashed "+OR+"66",
-                background:carBannerPhoto?"url("+carBannerPhoto+") center/cover no-repeat":OR+"08",
-                display:"flex",alignItems:"center",justifyContent:"center",
-              }}>
-                {!carBannerPhoto && <span style={{fontSize:10,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:14}}>📤</span>Upload Photo</span>}
-                {carBannerPhoto && <span style={{position:"absolute",bottom:4,left:6,fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>Your Photo</span>}
-                {carBannerPhoto && <span style={{position:"absolute",top:4,right:5,fontSize:10,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
-              </button>
-              {CAR_BANNERS.map(b=>(
-                <button key={b.id} onClick={()=>{setCarBannerPreset(b.id);setCarBannerPhoto(null);}} style={{
-                  height:56,borderRadius:12,border:(!carBannerPhoto&&carBannerPreset===b.id)?"2.5px solid "+OR:"1.5px solid #ebebeb",
-                  background:b.css,cursor:"pointer",position:"relative",overflow:"hidden",
+          {/* Appearance editor — Banner / Body Style / Color / Brand / Mods all
+              live behind one toggle instead of five stacked sections, so you
+              can flip between them without scrolling away from the avatar
+              preview above, which updates live as you change any of them. */}
+          <div style={{display:"flex",gap:5,marginBottom:12,overflowX:"auto"}}>
+            {[["banner","Banner"],["bodystyle","Body Style"],["color","Color"],["brand","Brand"],["mods","Mods"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setCarEditTab(id)} style={{
+                flexShrink:0,padding:"7px 13px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:700,
+                border:"1.5px solid "+(carEditTab===id?OR:"#ebebeb"),
+                background:carEditTab===id?OR+"0f":"#f8f8f8",
+                color:carEditTab===id?OR:"#111",
+              }}>{label}</button>
+            ))}
+          </div>
+
+          {carEditTab==="banner" && (
+            <div style={{...CARD,marginBottom:14}}>
+              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>SELECT A BANNER</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>carBannerPhotoRef.current?.click()} style={{
+                  height:56,borderRadius:12,cursor:"pointer",position:"relative",overflow:"hidden",
+                  border:carBannerPhoto?"2.5px solid "+OR:"1.5px dashed "+OR+"66",
+                  background:carBannerPhoto?"url("+carBannerPhoto+") center/cover no-repeat":OR+"08",
+                  display:"flex",alignItems:"center",justifyContent:"center",
                 }}>
-                  <span style={{position:"absolute",bottom:4,left:6,fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>{b.label}</span>
-                  {(!carBannerPhoto&&carBannerPreset===b.id) && <span style={{position:"absolute",top:4,right:5,fontSize:10,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                  {!carBannerPhoto && <span style={{fontSize:10,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:14}}>📤</span>Upload Photo</span>}
+                  {carBannerPhoto && <span style={{position:"absolute",bottom:4,left:6,fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>Your Photo</span>}
+                  {carBannerPhoto && <span style={{position:"absolute",top:4,right:5,fontSize:10,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                </button>
+                {CAR_BANNERS.map(b=>(
+                  <button key={b.id} onClick={()=>{setCarBannerPreset(b.id);setCarBannerPhoto(null);}} style={{
+                    height:56,borderRadius:12,border:(!carBannerPhoto&&carBannerPreset===b.id)?"2.5px solid "+OR:"1.5px solid #ebebeb",
+                    background:b.css,cursor:"pointer",position:"relative",overflow:"hidden",
+                  }}>
+                    <span style={{position:"absolute",bottom:4,left:6,fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>{b.label}</span>
+                    {(!carBannerPhoto&&carBannerPreset===b.id) && <span style={{position:"absolute",top:4,right:5,fontSize:10,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+              <input ref={carBannerPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setCarBannerPhoto(ev.target.result);};r.readAsDataURL(f);e.target.value="";}}/>
+              {carBannerPhoto && <button onClick={()=>setCarBannerPhoto(null)} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:12}}>Remove Uploaded Photo</button>}
+            </div>
+          )}
+
+          {carEditTab==="bodystyle" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
+              {CAR_BODY_STYLES.map(s=>(
+                <button key={s.id} onClick={()=>{setCarBodyStyle(s.id);setCarModel(s.label);setCarSaved(false);}} style={{
+                  display:"flex",flexDirection:"column",alignItems:"center",padding:"6px 3px 5px",borderRadius:10,cursor:"pointer",fontFamily:F,
+                  border:"1.5px solid "+(carBodyStyle===s.id?OR:"#ebebeb"),
+                  background:carBodyStyle===s.id?OR+"0f":"#f8f8f8",
+                }}>
+                  <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+                    <CarSVG color={carColor} mods={{}} size={46} styleId={s.id}/>
+                  </div>
+                  <div style={{fontSize:7.5,fontWeight:700,color:carBodyStyle===s.id?OR:"#111",marginTop:2,textAlign:"center",lineHeight:1.15}}>{s.label}</div>
                 </button>
               ))}
             </div>
-            <input ref={carBannerPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setCarBannerPhoto(ev.target.result);};r.readAsDataURL(f);e.target.value="";}}/>
-            {carBannerPhoto && <button onClick={()=>setCarBannerPhoto(null)} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:12}}>Remove Uploaded Photo</button>}
-          </div>
+          )}
+
+          {carEditTab==="color" && (
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+              {CAR_COLORS.map(c=><button key={c} onClick={()=>{setCarColor(c);setCarSaved(false);}} style={{width:28,height:28,borderRadius:"50%",background:c,border:"none",cursor:"pointer",outline:carColor===c?"3px solid "+OR:"none",outlineOffset:2}}/>)}
+            </div>
+          )}
+
+          {carEditTab==="brand" && (
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+              <button onClick={()=>{setCarBrand(null);setCarSaved(false);}} style={TAG(carBrand===null)}>None</button>
+              {CAR_BRANDS.map(b=>(
+                <button key={b.id} onClick={()=>{setCarBrand(b.id);setCarSaved(false);}} style={{
+                  padding:"6px 11px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:800,
+                  border:"1.5px solid "+(carBrand===b.id?b.color:"#ebebeb"),
+                  background:carBrand===b.id?b.color+"1a":"#f8f8f8",
+                  color:carBrand===b.id?b.color:"#111",
+                }}>{b.name}</button>
+              ))}
+            </div>
+          )}
+
+          {carEditTab==="mods" && (
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:6}}>MODS — {activeModCat}</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                {Object.keys(CAR_MODS).map(c=><button key={c} onClick={()=>setActiveModCat(c)} style={{...TAG(activeModCat===c),flexShrink:0,fontSize:10,padding:"4px 9px"}}>{c}</button>)}
+              </div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                {(CAR_MODS[activeModCat]||[]).map(o=><button key={o} onClick={()=>{setCarMods(m=>({...m,[activeModCat]:o}));setCarSaved(false);}} style={TAG(carMods[activeModCat]===o)}>{o}</button>)}
+              </div>
+            </div>
+          )}
 
           <div style={SEC}>NAME</div>
           <input value={carName} onChange={e=>{setCarName(e.target.value);setCarSaved(false);}} placeholder="Name your ride…" style={{...INP,marginBottom:14}}/>
@@ -2313,9 +2603,11 @@ export default function SonoLane() {
 
           {/* Private car info — plate, registration, mileage, and any other
               handy details. Never shown publicly; kept strictly for the
-              owner's own quick reference on their phone. */}
+              owner's own quick reference on their phone. Tinted (instead of
+              the plain white every other card on this page uses) so it's
+              obvious at a glance that this section is handled differently. */}
           <div style={SEC}>PRIVATE CAR INFO</div>
-          <div style={{...CARD,marginBottom:14}}>
+          <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0",marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,color:"#111"}}>
               <span style={{fontSize:12}}>🔒</span>
               <span style={{fontSize:10,fontWeight:700,color:"#111"}}>Only visible to you — never shown on your car's page or profile.</span>
@@ -2327,49 +2619,12 @@ export default function SonoLane() {
             <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>CURRENT MILEAGE</div>
             <input type="number" inputMode="numeric" value={carMileage} onChange={e=>{setCarMileage(e.target.value);setCarSaved(false);}} placeholder="e.g. 42500" style={{...INP,marginBottom:12}}/>
             <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>OTHER NOTES</div>
-            <textarea value={carPrivateNotes} onChange={e=>{setCarPrivateNotes(e.target.value);setCarSaved(false);}} placeholder="VIN, insurance info, service reminders, anything else handy to have on hand…" rows={3} style={{...INP,resize:"none"}}/>
-          </div>
-
-          <div style={SEC}>COLOR</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
-            {CAR_COLORS.map(c=><button key={c} onClick={()=>{setCarColor(c);setCarSaved(false);}} style={{width:28,height:28,borderRadius:"50%",background:c,border:"none",cursor:"pointer",outline:carColor===c?"3px solid "+OR:"none",outlineOffset:2}}/>)}
-          </div>
-
-          <div style={SEC}>BODY STYLE</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
-            {CAR_BODY_STYLES.map(s=>(
-              <button key={s.id} onClick={()=>{setCarBodyStyle(s.id);setCarModel(s.label);setCarSaved(false);}} style={{
-                display:"flex",flexDirection:"column",alignItems:"center",padding:"6px 3px 5px",borderRadius:10,cursor:"pointer",fontFamily:F,
-                border:"1.5px solid "+(carBodyStyle===s.id?OR:"#ebebeb"),
-                background:carBodyStyle===s.id?OR+"0f":"#f8f8f8",
-              }}>
-                <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-                  <CarSVG color={carColor} mods={{}} size={46} styleId={s.id}/>
-                </div>
-                <div style={{fontSize:7.5,fontWeight:700,color:carBodyStyle===s.id?OR:"#111",marginTop:2,textAlign:"center",lineHeight:1.15}}>{s.label}</div>
-              </button>
-            ))}
-          </div>
-
-          <div style={SEC}>BRAND</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
-            <button onClick={()=>{setCarBrand(null);setCarSaved(false);}} style={TAG(carBrand===null)}>None</button>
-            {CAR_BRANDS.map(b=>(
-              <button key={b.id} onClick={()=>{setCarBrand(b.id);setCarSaved(false);}} style={{
-                padding:"6px 11px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:800,
-                border:"1.5px solid "+(carBrand===b.id?b.color:"#ebebeb"),
-                background:carBrand===b.id?b.color+"1a":"#f8f8f8",
-                color:carBrand===b.id?b.color:"#111",
-              }}>{b.name}</button>
-            ))}
-          </div>
-
-          <div style={SEC}>MODS — {activeModCat}</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
-            {Object.keys(CAR_MODS).map(c=><button key={c} onClick={()=>setActiveModCat(c)} style={{...TAG(activeModCat===c),flexShrink:0,fontSize:10,padding:"4px 9px"}}>{c}</button>)}
-          </div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
-            {(CAR_MODS[activeModCat]||[]).map(o=><button key={o} onClick={()=>{setCarMods(m=>({...m,[activeModCat]:o}));setCarSaved(false);}} style={TAG(carMods[activeModCat]===o)}>{o}</button>)}
+            <textarea value={carPrivateNotes} onChange={e=>{setCarPrivateNotes(e.target.value);setCarSaved(false);}} placeholder="VIN, insurance info, service reminders, anything else handy to have on hand…" rows={3} style={{...INP,resize:"none",marginBottom:12}}/>
+            {/* Snapshots of things like your insurance card or registration —
+                tapping + brings up your device's normal choice between taking
+                a new photo with the camera or picking an existing one. */}
+            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>PHOTOS — INSURANCE CARD, ETC.</div>
+            {PhotoGallery(carPrivatePhotos, setCarPrivatePhotos, carPrivatePhotoRef, 6)}
           </div>
         </div>
       </div>
@@ -2473,7 +2728,7 @@ export default function SonoLane() {
                       <video src={clip.url} controls style={{width:"100%",display:"block",maxHeight:160,background:"#000"}}/>
                       <div style={{padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
                         <span style={{fontSize:9,color:"#aaa",flex:1}}>{clip.time} · {clip.dist} mi</span>
-                        <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+".webm";a.click();}} style={{padding:"4px 8px",borderRadius:20,background:"#222",color:"#aaa",border:"none",fontSize:9,cursor:"pointer"}}>⬇</button>
+                        <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"4px 8px",borderRadius:20,background:"#222",color:"#aaa",border:"none",fontSize:9,cursor:"pointer"}}>⬇</button>
                       </div>
                     </div>
                   ))}
@@ -2592,11 +2847,11 @@ export default function SonoLane() {
               <div style={{fontWeight:800,color:"#111",marginBottom:6}}>What gets recorded</div>
               <div style={{marginBottom:10}}>Speed, drive duration, and driving-behavior data (like green lights hit) are logged for every automatic drive and shown in Drive History. Video footage is saved and only viewable here, in the Dashcam section.</div>
               <div style={{fontWeight:800,color:"#111",marginBottom:6}}>Where it's stored</div>
-              <div style={{marginBottom:10}}>Footage and drive data stay on this device for this session and are never sent anywhere unless you take an explicit action, like sharing or downloading a clip.</div>
+              <div style={{marginBottom:10}}>Footage and drive data stay on this device, are kept for 72 hours to save space, and are never sent anywhere unless you take an explicit action, like sharing or downloading a clip.</div>
               <div style={{fontWeight:800,color:"#111",marginBottom:6}}>Your control</div>
               <div>You can revoke this permission at any time from this screen — doing so immediately stops any active or future automatic recording.</div>
             </div>
-            <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
+            <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
               I Agree — Enable Dashcam
             </button>
             <button onClick={back} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
@@ -2666,8 +2921,8 @@ export default function SonoLane() {
                         <div style={{fontSize:11,fontWeight:700,color:"#111"}}>{clip.time}</div>
                         <div style={{fontSize:9,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
                       </div>
-                      <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+".webm";a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:10,cursor:"pointer"}}>⬇</button>
-                      <button onClick={()=>{URL.revokeObjectURL(clip.url);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:10,cursor:"pointer"}}>🗑</button>
+                      <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:10,cursor:"pointer"}}>⬇</button>
+                      <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:10,cursor:"pointer"}}>🗑</button>
                     </div>
                   </div>
                 ))}
@@ -3269,7 +3524,10 @@ export default function SonoLane() {
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEvent(false)}>
             <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
-              <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0}}><div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div></div>
+              <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div>
+                <button onClick={()=>setShowEvent(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:12}}>
                   {eventPhotos.map((p,i)=>(
@@ -3447,7 +3705,7 @@ export default function SonoLane() {
         <button onClick={()=>{playStartupSound(startupSound);go("drive");}} style={{
           width:"100%",padding:"14px 0",marginTop:14,border:"none",cursor:"pointer",fontFamily:F,
           display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexShrink:0,
-          background:"#fff",overflow:"hidden",
+          background:"#f8f8f8",overflow:"hidden",
         }}>
           <div style={{
             flex:1,height:20,transform:"skewX(-18deg)",
@@ -3880,7 +4138,10 @@ export default function SonoLane() {
             {/* Header */}
             <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 10px"}}/>
-              <div style={{fontSize:15,fontWeight:800,color:"#111"}}>Create Route Post</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>Create Route Post</div>
+                <button onClick={()=>setShowPost(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
             </div>
 
             <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
@@ -4117,10 +4378,6 @@ export default function SonoLane() {
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
                 <GhostCard/><GhostCard/><GhostCard/><GhostCard/>
               </div>
-              <div style={{textAlign:"center",padding:"4px 20px 20px",color:"#111"}}>
-                <div style={{fontSize:12,fontWeight:600,color:"#111",marginBottom:4}}>No events yet</div>
-                <div style={{fontSize:11}}>Be the first — tap <strong style={{color:OR}}>+ Create</strong> above.</div>
-              </div>
             </div>
           )}
           {filtered.length===0 && events.length>0 && evFilters.length===1 && evFilters[0]==="Following" && (
@@ -4224,7 +4481,10 @@ export default function SonoLane() {
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEvent(false)}>
             <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
-              <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0}}><div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div></div>
+              <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div>
+                <button onClick={()=>setShowEvent(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:12}}>
                   {eventPhotos.map((p,i)=>(
@@ -4296,6 +4556,22 @@ export default function SonoLane() {
   const CreatePanel = useStablePanel(() => {
     const unreadNotifs = notifications.filter(n=>!n.read).length;
     const curFriend = friends.find(f=>f.id===activeChan);
+    // Sidebar collapse — lets the actual chat take the full screen width
+    // instead of always sharing it with the lane/DM list.
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    // Lanes settings sheet (replaces the old mic/voice-command button in the
+    // user bar) — display of your own online status, muting the 🔔
+    // notifications badge for Lanes activity, and which chats are pinned.
+    const [showLanesSettings, setShowLanesSettings] = useState(false);
+    const [showOnlineStatus, setShowOnlineStatus] = usePersistedState("sl_showOnlineStatus", true);
+    const [lanesNotifications, setLanesNotifications] = usePersistedState("sl_lanesNotifications", true);
+    const [pinnedChans, setPinnedChans] = usePersistedState("sl_pinnedChans", []);
+    const togglePin = (id) => setPinnedChans(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]);
+    const sortPinned = (list) => {
+      const pinned = list.filter(x=>pinnedChans.includes(x.id));
+      const rest = list.filter(x=>!pinnedChans.includes(x.id));
+      return [...pinned, ...rest];
+    };
     // Public lanes near you — your own public-visibility lanes always show;
     // other community-created ones are filtered by the discovery radius,
     // same as posts/events (see milesAwayFor). This is the "Public Lanes"
@@ -4319,6 +4595,33 @@ export default function SonoLane() {
     // circle instead of a text bar. The keyboard icon in its corner switches
     // to typing; switching lanes resets back to voice by default.
     const [chatInputMode, setChatInputMode] = useState("voice"); // "voice" | "text"
+    // Real voice-message recording for the lane walkie-talkie button — tap
+    // once to start, tap again while recording to pause (so you can listen
+    // back to what's captured so far), tap again while paused to keep
+    // going, or hit Send at any point to stop and send it. Backed by real
+    // getUserMedia + MediaRecorder audio (see startLaneVoiceMsg etc below),
+    // replacing the old hold-down/release simulated recording.
+    const [laneRecPhase, setLaneRecPhase] = useState("idle"); // idle | recording | paused
+    const [laneRecSeconds, setLaneRecSeconds] = useState(0);
+    const [laneRecPreviewUrl, setLaneRecPreviewUrl] = useState(null);
+    const laneRecMR = useRef(null);
+    const laneRecChunks = useRef([]);
+    const laneRecStream = useRef(null);
+    const laneRecTimer = useRef(null);
+    const laneRecPendingPause = useRef(false);
+    // Playback for real recorded voice messages (msg.audioUrl) — one shared
+    // <audio> element, tracking which message id is currently playing.
+    const voiceAudioRef = useRef(null);
+    const [playingVoiceId, setPlayingVoiceId] = useState(null);
+    const toggleVoicePlayback = (msg) => {
+      if (!msg.audioUrl) return;
+      const audio = voiceAudioRef.current || (voiceAudioRef.current = new Audio());
+      if (playingVoiceId === msg.id) { audio.pause(); setPlayingVoiceId(null); return; }
+      audio.src = msg.audioUrl;
+      audio.onended = () => setPlayingVoiceId(null);
+      audio.play().catch(()=>{});
+      setPlayingVoiceId(msg.id);
+    };
     // Which voice messages have their transcript expanded, keyed by msg.id —
     // every voice clip has a simulated speech-to-text caption, shown only
     // when you tap to read it instead of playing it back.
@@ -4387,39 +4690,113 @@ export default function SonoLane() {
       setChanInput("");
     };
 
-    // CB Voice recording
-    const startCbRecord = () => {
-      if(curCityLane && curCityLane.id!==currentFreewayId) return; // must be on this freeway to talk
-      setCbRecording(true); setCbTimer(0);
-      cbTimerRef.current = setInterval(()=>setCbTimer(t=>t+1), 1000);
+    // Real lane voice-message recording — tap-to-start / tap-to-pause /
+    // Send-to-finish, replacing the old hold-to-talk simulated recording.
+    const pickAudioMime = () => {
+      if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
+      const candidates = ["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
+      return candidates.find(c => { try { return MediaRecorder.isTypeSupported(c); } catch { return false; } }) || "";
     };
-    const stopCbRecord = () => {
-      if(curCityLane && curCityLane.id!==currentFreewayId) return;
-      clearInterval(cbTimerRef.current);
-      const secs = cbTimer;
-      setCbRecording(false); setCbTimer(0);
-      // Send voice message to current lane
-      const laneId = activeChan;
-      const msg = {
-        id:Date.now(), text:"", mine:true,
-        user:userName||"You",
-        initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
-        color:OR,
-        ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-        isVoice:true, voiceSeconds:secs, transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)],
-      };
-      setLaneMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),msg]}));
-      // Simulate someone responding in city lanes (CB effect)
-      if(curCityLane||curCustomLane) {
-        const HANDLES=["SoCalDrifter","NightOwl_Mike","TruckDog99","FreewayFiona","CruiseCtrl","VanLife_KC"];
-        const COLORS=["#6366f1","#22c55e","#a855f7","#14b8a6","#ec4899","#f59e0b"];
-        const ri=Math.floor(Math.random()*HANDLES.length);
-        setTimeout(()=>{
-          const reply={id:Date.now()+1,text:"",mine:false,user:HANDLES[ri],initials:HANDLES[ri].slice(0,2).toUpperCase(),color:COLORS[ri],ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),isVoice:true,voiceSeconds:Math.floor(Math.random()*8)+2,transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)]};
-          setLaneMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),reply]}));
-        }, 1400+Math.random()*1200);
+    const clearLaneRecTimer = () => { clearInterval(laneRecTimer.current); laneRecTimer.current = null; };
+    const teardownLaneRec = () => {
+      clearLaneRecTimer();
+      if (laneRecStream.current) { laneRecStream.current.getTracks().forEach(t=>t.stop()); laneRecStream.current = null; }
+      if (laneRecPreviewUrl) { try { URL.revokeObjectURL(laneRecPreviewUrl); } catch {} }
+      laneRecChunks.current = [];
+      laneRecMR.current = null;
+      setLaneRecPhase("idle"); setLaneRecSeconds(0); setLaneRecPreviewUrl(null);
+    };
+    const startLaneVoiceMsg = async () => {
+      if(curCityLane && curCityLane.id!==currentFreewayId) return; // must be on this freeway to talk
+      if(laneRecPhase!=="idle") return;
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        laneRecStream.current = stream;
+        const mime = pickAudioMime();
+        const mr = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream);
+        laneRecChunks.current = [];
+        mr.ondataavailable = e => {
+          if(e.data && e.data.size>0) laneRecChunks.current.push(e.data);
+          if(laneRecPendingPause.current){
+            laneRecPendingPause.current = false;
+            const usedMime = mr.mimeType || "audio/webm";
+            const blob = new Blob(laneRecChunks.current, {type:usedMime});
+            setLaneRecPreviewUrl(URL.createObjectURL(blob));
+          }
+        };
+        laneRecMR.current = mr;
+        mr.start(250);
+        setLaneRecPhase("recording"); setLaneRecSeconds(0); setLaneRecPreviewUrl(null);
+        laneRecTimer.current = setInterval(()=>setLaneRecSeconds(s=>s+1), 1000);
+      }catch{
+        // mic permission denied, or no mic available — silently no-op
       }
     };
+    const pauseLaneVoiceMsg = () => {
+      const mr = laneRecMR.current;
+      if(!mr || laneRecPhase!=="recording") return;
+      clearLaneRecTimer();
+      setLaneRecPhase("paused");
+      laneRecPendingPause.current = true;
+      try{ mr.requestData(); }catch{ laneRecPendingPause.current = false; }
+      try{ mr.pause(); }catch{}
+    };
+    const resumeLaneVoiceMsg = () => {
+      const mr = laneRecMR.current;
+      if(!mr || laneRecPhase!=="paused") return;
+      if(laneRecPreviewUrl){ try{ URL.revokeObjectURL(laneRecPreviewUrl); }catch{} setLaneRecPreviewUrl(null); }
+      try{ mr.resume(); }catch{}
+      setLaneRecPhase("recording");
+      laneRecTimer.current = setInterval(()=>setLaneRecSeconds(s=>s+1), 1000);
+    };
+    const cancelLaneVoiceMsg = () => {
+      const mr = laneRecMR.current;
+      if(mr){ try{ mr.onstop = null; mr.stop(); }catch{} }
+      teardownLaneRec();
+    };
+    const sendLaneVoiceMsg = () => {
+      const mr = laneRecMR.current;
+      if(!mr || laneRecPhase==="idle") return;
+      clearLaneRecTimer();
+      const secs = laneRecSeconds;
+      const laneId = activeChan;
+      const wasLaneChat = isLaneChat;
+      mr.onstop = () => {
+        const usedMime = mr.mimeType || "audio/webm";
+        const blob = new Blob(laneRecChunks.current, {type:usedMime});
+        const audioUrl = URL.createObjectURL(blob);
+        const msg = {
+          id:Date.now(), text:"", mine:true,
+          user:userName||"You",
+          initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
+          color:OR,
+          ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+          isVoice:true, voiceSeconds:secs||1, audioUrl,
+        };
+        setLaneMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),msg]}));
+        if(!wasLaneChat) setFriendMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),msg]})); // friend DM — keep both stores in sync, like text messages
+        if(laneRecStream.current){ laneRecStream.current.getTracks().forEach(t=>t.stop()); laneRecStream.current = null; }
+        laneRecChunks.current = [];
+        laneRecMR.current = null;
+        setLaneRecPhase("idle"); setLaneRecSeconds(0); setLaneRecPreviewUrl(null);
+        // Simulate someone responding in city/custom lanes (CB effect)
+        if(wasLaneChat) {
+          const HANDLES=["SoCalDrifter","NightOwl_Mike","TruckDog99","FreewayFiona","CruiseCtrl","VanLife_KC"];
+          const COLORS=["#6366f1","#22c55e","#a855f7","#14b8a6","#ec4899","#f59e0b"];
+          const ri=Math.floor(Math.random()*HANDLES.length);
+          setTimeout(()=>{
+            const reply={id:Date.now()+1,text:"",mine:false,user:HANDLES[ri],initials:HANDLES[ri].slice(0,2).toUpperCase(),color:COLORS[ri],ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),isVoice:true,voiceSeconds:Math.floor(Math.random()*8)+2,transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)]};
+            setLaneMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),reply]}));
+          }, 1400+Math.random()*1200);
+        }
+      };
+      try{ mr.stop(); }catch{ teardownLaneRec(); }
+    };
+    // Don't leak an open mic stream if this chat panel unmounts mid-recording.
+    useEffect(() => () => {
+      if(laneRecStream.current) laneRecStream.current.getTracks().forEach(t=>t.stop());
+      clearInterval(laneRecTimer.current);
+    }, []);
 
     const allMsgs = activeChan==="notes"||activeChan==="notifications"||activeChan==="sono" ? [] : (friendMsgs[activeChan]||laneMsgs[activeChan]||[]);
 
@@ -4440,7 +4817,7 @@ export default function SonoLane() {
       <div style={{flex:1,display:"flex",flexDirection:"row",overflow:"hidden",background:"#36393f"}}>
 
         {/* ── Sidebar ── */}
-        <div style={{width:196,background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden"}}>
+        <div style={{width:sidebarOpen?196:0,background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",transition:"width 0.2s ease"}}>
           {/* App name */}
           <div style={{padding:"11px 12px 9px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
             <div style={{flex:1}}>
@@ -4456,7 +4833,7 @@ export default function SonoLane() {
             <div style={{padding:"8px 6px 3px"}}>
               <span style={{fontSize:8,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Personal</span>
             </div>
-            <SideBtn id="notifications" icon="🔔" label="notifications" badge={unreadNotifs}/>
+            <SideBtn id="notifications" icon="🔔" label="notifications" badge={lanesNotifications?unreadNotifs:0}/>
             <SideBtn id="notes" icon="#" label="notes" sub="you"/>
             <SideBtn id="sono" icon="#" label={"Sono AI · "+pal.name} color={pal.color}/>
 
@@ -4487,16 +4864,19 @@ export default function SonoLane() {
               <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#4f545c",border:"none",cursor:"pointer",color:"#8e9297",fontSize:11,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
             </div>
             {sidebarCustomLanes.length===0 && <div style={{fontSize:9,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
-            {sidebarCustomLanes.map(lane=>(
-              <button key={lane.id} onClick={()=>setActiveChan(lane.id)} style={{
-                width:"100%",display:"flex",alignItems:"center",gap:6,
-                padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                background:activeChan===lane.id?"#42464d":"transparent",marginBottom:1,
-              }}>
-                <span style={{fontSize:10,color:lane.color||"#8e9297"}}>#</span>
-                <span style={{flex:1,fontSize:11,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
-                <span style={{fontSize:8,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
-              </button>
+            {sortPinned(sidebarCustomLanes).map(lane=>(
+              <div key={lane.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
+                <button onClick={()=>setActiveChan(lane.id)} style={{
+                  flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,
+                  padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
+                  background:activeChan===lane.id?"#42464d":"transparent",
+                }}>
+                  <span style={{fontSize:10,color:lane.color||"#8e9297"}}>#</span>
+                  <span style={{flex:1,fontSize:11,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                  <span style={{fontSize:8,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
+                </button>
+                <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:9,color:pinnedChans.includes(lane.id)?OR:"#4f545c",padding:0}}>📌</button>
+              </div>
             ))}
 
             {/* Direct Messages */}
@@ -4504,18 +4884,21 @@ export default function SonoLane() {
               <div style={{padding:"10px 6px 3px"}}>
                 <span style={{fontSize:8,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Direct Messages</span>
               </div>
-              {friends.map(fr=>(
-                <button key={fr.id} onClick={()=>setActiveChan(fr.id)} style={{
-                  width:"100%",display:"flex",alignItems:"center",gap:7,
-                  padding:"4px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                  background:activeChan===fr.id?"#42464d":"transparent",marginBottom:1,
-                }}>
-                  <div style={{position:"relative",flexShrink:0}}>
-                    <FriendAvatar fr={fr} size={22} fontSize={8}/>
-                    <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #2f3136"}}/>
-                  </div>
-                  <span style={{flex:1,fontSize:11,fontWeight:activeChan===fr.id?600:400,color:activeChan===fr.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</span>
-                </button>
+              {sortPinned(friends).map(fr=>(
+                <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
+                  <button onClick={()=>setActiveChan(fr.id)} style={{
+                    flex:1,minWidth:0,display:"flex",alignItems:"center",gap:7,
+                    padding:"4px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
+                    background:activeChan===fr.id?"#42464d":"transparent",
+                  }}>
+                    <div style={{position:"relative",flexShrink:0}}>
+                      <FriendAvatar fr={fr} size={22} fontSize={8}/>
+                      <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #2f3136"}}/>
+                    </div>
+                    <span style={{flex:1,fontSize:11,fontWeight:activeChan===fr.id?600:400,color:activeChan===fr.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</span>
+                  </button>
+                  <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:9,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
+                </div>
               ))}
             </>}
 
@@ -4531,17 +4914,59 @@ export default function SonoLane() {
             </div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:10,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName||"You"}</div>
-              <div style={{fontSize:7,color:"#72767d"}}>● Online</div>
+              {showOnlineStatus && <div style={{fontSize:7,color:"#72767d"}}>● Online</div>}
             </div>
-            <button onClick={toggleVoice} style={{width:20,height:20,borderRadius:4,background:voiceOn?"#ed4245":"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11}}>🎙</button>
+            <button onClick={()=>setShowLanesSettings(true)} title="Lanes settings" style={{width:20,height:20,borderRadius:4,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#8e9297"}}>⚙️</button>
           </div>
         </div>
+
+        {/* Lanes settings sheet */}
+        {showLanesSettings && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:800,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowLanesSettings(false)}>
+            <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto 0",flexShrink:0}}/>
+              <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚙️ Lanes Settings</div>
+                <button onClick={()=>setShowLanesSettings(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#f8f8f8",marginBottom:10}}>
+                  <div style={{flex:1,paddingRight:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Show online status</div>
+                    <div style={{fontSize:10,color:"#888",marginTop:2}}>Let others see the "● Online" indicator next to your name.</div>
+                  </div>
+                  <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#ddd",position:"relative",flexShrink:0,padding:0}}>
+                    <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+                  </button>
+                </div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#f8f8f8",marginBottom:10}}>
+                  <div style={{flex:1,paddingRight:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Lanes notifications</div>
+                    <div style={{fontSize:10,color:"#888",marginTop:2}}>Get badge alerts for new messages and activity in Lanes.</div>
+                  </div>
+                  <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#ddd",position:"relative",flexShrink:0,padding:0}}>
+                    <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+                  </button>
+                </div>
+                <div style={{padding:"11px 12px",borderRadius:12,background:"#f8f8f8"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#111",marginBottom:2}}>📌 Pinning chats</div>
+                  <div style={{fontSize:10,color:"#888"}}>Tap the pin icon next to any lane or direct message in the sidebar list to keep it at the top.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Main area ── */}
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
           {/* Header */}
           <div style={{padding:"9px 14px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:8,background:"#36393f"}}>
+            {/* Collapse the lane/DM list sidebar so the chat itself gets the
+                full screen width — tap again to bring it back. */}
+            <button onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?"Hide lane list":"Show lane list"} style={{width:26,height:26,borderRadius:6,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#8e9297",flexShrink:0,padding:0}}>
+              {sidebarOpen?"◀":"☰"}
+            </button>
             {curCityLane ? (
               <>
                 <span style={{fontSize:14}}>📡</span>
@@ -4659,7 +5084,7 @@ export default function SonoLane() {
                     {msg.isVoice ? (
                       <div style={{display:"flex",flexDirection:"column",alignItems:msg.mine?"flex-end":"flex-start",gap:3}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,background:msg.mine?"#f97316":"#40444b",borderRadius:20,padding:"7px 12px",width:"fit-content"}}>
-                          <div style={{width:24,height:24,borderRadius:"50%",background:msg.mine?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>▶</div>
+                          <button onClick={()=>toggleVoicePlayback(msg)} disabled={!msg.audioUrl} style={{width:24,height:24,borderRadius:"50%",background:msg.mine?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)",border:"none",padding:0,color:"#fff",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:msg.audioUrl?"pointer":"default"}}>{playingVoiceId===msg.id?"❚❚":"▶"}</button>
                           <div style={{flex:1}}>
                             <div style={{display:"flex",gap:2,alignItems:"center",height:16}}>
                               {Array.from({length:16}).map((_,wi)=>(
@@ -4690,7 +5115,7 @@ export default function SonoLane() {
 
           {/* Input bar */}
           {activeChan!=="notifications"&&(
-            <div style={{padding:"6px 10px 8px",flexShrink:0,background:"#36393f"}}>
+            <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#36393f"}}>
 
               {/* Voice chat banner — shows when VC is active in this channel */}
               {voiceChatActive===activeChan && (
@@ -4732,15 +5157,31 @@ export default function SonoLane() {
                     }
                   }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{position:"absolute",right:4,bottom:0,width:34,height:34,borderRadius:8,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:voiceChatActive===activeChan?"#23a55a":"#72767d"}}>🔊</button>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
-                    <button
-                      disabled={laneLocked}
-                      onMouseDown={startCbRecord} onMouseUp={stopCbRecord} onMouseLeave={()=>{if(cbRecording) stopCbRecord();}}
-                      onTouchStart={e=>{e.preventDefault();startCbRecord();}} onTouchEnd={e=>{e.preventDefault();stopCbRecord();}}
-                      style={{width:64,height:64,borderRadius:"50%",background:cbRecording?"#ed4245":"#5865f2",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:cbRecording?"0 0 0 8px #ed424522":"0 2px 10px rgba(0,0,0,0.35)",transition:"box-shadow .15s",flexShrink:0}}>
-                      <span style={{fontSize:24,color:"#fff"}}>{cbRecording?"●":"🎙"}</span>
-                    </button>
-                    <span style={{fontSize:9,fontWeight:700,color:cbRecording?"#ed4245":"#72767d"}}>
-                      {laneLocked ? "Get on "+curCityLane.name+" to talk" : cbRecording ? "Recording… "+cbTimer+"s" : "Hold to talk"}
+                    {laneRecPhase==="paused" && laneRecPreviewUrl && (
+                      <audio controls src={laneRecPreviewUrl} style={{height:26,width:190,marginBottom:2}}/>
+                    )}
+                    <div style={{display:"flex",alignItems:"center",gap:14}}>
+                      {laneRecPhase!=="idle" && (
+                        <button onClick={cancelLaneVoiceMsg} title="Cancel" style={{width:32,height:32,borderRadius:"50%",background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#8e9297",flexShrink:0}}>✕</button>
+                      )}
+                      <button
+                        disabled={laneLocked}
+                        onClick={()=>{
+                          if(laneLocked) return;
+                          if(laneRecPhase==="idle") startLaneVoiceMsg();
+                          else if(laneRecPhase==="recording") pauseLaneVoiceMsg();
+                          else resumeLaneVoiceMsg();
+                        }}
+                        title={laneRecPhase==="idle"?"Tap to record":laneRecPhase==="recording"?"Tap to pause":"Tap to resume"}
+                        style={{width:64,height:64,borderRadius:"50%",background:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#5865f2",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:laneRecPhase==="recording"?"0 0 0 8px #ed424522":"0 2px 10px rgba(0,0,0,0.35)",transition:"box-shadow .15s",flexShrink:0}}>
+                        <span style={{fontSize:22,color:"#fff"}}>{laneRecPhase==="recording"?"❚❚":laneRecPhase==="paused"?"🎙":"🎙"}</span>
+                      </button>
+                      {laneRecPhase!=="idle" && (
+                        <button onClick={sendLaneVoiceMsg} title="Send" style={{width:32,height:32,borderRadius:"50%",background:"#23a55a",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>➤</button>
+                      )}
+                    </div>
+                    <span style={{fontSize:9,fontWeight:700,color:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#72767d"}}>
+                      {laneLocked ? "Get on "+curCityLane.name+" to talk" : laneRecPhase==="recording" ? "Recording… "+laneRecSeconds+"s — tap to pause" : laneRecPhase==="paused" ? "Paused "+laneRecSeconds+"s — tap to resume, or send" : "Tap to record a voice message"}
                     </span>
                   </div>
                 </div>
@@ -5343,7 +5784,13 @@ export default function SonoLane() {
       // sits at the bottom of the current page (a chat input bar, a
       // bottom toggle, etc.), inconsistently across phone models. Insets
       // alone track the real viewport on every device instead.
-      style={{display:"flex",flexDirection:"column",background:"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
+      // The safe-area padding above sits OUTSIDE whatever panel is showing —
+      // it's the shell's own background peeking through below the panel's
+      // content. Lanes (panel==="create") is the one page with a dark theme,
+      // so leaving this shell background white made that gap show up as an
+      // obvious blank white strip under a dark chat. Matching it here instead
+      // lets Lanes' dark background run all the way to the true bottom edge.
+      style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
       <style>{"@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}"}</style>
 
       {panel!=="drive" && <TopNav/>}
@@ -5489,7 +5936,7 @@ export default function SonoLane() {
               <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"14px",marginBottom:16,fontSize:11,color:"#111",lineHeight:1.7}}>
                 Camera and mic access is used only while SonoLane is open in the foreground. Footage stays on this device and is viewable anytime from Profile → Dashcam, where you can also revoke access.
               </div>
-              <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");setShowDashcamSetup(false);}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
+              <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");setShowDashcamSetup(false);if(panel==="drive")go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
                 I Agree — Enable Dashcam
               </button>
               <button onClick={()=>setShowDashcamSetup(false)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
