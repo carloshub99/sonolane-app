@@ -5753,14 +5753,14 @@ export default function SonoLane() {
   const TopNav = () => {
     const onLanes = panel==="create";
     return (
-    <div style={{flexShrink:0,display:"flex",gap:4,padding:"12px 8px",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+    <div style={{flexShrink:0,display:"flex",gap:4,padding:"6px 8px",paddingBottom:"calc(6px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
       {TOPNAV_ITEMS.map(it=>{
         const active = panel===it.id;
         const color = DPAD_COLORS[it.iconId];
         return (
           <button key={it.id} onClick={()=>go(it.id)} style={{
             flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-            padding:"12px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,
+            padding:"7px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,
             background:active?color+"14":"transparent",
           }}>
             {it.id==="profile" ? <CompassStar size={17} color={color}/> : <DPadIcon id={it.iconId} color={color} size={17}/>}
@@ -5799,14 +5799,15 @@ export default function SonoLane() {
       // sits at the bottom of the current page (a chat input bar, a
       // bottom toggle, etc.), inconsistently across phone models. Insets
       // alone track the real viewport on every device instead.
-      // The safe-area padding above sits OUTSIDE whatever panel is showing —
-      // it's the shell's own background peeking through below the panel's
-      // content. Lanes (panel==="create") is the one page with a dark theme,
-      // so leaving this shell background white made that gap show up as an
-      // obvious blank white strip under a dark chat. Matching it here instead
-      // lets Lanes' dark background run all the way to the true bottom edge.
-      style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
-      <style>{"@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}"}</style>
+      // The bottom safe-area inset is handled by whichever bar sits at the
+      // very bottom (TopNav, or Drive's own bottom bar) baking it into their
+      // own paddingBottom, instead of the shell reserving a separate strip
+      // below them — that separate strip was its own background peeking
+      // through under the active bar, which read as a stray blank gap
+      // (most visible as white under Lanes' dark chat). This way whatever
+      // bar is showing runs its own background all the way to the true edge.
+      style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",boxSizing:"border-box"}}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
 
       <div
         style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}
