@@ -2074,7 +2074,7 @@ export default function SonoLane() {
           <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
           <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DefaultAvatar size={18} color="#555"/> My Profile</div>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 28px"}}>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 14px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <span style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
             <span style={{fontSize:9,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
@@ -2211,7 +2211,7 @@ export default function SonoLane() {
             <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {g.name}</div>
             <VN action={()=>{setActiveChan(g.laneId);go("create");}} style={{padding:"6px 12px",borderRadius:20,background:"#5865f2",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>💬 Group Chat</VN>
           </div>
-          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 28px"}}>
+          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 14px"}}>
             <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
 
             {/* Your vehicle */}
@@ -2315,7 +2315,7 @@ export default function SonoLane() {
           </div>
           <button onClick={()=>setSubPanel("editcar")} title="Edit car" style={{width:34,height:34,borderRadius:"50%",fontSize:19,background:"none",color:"#111",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 28px"}}>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 14px"}}>
 
           {/* Hero — customizable banner (upload or premade) behind either the custom SVG avatar or an uploaded car photo. Banner is edited from the Edit Car menu. */}
           <div style={{background:bannerBg,padding:"28px 20px 20px",display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
@@ -2737,7 +2737,7 @@ export default function SonoLane() {
             </div>
           ) : (
             /* ── Trip list ── */
-            <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 28px"}}>
+            <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 14px"}}>
               {tripHistory.length===0 ? (
                 <div style={{textAlign:"center",padding:"52px 20px",color:"#111"}}>
                   <div style={{fontSize:48,marginBottom:12}}>🛤️</div>
@@ -2835,7 +2835,7 @@ export default function SonoLane() {
             <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
             <div style={{flex:1,fontSize:14,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
           </div>
-          <div style={{flex:1,overflowY:"auto",padding:"22px 18px 28px"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"22px 18px 14px"}}>
             <div style={{textAlign:"center",marginBottom:18}}>
               <div style={{fontSize:44,marginBottom:8}}>📹</div>
               <div style={{fontSize:15,fontWeight:900,color:"#111",marginBottom:4}}>Terms of Service &amp; Privacy Notice</div>
@@ -3451,7 +3451,7 @@ export default function SonoLane() {
           <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/> My Events</div>
           <button onClick={()=>{setShowEvent(true);}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Event</button>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 28px"}}>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 14px"}}>
           {events.length===0 ? (
             <div style={{textAlign:"center",padding:"48px 20px",color:"#111"}}>
               <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}><CompassStar size={48}/></div>
@@ -3528,7 +3528,7 @@ export default function SonoLane() {
                 <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div>
                 <button onClick={()=>setShowEvent(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:12}}>
                   {eventPhotos.map((p,i)=>(
                     <div key={i} style={{flex:1,height:80,borderRadius:10,overflow:"hidden",position:"relative"}}>
@@ -3601,7 +3601,7 @@ export default function SonoLane() {
             <div style={{fontSize:9,color:"#111",textAlign:"right"}}>{Math.round(unlockedAch.length/ACHIEVEMENTS.length*100)}% complete</div>
           </div>
 
-          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 28px"}}>
+          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 14px"}}>
             {cats.map(cat=>(
               <div key={cat}>
                 <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:10}}>{CAT_LABELS[cat]||cat.toUpperCase()}</div>
@@ -3705,7 +3705,7 @@ export default function SonoLane() {
         <button onClick={()=>{playStartupSound(startupSound);go("drive");}} style={{
           width:"100%",padding:"14px 0",marginTop:14,border:"none",cursor:"pointer",fontFamily:F,
           display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexShrink:0,
-          background:"#f8f8f8",overflow:"hidden",
+          background:"#fff",overflow:"hidden",
         }}>
           <div style={{
             flex:1,height:20,transform:"skewX(-18deg)",
@@ -3716,7 +3716,7 @@ export default function SonoLane() {
           }}/>
           <span style={{
             flexShrink:0,padding:"7px 22px",borderRadius:9,
-            background:"#fff",border:"2.5px solid #000",
+            background:"#f0f0f0",border:"2.5px solid #000",
             fontSize:22,fontWeight:900,fontStyle:"italic",letterSpacing:1,textTransform:"uppercase",
             color:"#000",
           }}>Start Drive</span>
@@ -3775,7 +3775,7 @@ export default function SonoLane() {
         </div>
 
         {/* ── Tile grid ── */}
-        <div style={{padding:"14px 14px 28px",display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"14px 14px 14px",display:"flex",flexDirection:"column"}}>
 
           {/* ── Discovery radius — display only; change it from Edit Profile ── */}
           <div style={{flexShrink:0,background:"#fff",borderRadius:16,border:"1px solid #ebebeb",padding:"14px",marginBottom:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
@@ -4044,15 +4044,27 @@ export default function SonoLane() {
     };
     return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      {/* Header — matches the Events page: page symbol + name, My Routes / Create top right */}
+      {/* Header — matches the Events page: page symbol + name + Routes/Events
+          toggle, My Routes / Create on their own row underneath */}
       <div style={{padding:"10px 14px 8px",borderBottom:"1px solid #ebebeb",flexShrink:0,background:"#fff"}}>
-        <div style={{display:"flex",alignItems:"center",marginBottom:8}}>
-          <div style={{flex:1}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> Routes</div>
             <div style={{fontSize:9,color:"#111"}}>{filtered.length} showing{appRadius ? " · within "+appRadius+" mi" : ""}</div>
           </div>
-          <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,marginRight:6}}>My Routes</VN>
-          <VN action={()=>setShowPost(true)} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create</VN>
+          {/* Routes/Events toggle — now lives up here since the main nav moved to the bottom */}
+          <div style={{display:"flex",gap:2,background:"#f3f3f3",borderRadius:20,padding:2,flexShrink:0}}>
+            <button onClick={()=>setDiscoverTab("routes")} title="Routes" style={{padding:"7px 11px",borderRadius:18,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="routes"?"#fff":"transparent",boxShadow:discoverTab==="routes"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
+              <DPadIcon id="road" color={discoverTab==="routes"?DPAD_COLORS.road:"#999"} size={14}/>
+            </button>
+            <button onClick={()=>setDiscoverTab("events")} title="Events" style={{padding:"7px 11px",borderRadius:18,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="events"?"#fff":"transparent",boxShadow:discoverTab==="events"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
+              <DPadIcon id="event" color={discoverTab==="events"?DPAD_COLORS.event:"#999"} size={14}/>
+            </button>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:8}}>
+          <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Routes</VN>
+          <VN action={()=>setShowPost(true)} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
         </div>
         <input value={feedSearch} onChange={e=>setFeedSearch(e.target.value)} placeholder="Search routes…" style={{...INP,marginBottom:6}}/>
         <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2}}>
@@ -4144,7 +4156,7 @@ export default function SonoLane() {
               </div>
             </div>
 
-            <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+            <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
 
               {/* Add from Saved Routes button — always visible */}
               <button onClick={()=>setShowRoutePicker(true)} style={{
@@ -4343,15 +4355,26 @@ export default function SonoLane() {
       <div style={{flex:1,display:"flex",flexDirection:"column",background:"#f8f8f8",overflow:"hidden"}}>
         {/* Header */}
         <div style={{padding:"10px 14px 8px",background:"#fff",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",marginBottom:8}}>
-            <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+            <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:15,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="event" color={DPAD_COLORS.event} size={16}/> Events</div>
               <div style={{fontSize:9,color:"#111"}}>
                 {filtered.length} showing{appRadius ? " · within "+appRadius+" mi" : ""}
               </div>
             </div>
-            <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("myevents"),100);}} style={{padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,marginRight:6}}>My Events</VN>
-            <VN action={()=>setShowEvent(true)} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create</VN>
+            {/* Routes/Events toggle — now lives up here since the main nav moved to the bottom */}
+            <div style={{display:"flex",gap:2,background:"#f3f3f3",borderRadius:20,padding:2,flexShrink:0}}>
+              <button onClick={()=>setDiscoverTab("routes")} title="Routes" style={{padding:"7px 11px",borderRadius:18,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="routes"?"#fff":"transparent",boxShadow:discoverTab==="routes"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
+                <DPadIcon id="road" color={discoverTab==="routes"?DPAD_COLORS.road:"#999"} size={14}/>
+              </button>
+              <button onClick={()=>setDiscoverTab("events")} title="Events" style={{padding:"7px 11px",borderRadius:18,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="events"?"#fff":"transparent",boxShadow:discoverTab==="events"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
+                <DPadIcon id="event" color={discoverTab==="events"?DPAD_COLORS.event:"#999"} size={14}/>
+              </button>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("myevents"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Events</VN>
+            <VN action={()=>setShowEvent(true)} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
           </div>
           {/* Search */}
           <input value={evSearch} onChange={e=>setEvSearch(e.target.value)} placeholder="Search events…" style={{...INP,marginBottom:6,fontSize:12,padding:"8px 12px"}}/>
@@ -4372,7 +4395,7 @@ export default function SonoLane() {
 
 
         {/* Feed */}
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 12px 28px"}}>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 12px 14px"}}>
           {filtered.length===0 && events.length===0 && (
             <div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
@@ -4452,7 +4475,7 @@ export default function SonoLane() {
                 <button onClick={()=>setFlyerEvent(null)} style={{position:"absolute",top:14,right:14,width:30,height:30,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:15,cursor:"pointer"}}>×</button>
                 <div style={{position:"absolute",bottom:14,left:14,background:EV_COLORS[flyerEvent.type]||OR,borderRadius:20,padding:"4px 12px",fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase"}}>{flyerEvent.type}</div>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"18px 18px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"18px 18px 14px"}}>
                 <div style={{fontSize:22,fontWeight:900,color:"#111",marginBottom:10,lineHeight:1.2}}>{flyerEvent.title}</div>
                 {flyerEvent.address && (
                   <button onClick={()=>openMaps(flyerEvent.address)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:13,background:"#f0fdf4",border:"1.5px solid #22c55e33",cursor:"pointer",fontFamily:F,marginBottom:14,textAlign:"left"}}>
@@ -4485,7 +4508,7 @@ export default function SonoLane() {
                 <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div>
                 <button onClick={()=>setShowEvent(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:12}}>
                   {eventPhotos.map((p,i)=>(
                     <div key={i} style={{flex:1,height:80,borderRadius:10,overflow:"hidden",position:"relative"}}>
@@ -4525,30 +4548,13 @@ export default function SonoLane() {
     );
   });
 
-  /* ── DISCOVER — Routes feed + Events feed on one page, toggled at the bottom ── */
+  /* ── DISCOVER — Routes feed + Events feed on one page; the Routes/Events
+       toggle itself lives at the top of each page's own header (see the
+       segmented control next to the title in FeedPanel/MapPanel below),
+       now that the main Lanes/SonoLane/Discover nav moved to the bottom. ── */
   const DiscoverPanel = useStablePanel(() => (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {discoverTab==="routes" ? <FeedPanel/> : <MapPanel/>}
-      </div>
-      <div style={{flexShrink:0,display:"flex",borderTop:"1px solid #ebebeb",background:"#fff"}}>
-        <button onClick={()=>setDiscoverTab("routes")} style={{
-          flex:1,padding:"9px 4px 8px",border:"none",cursor:"pointer",fontFamily:F,
-          background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-          borderTop:"2px solid "+(discoverTab==="routes"?DPAD_COLORS.road:"transparent"),
-        }}>
-          <DPadIcon id="road" color={DPAD_COLORS.road} size={18}/>
-          <span style={{fontSize:9,fontWeight:discoverTab==="routes"?800:500,color:discoverTab==="routes"?DPAD_COLORS.road:"#888"}}>Routes</span>
-        </button>
-        <button onClick={()=>setDiscoverTab("events")} style={{
-          flex:1,padding:"9px 4px 8px",border:"none",cursor:"pointer",fontFamily:F,
-          background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-          borderTop:"2px solid "+(discoverTab==="events"?DPAD_COLORS.event:"transparent"),
-        }}>
-          <DPadIcon id="event" color={DPAD_COLORS.event} size={18}/>
-          <span style={{fontSize:9,fontWeight:discoverTab==="events"?800:500,color:discoverTab==="events"?DPAD_COLORS.event:"#888"}}>Events</span>
-        </button>
-      </div>
+      {discoverTab==="routes" ? <FeedPanel/> : <MapPanel/>}
     </div>
   ));
 
@@ -4929,7 +4935,7 @@ export default function SonoLane() {
                 <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚙️ Lanes Settings</div>
                 <button onClick={()=>setShowLanesSettings(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#f8f8f8",marginBottom:10}}>
                   <div style={{flex:1,paddingRight:10}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Show online status</div>
@@ -5738,8 +5744,16 @@ export default function SonoLane() {
     {id:"profile",  label:"SonoLane", iconId:"profile"},
     {id:"discover", label:"Discover", iconId: discoverTab==="events" ? "event" : "road"},
   ];
-  const TopNav = () => (
-    <div style={{flexShrink:0,display:"flex",gap:4,padding:"12px 8px",background:"#fff",borderBottom:"1px solid #ebebeb",zIndex:100}}>
+  // Now a bottom tab bar (moved down from the top) — a top border separates
+  // it from the page content above instead of a bottom border below it.
+  // While Lanes is the active page, it picks up Lanes' own dark grey theme
+  // (matching the chat above it) instead of staying white like every other
+  // page — only the currently-open page's own nav bar tints, not the app
+  // globally.
+  const TopNav = () => {
+    const onLanes = panel==="create";
+    return (
+    <div style={{flexShrink:0,display:"flex",gap:4,padding:"12px 8px",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
       {TOPNAV_ITEMS.map(it=>{
         const active = panel===it.id;
         const color = DPAD_COLORS[it.iconId];
@@ -5750,12 +5764,13 @@ export default function SonoLane() {
             background:active?color+"14":"transparent",
           }}>
             {it.id==="profile" ? <CompassStar size={17} color={color}/> : <DPadIcon id={it.iconId} color={color} size={17}/>}
-            <span style={{fontSize:11,fontWeight:active?800:600,color:active?color:"#888"}}>{it.label}</span>
+            <span style={{fontSize:11,fontWeight:active?800:600,color:active?color:(onLanes?"#8e9297":"#888")}}>{it.label}</span>
           </button>
         );
       })}
     </div>
-  );
+    );
+  };
 
   // Real-backend mode only: block on the session check, then require a
   // signed-in user before the app itself ever renders. Local demo mode
@@ -5793,8 +5808,6 @@ export default function SonoLane() {
       style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
       <style>{"@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}"}</style>
 
-      {panel!=="drive" && <TopNav/>}
-
       <div
         style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}
         onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}
@@ -5802,6 +5815,8 @@ export default function SonoLane() {
       >
         <ActivePanel/>
       </div>
+
+      {panel!=="drive" && <TopNav/>}
 
       {showAgent && (
         <div style={{position:"fixed",bottom:panel==="drive"?132:16,left:8,right:8,zIndex:400,background:"#fff",borderRadius:14,border:"1.5px solid "+pal.color+"44",boxShadow:"0 4px 24px "+pal.color+"22"}}>
@@ -5833,7 +5848,7 @@ export default function SonoLane() {
                 <div style={{fontSize:28}}>{weather.icon}</div>
                 <div><div style={{fontSize:20,fontWeight:900,color:"#111"}}>{weather.temp}°F <span style={{fontSize:13,fontWeight:400,color:"#111"}}>{weather.cond}</span></div><div style={{fontSize:10,color:"#111"}}>Los Angeles, CA</div></div>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>7-DAY FORECAST</div>
                 {FORECAST.map((d,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #f5f5f5"}}>
@@ -5854,7 +5869,7 @@ export default function SonoLane() {
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
                 <div style={{fontSize:16,fontWeight:800,color:"#111"}}>⭐ Star Points</div>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 <div style={{textAlign:"center",padding:"16px 0 20px"}}>
                   <div style={{fontSize:52,fontWeight:900,color:"#f59e0b",lineHeight:1}}>{pts}</div>
                   <div style={{fontSize:12,color:"#111",marginTop:4}}>Level {Math.floor(pts/200)} · {200-(pts%200)} pts to next level</div>
@@ -5874,7 +5889,7 @@ export default function SonoLane() {
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
                 <div style={{fontSize:16,fontWeight:800,color:"#111"}}>👥 Friends</div>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 {friends.length===0?(
                   <div style={{textAlign:"center",padding:"30px 0",color:"#111"}}>
                     <div style={{fontSize:36,marginBottom:8}}>👥</div>
@@ -5894,7 +5909,7 @@ export default function SonoLane() {
                 <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> My Routes</div>
                 <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"5px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ New</button>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 28px"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 14px"}}>
                 {routes.length===0?(
                   <div style={{textAlign:"center",padding:"30px 0",color:"#111"}}>
                     <div style={{fontSize:36,marginBottom:8}}>🗺️</div>
