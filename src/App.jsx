@@ -191,6 +191,35 @@ const SEED_PUBLIC_LANES = [
   { id:"pub_builds",  name:"jdm-and-euro",      desc:"JDM & Euro builds talk",         color:"#22c55e", host:"TruckDog99" },
   { id:"pub_offroad", name:"offroad-trails",    desc:"Trail conditions & meetups",     color:"#a855f7", host:"FreewayFiona" },
 ];
+// Seeds the Route feed with 10 posts on first-ever load, one for each of San
+// Diego's top drives — each with 2 stops along the way (a food stop, then a
+// parking stop) before the destination itself. Posted as your own routes
+// (authorId "me") so every seeded route is fully yours to edit or remove,
+// same as anything you post from scratch.
+const SD_ROUTE_POSTS = [
+  { title:"Balboa Park Cruise",       type:"scenic",    distance:"9 mi",  body:"Easy cruise from downtown up into Balboa Park — grab lunch on the way, then wander the gardens and museums once you're parked.", stops:["Food: Liberty Public Market","Park: Inspiration Point Lot, Balboa Park"], author:"SoCalDrifter"   },
+  { title:"La Jolla Cove Coastal Run", type:"scenic",   distance:"12 mi", body:"Coast-hugging drive up to La Jolla Cove — perfect for sea lion watching and a sunset stop.", stops:["Food: The Cottage La Jolla","Park: Ellen Browning Scripps Park"], author:"NightOwl_Mike"  },
+  { title:"Coronado Beach Day",        type:"scenic",   distance:"7 mi",  body:"Over the bridge to Coronado — classic beach day route with a coffee stop before you park up near the sand.", stops:["Food: Clayton's Coffee Shop","Park: Coronado Beach Public Lot"], author:"TruckDog99"     },
+  { title:"Gaslamp Quarter Night Out", type:"road trip",distance:"6 mi",  body:"Downtown run into the Gaslamp Quarter for a night out — quick bite first, then park and walk the whole strip.", stops:["Food: Ballast Point Brewing, Gaslamp","Park: 5th Avenue Parkade"], author:"FreewayFiona"   },
+  { title:"San Diego Zoo Family Trip", type:"road trip",distance:"10 mi", body:"Family-friendly route up to the Zoo — stop for a quick lunch before the gates so nobody's hangry in line.", stops:["Food: Panera Bread, Hillcrest","Park: San Diego Zoo Main Lot"], author:"CruiseCtrl"     },
+  { title:"USS Midway Museum Run",     type:"road trip",distance:"8 mi",  body:"Harbor-front drive to the USS Midway — grab seafood downtown, then park right on the waterfront.", stops:["Food: Anthony's Fish Grotto","Park: Navy Pier Parking, Downtown"], author:"VanLife_KC"     },
+  { title:"Old Town Heritage Drive",   type:"scenic",   distance:"8 mi",  body:"Short hop into Old Town for the historic district — classic Mexican food stop before you park and explore on foot.", stops:["Food: Old Town Mexican Cafe","Park: Old Town State Historic Park Lot"], author:"SoCalDrifter" },
+  { title:"Sunset Cliffs Golden Hour", type:"hike",     distance:"11 mi", body:"Point Loma drive out to Sunset Cliffs — timed for golden hour, with a fish stop on the way out.", stops:["Food: Point Loma Seafoods","Park: Sunset Cliffs Natural Park Lot"], author:"NightOwl_Mike" },
+  { title:"Mission Beach Boardwalk",   type:"bike",     distance:"9 mi",  body:"Beach cruise to Mission Beach — churros on the way, then park near Belmont Park for the boardwalk.", stops:["Food: Mission Beach Churro Stand","Park: Belmont Park Lot"], author:"TruckDog99"        },
+  { title:"Torrey Pines Reserve Hike", type:"hike",     distance:"14 mi", body:"North county drive to Torrey Pines — coffee stop before the trailhead, then park right at the reserve.", stops:["Food: Torrey Pines Café","Park: Torrey Pines State Reserve Lot"], author:"FreewayFiona"    },
+].map((r,i)=>({
+  id:"sd_route_"+i, title:r.title, type:r.type, body:r.body, distance:r.distance, stops:r.stops,
+  highlights:"", photos:[], fromSaved:false, likes:40+i*23, authorId:"me", authorName:"You",
+}));
+// The same 10 San Diego routes, but shaped for the "My Routes" created-routes
+// list (routes state) instead of the community feed (posts state) — so
+// "My Routes" shows you as having actually created all 10, not just posted
+// them. Same source data, a different id prefix to avoid colliding with the
+// feed-post copies above.
+const SD_ROUTES = SD_ROUTE_POSTS.map((r,i)=>({
+  id:"sd_myroute_"+i, title:r.title, type:r.type, distance:r.distance, bio:r.body, stops:r.stops,
+  color:[OR,"#22c55e","#6366f1","#a855f7"][i%4], public:true,
+}));
 // Simulated vehicle + bio an invited friend shows up with once they "accept"
 // an invite into one of your Shared Garages (no real multi-user backend, so
 // this mirrors the app's existing pattern of a simulated reply — same idea
@@ -278,8 +307,37 @@ const CAR_MODS = {
   Tint:["None","Light","Medium","Dark","Limo"],
   Exhaust:["Stock","Dual","Quad"],
 };
+// Simulated Spotify "Now Playing" queue — a real Spotify connection needs a
+// developer OAuth key we don't have here, so this drives an actually-ticking
+// mini player (real elapsed time, auto-advances tracks) once you tap Connect.
+const SPOTIFY_TRACKS = [
+  {title:"Night Drive",   artist:"Neon Highway", dur:198, color:"#1DB954"},
+  {title:"Coastal Haze",  artist:"Sable Cove",   dur:214, color:"#6366f1"},
+  {title:"Overpass",      artist:"Late Shift",   dur:187, color:"#f97316"},
+  {title:"Static Bloom",  artist:"Radio Static", dur:231, color:"#a855f7"},
+  {title:"Low Beam",      artist:"Sable Cove",   dur:205, color:"#22c55e"},
+];
 const EV_ICONS  = {"car meet":"🚗","party":"🎉","market":"🛍️","concert":"🎵","food":"🌮","art":"🎨"};
 const EV_COLORS = {"car meet":"#f97316","party":"#a855f7","market":"#22c55e","concert":"#6366f1","food":"#ef4444","art":"#ec4899"};
+// Seeds the Events feed with 10 posts on first-ever load — things to do in
+// San Diego, all dated out in 2030 so they always read as upcoming. Posted
+// as your own events (authorId "me") so every one of them is fully yours to
+// edit or remove, same as any event you create from scratch.
+const SD_EVENTS = [
+  { title:"Sunset Cliffs Bonfire Night",       type:"party",    date:"2030-01-18", address:"Sunset Cliffs Natural Park, San Diego, CA", desc:"Beachfront bonfire and live acoustic sets right on the cliffs — bring a chair and watch the sunset over the Pacific." },
+  { title:"Balboa Park Food Truck Festival",   type:"food",     date:"2030-02-14", address:"Balboa Park, San Diego, CA",                 desc:"Dozens of San Diego's best food trucks lined up across the Park's central mesa, with live music all afternoon." },
+  { title:"La Jolla Cove Car Meet",            type:"car meet", date:"2030-03-08", address:"La Jolla Cove, San Diego, CA",                desc:"Weekend car meet along the coast — classics, imports, and everything in between, with an ocean view backdrop." },
+  { title:"Gaslamp Quarter Art Walk",          type:"art",      date:"2030-04-12", address:"Gaslamp Quarter, San Diego, CA",              desc:"Galleries and pop-up studios throw open their doors for a night of live painting, local artists, and street performers." },
+  { title:"Liberty Public Market Bazaar",      type:"market",   date:"2030-05-03", address:"Liberty Public Market, San Diego, CA",        desc:"A weekend bazaar of local makers, vintage finds, and small-batch goods inside and around the market hall." },
+  { title:"Petco Park Summer Concert Series",  type:"concert",  date:"2030-06-21", address:"Petco Park, San Diego, CA",                   desc:"Outdoor summer concert on the Petco Park lawn — gates open early for tailgating in the lot." },
+  { title:"Mission Beach Boardwalk Block Party", type:"party",  date:"2030-07-19", address:"Mission Beach Boardwalk, San Diego, CA",      desc:"A full block of the boardwalk shuts down for DJs, food stalls, and beach games all day into the evening." },
+  { title:"Old Town Taco & Tequila Festival",  type:"food",     date:"2030-08-09", address:"Old Town San Diego State Historic Park, CA",  desc:"Sample tacos and tequila flights from Old Town's best kitchens and bars, with mariachi sets between rounds." },
+  { title:"Coronado Classic Car Show",         type:"car meet", date:"2030-09-13", address:"Coronado Ferry Landing, Coronado, CA",        desc:"Classic and vintage cars lined up along the ferry landing with the downtown skyline across the bay." },
+  { title:"North Park Vinyl & Vintage Market", type:"market",   date:"2030-10-25", address:"North Park, San Diego, CA",                   desc:"Crate-diggers' market of vinyl, vintage clothing, and local record labels spread across North Park's main strip." },
+].map((e,i)=>({
+  id:"sd_event_"+i, title:e.title, type:e.type, desc:e.desc, address:e.address, date:e.date,
+  icon:EV_ICONS[e.type]||"📍", photos:[], authorId:"me", authorName:"You", rsvps:20+i*7,
+}));
 // Premade garage-banner backgrounds — users can pick one of these instead of uploading a photo.
 const CAR_BANNERS = [
   {id:"midnight", label:"Midnight",      css:"linear-gradient(180deg,#1a1a1a 0%,#111 60%,#0d0d0d 100%)"},
@@ -788,7 +846,7 @@ function AuthScreen() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
-  const inp = {width:"100%",padding:"12px 14px",borderRadius:10,background:"#f8f8f8",border:"1px solid #ebebeb",color:"#111",fontSize:14,boxSizing:"border-box",fontFamily:F,outline:"none"};
+  const inp = {width:"100%",padding:"12px 14px",borderRadius:10,background:"#f8f8f8",border:"1px solid #ebebeb",color:"#111",fontSize:16,boxSizing:"border-box",fontFamily:F,outline:"none"};
 
   const submit = async () => {
     setError("");
@@ -822,10 +880,10 @@ function AuthScreen() {
   if (checkEmail) {
     return (
       <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24,paddingTop:"calc(24px + env(safe-area-inset-top, 0px))",paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))",textAlign:"center",boxSizing:"border-box"}}>
-        <div style={{fontSize:44,marginBottom:16}}>📬</div>
-        <div style={{fontSize:17,fontWeight:800,color:"#111",marginBottom:8}}>Check your email</div>
-        <div style={{fontSize:13,color:"#666",maxWidth:280,lineHeight:1.6}}>We sent a confirmation link to <b>{email}</b>. Tap it, then come back and log in.</div>
-        <button onClick={()=>{setCheckEmail(false);setMode("signin");}} style={{marginTop:20,padding:"10px 18px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Back to log in</button>
+        <div style={{fontSize:46,marginBottom:16}}>📬</div>
+        <div style={{fontSize:19,fontWeight:800,color:"#111",marginBottom:8}}>Check your email</div>
+        <div style={{fontSize:15,color:"#666",maxWidth:280,lineHeight:1.6}}>We sent a confirmation link to <b>{email}</b>. Tap it, then come back and log in.</div>
+        <button onClick={()=>{setCheckEmail(false);setMode("signin");}} style={{marginTop:20,padding:"10px 18px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>Back to log in</button>
       </div>
     );
   }
@@ -835,8 +893,8 @@ function AuthScreen() {
       <div style={{width:"100%",maxWidth:320}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <img src={STAR_LOGO} alt="" style={{width:44,height:44,marginBottom:8,borderRadius:10}}/>
-          <div style={{fontSize:20,fontWeight:900,color:"#111"}}>SonoLane</div>
-          <div style={{fontSize:12,color:"#888",marginTop:4}}>{mode==="signup" ? "Create your account" : "Welcome back"}</div>
+          <div style={{fontSize:22,fontWeight:900,color:"#111"}}>SonoLane</div>
+          <div style={{fontSize:14,color:"#888",marginTop:4}}>{mode==="signup" ? "Create your account" : "Welcome back"}</div>
         </div>
         {mode==="signup" && (
           <>
@@ -848,13 +906,13 @@ function AuthScreen() {
         <input value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" type="password"
           onKeyDown={e=>{if(e.key==="Enter")submit();}}
           style={{...inp,marginBottom:12}}/>
-        {error && <div style={{fontSize:12,color:"#ef4444",marginBottom:12,lineHeight:1.5}}>{error}</div>}
-        <button onClick={submit} disabled={busy} style={{width:"100%",padding:"13px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:busy?"default":"pointer",fontFamily:F,opacity:busy?0.7:1,marginBottom:14}}>
+        {error && <div style={{fontSize:14,color:"#ef4444",marginBottom:12,lineHeight:1.5}}>{error}</div>}
+        <button onClick={submit} disabled={busy} style={{width:"100%",padding:"13px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:16,fontWeight:800,cursor:busy?"default":"pointer",fontFamily:F,opacity:busy?0.7:1,marginBottom:14}}>
           {busy ? "One sec…" : mode==="signup" ? "Sign Up" : "Log In"}
         </button>
-        <div style={{textAlign:"center",fontSize:12,color:"#666"}}>
+        <div style={{textAlign:"center",fontSize:14,color:"#666"}}>
           {mode==="signup" ? "Already have an account? " : "New here? "}
-          <button onClick={()=>{setMode(mode==="signup"?"signin":"signup");setError("");}} style={{background:"none",border:"none",color:OR,fontWeight:700,cursor:"pointer",fontFamily:F,fontSize:12,padding:0}}>
+          <button onClick={()=>{setMode(mode==="signup"?"signin":"signup");setError("");}} style={{background:"none",border:"none",color:OR,fontWeight:700,cursor:"pointer",fontFamily:F,fontSize:14,padding:0}}>
             {mode==="signup" ? "Log in" : "Sign up"}
           </button>
         </div>
@@ -891,7 +949,27 @@ export default function SonoLane() {
   const [voiceOn,      setVoiceOn]      = useState(false);
   const [voiceText,    setVoiceText]    = useState("");
   const [aiThinking,   setAiThinking]   = useState(false);
-  const [aiPalId,      setAiPalId]      = useState("nova");
+  const [aiPalId,      setAiPalId]      = usePersistedState("sl_aiPalId", "nova");
+  // "Say Sono to Wake" — Profile > AI setting. Governs voice control
+  // everywhere OUTSIDE Drive mode. When on, the voice-command listener
+  // below starts automatically the moment you leave Drive mode.
+  const [sayWakeEnabled, setSayWakeEnabled] = usePersistedState("sl_sayWake", true);
+  // Drive mode's own separate voice-control setting, in Drive mode's own
+  // Settings sheet — lets you keep voice on inside Drive mode independently
+  // of whatever the rest-of-app setting above is set to.
+  const [driveSayWakeEnabled, setDriveSayWakeEnabled] = usePersistedState("sl_driveSayWake", true);
+  // AI Co-Pilot as a Top 3 Friend — tapping it starts a live voice call
+  // instead of opening a normal friend chat.
+  const [aiInTop3,     setAiInTop3]     = usePersistedState("sl_aiInTop3", false);
+  const [showTop3Chooser, setShowTop3Chooser] = useState(false);
+  const [aiCallOpen,      setAiCallOpen]      = useState(false);
+  const [aiCallListening, setAiCallListening] = useState(false);
+  const [aiCallSpeaking,  setAiCallSpeakingState] = useState(false);
+  const [aiCallInterim,   setAiCallInterim]   = useState("");
+  const aiCallActiveRef   = useRef(false);
+  const aiCallSpeakingRef = useRef(false);
+  const aiCallRecogRef    = useRef(null);
+  const setAiCallSpeaking = v => { aiCallSpeakingRef.current=v; setAiCallSpeakingState(v); };
   const [subPanel,     setSubPanel]     = useState(null);
   // Car customization — persisted via usePersistedState so it survives
   // closing and reopening the app (a phone install, not just this tab),
@@ -923,7 +1001,7 @@ export default function SonoLane() {
   const [userBio,      setUserBio]      = usePersistedState("sl_userBio", "");
   const [userRegion,   setUserRegion]   = usePersistedState("sl_userRegion", ""); // e.g. "Los Angeles, CA" — collected at sign-up
   const [editMode,     setEditMode]     = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState(null); // base64 data URL
+  const [profilePhoto, setProfilePhoto] = usePersistedState("sl_profilePhoto", null); // base64 data URL
   const profilePhotoRef = useRef(null);
   const [carExteriorPhotos, setCarExteriorPhotos] = usePersistedState("sl_carExteriorPhotos", []); // [{id,url}] — up to 4 garage exterior shots
   const [carInteriorPhotos, setCarInteriorPhotos] = usePersistedState("sl_carInteriorPhotos", []); // [{id,url}] — up to 4 garage interior shots
@@ -1039,9 +1117,16 @@ export default function SonoLane() {
     return data || [];
   };
   // Sends a real 1:1 message row — the Lanes Direct Messages backend.
+  // Returns the inserted row's real id so the caller can reconcile it with
+  // the optimistic local copy (see sendChanMsg) — otherwise the next poll
+  // fetches the same message back under its DB id, which doesn't match the
+  // local Date.now() id, and it silently doubles up in the thread.
   const sendMessageSupabase = async (recipientId, text) => {
-    if (!isSupabaseConfigured || !currentUserId || !recipientId || !text.trim()) return;
-    await supabase.from("messages").insert({ sender_id: currentUserId, recipient_id: recipientId, text: text.trim() });
+    if (!isSupabaseConfigured || !currentUserId || !recipientId || !text.trim()) return null;
+    const { data } = await supabase.from("messages")
+      .insert({ sender_id: currentUserId, recipient_id: recipientId, text: text.trim() })
+      .select("id").single();
+    return data ? data.id : null;
   };
   // Loads the full 1:1 history with one friend, both directions.
   const fetchMessagesSupabase = async (otherUserId) => {
@@ -1057,6 +1142,56 @@ export default function SonoLane() {
     if (!isSupabaseConfigured || !currentUserId || !recipientId) return;
     await supabase.from("notifications").insert({ recipient_id: recipientId, actor_id: currentUserId, icon, text });
   };
+  // Events — creating one saves a real row so it shows up on EVERY signed-in
+  // user's Events feed, not just your own device. Local demo mode (no
+  // Supabase project) keeps events device-local like everything else here.
+  // Your own events still live in local state the instant you create them
+  // (see submitEvent) — these helpers are what makes them reach everyone else.
+  const createEventSupabase = async (ev) => {
+    if (!isSupabaseConfigured || !currentUserId) return null;
+    const { data } = await supabase.from("events").insert({
+      author_id: currentUserId, author_name: userName || "You",
+      // The DB column is "description", not "desc" — desc is a reserved
+      // word in Postgres (as in ORDER BY ... DESC) and isn't a valid bare
+      // column name. The app's own event objects keep using "desc"
+      // everywhere else; this is just the wire format for this one table.
+      title: ev.title, type: ev.type, description: ev.desc || "", address: ev.address || "",
+      event_date: ev.date || "", icon: ev.icon || "📍", photos: ev.photos || [], rsvps: 0,
+    }).select("id").single();
+    return data ? data.id : null;
+  };
+  const updateEventSupabase = async (sbId, ev) => {
+    if (!isSupabaseConfigured || !currentUserId || !sbId) return;
+    await supabase.from("events").update({
+      title: ev.title, type: ev.type, description: ev.desc || "", address: ev.address || "",
+      event_date: ev.date || "", icon: ev.icon || "📍", photos: ev.photos || [],
+    }).eq("id", sbId).eq("author_id", currentUserId);
+  };
+  const deleteEventSupabase = async (sbId) => {
+    if (!isSupabaseConfigured || !currentUserId || !sbId) return;
+    await supabase.from("events").delete().eq("id", sbId).eq("author_id", currentUserId);
+  };
+  // Loads every OTHER signed-in user's events for the shared community feed.
+  // Your own stay purely local (already there the instant you create them,
+  // no round trip needed) — this only ever fetches events you didn't author.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    (async () => {
+      const { data } = await supabase.from("events").select("*")
+        .neq("author_id", currentUserId).order("created_at", { ascending: false }).limit(300);
+      if (!data) return;
+      const mapped = data.map(r => ({
+        id: "sb_"+r.id, sbId: r.id, title: r.title, type: r.type, desc: r.description || "",
+        address: r.address || "", date: r.event_date || "", icon: r.icon || "📍",
+        photos: r.photos || [], authorId: r.author_id, authorName: r.author_name || "Driver",
+        rsvps: r.rsvps || 0,
+      }));
+      // Replace any previously-fetched community events with this fresh
+      // batch, but never touch your own local ones (everything not tagged
+      // with the "sb_" id prefix).
+      setEvents(prev => [...mapped, ...prev.filter(e => !String(e.id).startsWith("sb_"))]);
+    })();
+  }, [currentUserId]);
 
   // Live location sharing — a Top 3 Friend perk. Ids of friends it's on for;
   // stays on indefinitely once toggled (no auto-expiry), until turned off.
@@ -1143,27 +1278,97 @@ export default function SonoLane() {
   const [totalMiles, setTotalMiles] = useState(()=>parseFloat(memStore.getItem("sl_miles")||"0"));
   const [playingClip,  setPlayingClip]  = useState(null);
   const [selCalDate,   setSelCalDate]   = useState(null);
-  const [posts,        setPosts]        = useState([]);
+  const [posts,        setPosts]        = usePersistedState("sl_posts", []);
+  // One-time seed: drop the 10 San Diego route posts into the feed the first
+  // time this runs, regardless of what's already in posts (so it still
+  // happens even though "posts" already had a persisted, possibly-empty,
+  // value from before this feature existed). Never repeats once seeded.
+  useEffect(() => {
+    if (memStore.getItem("sl_sdRoutesSeeded")) return;
+    memStore.setItem("sl_sdRoutesSeeded", "1");
+    setPosts(p => [...SD_ROUTE_POSTS, ...p]);
+  }, []);
   const [showPost,     setShowPost]     = useState(false);
   const [newPost,      setNewPost]      = useState({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
   const [postPhotos,   setPostPhotos]   = useState([]);
   const [postRouteMode,setPostRouteMode]= useState("new"); // "new"|"existing"
   const [postSavedRoute,setPostSavedRoute]=useState(null); // selected saved route id
   const [showRoutePicker,setShowRoutePicker]=useState(false);
+  // Which route post (by id) is expanded to its own full-screen info page —
+  // opened by tapping any route card while browsing the feed.
+  const [viewRouteId,  setViewRouteId]  = useState(null);
+  // Which post is being edited via the "Create Route Post" sheet — null
+  // means the sheet is in create-new mode. Every route is yours (authorId
+  // "me"), so every route card can be reopened here and edited.
+  const [editingPostId,setEditingPostId]= useState(null);
   const [likedPosts,   setLikedPosts]   = useState({});
   const [feedSearch,   setFeedSearch]   = useState("");
-  const [events,       setEvents]       = useState([]);
+  const [events,       setEvents]       = usePersistedState("sl_events", []);
+  // One-time seed: drop the 10 San Diego events into the feed the first time
+  // this runs, same pattern as the route posts seed above. Never repeats.
+  useEffect(() => {
+    if (memStore.getItem("sl_sdEventsSeeded")) return;
+    memStore.setItem("sl_sdEventsSeeded", "1");
+    setEvents(p => [...SD_EVENTS, ...p]);
+  }, []);
   const [showEvent,    setShowEvent]    = useState(false);
-  const [newEvent,     setNewEvent]     = useState({title:"",type:"car meet",desc:"",address:""});
+  const [newEvent,     setNewEvent]     = useState({title:"",type:"car meet",desc:"",address:"",date:""});
   const [eventPhotos,  setEventPhotos]  = useState([]);
   const [flyerEvent,   setFlyerEvent]   = useState(null);
-  const [routes,       setRoutes]       = useState([]);
-  const [savedFromFeed,setSavedFromFeed]= useState([]); // routes saved from feed posts
-  const [newRoute,     setNewRoute]     = useState({title:"",type:"commute",distance:"",bio:"",stops:[""]});
+  // Which event is being edited via the Create Event sheet — null means
+  // create-new mode. Only the event's own author (always "me" today) can
+  // open this in edit mode.
+  const [editingEventId, setEditingEventId] = useState(null);
+  // Optimistic per-viewer RSVP toggle — same pattern as likedPosts — layered
+  // on top of each event's base `rsvps` count.
+  const [rsvpedEvents, setRsvpedEvents] = useState({});
+  const [routes,       setRoutes]       = usePersistedState("sl_routes", []);
+  // One-time seed: the 10 San Diego routes also count as routes you've
+  // actually created (not just posted to the feed), so "My Routes" and your
+  // Stats show 10 created routes. Same never-repeats pattern as the events
+  // and route-post seeds above.
+  // NOTE: this used to share the "sl_sdRoutesSeeded" flag with the feed-post
+  // seed above — since both effects run on mount, the posts seed always set
+  // that flag first, so this one always saw it already set and never ran,
+  // and "My Routes" stayed empty. Given its own flag so it actually fires.
+  useEffect(() => {
+    if (memStore.getItem("sl_sdMyRoutesSeeded")) return;
+    memStore.setItem("sl_sdMyRoutesSeeded", "1");
+    setRoutes(p => [...SD_ROUTES, ...p]);
+  }, []);
+  const [savedFromFeed,setSavedFromFeed]= usePersistedState("sl_savedFromFeed", []); // routes saved from feed posts
+  const [newRoute,     setNewRoute]     = useState({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
+  // Which "My Routes" entry (by id) is being edited via the Create/Edit
+  // Route sheet — null means the sheet is in create-new mode, same pattern
+  // as editingEventId/editingPostId elsewhere.
+  const [editingRouteId, setEditingRouteId] = useState(null);
+  const openEditRoute = (r) => {
+    setNewRoute({ title:r.title||"", type:r.type||"commute", distance:r.distance||"", bio:r.bio||"", stops:r.stops?.length?[...r.stops]:[""], public:!!r.public });
+    setEditingRouteId(r.id);
+    setSubPanel("createroute");
+  };
   const [showMusic,    setShowMusic]    = useState(false);
   const [musicTab,     setMusicTab]     = useState(()=>memStore.getItem("sl_radioTab")||"lanes"); // last mode persists
   const [startupSound,  setStartupSound]  = useState(()=>memStore.getItem("sl_startupSound")||"classic");
   const [spotifyLinked,setSpotifyLinked]= useState(false);
+  // Spotify "Now Playing" activity — a real Spotify connection needs their
+  // own developer OAuth key, which we don't have, but once you've linked in
+  // My Music this actually ticks forward in real time and advances tracks,
+  // driven by the play/pause you tap on the widget or in My Music.
+  const [spotifyTrackIdx, setSpotifyTrackIdx] = useState(0);
+  const [spotifyPlaying,  setSpotifyPlaying]  = useState(false);
+  const [spotifyElapsed,  setSpotifyElapsed]  = useState(0);
+  useEffect(() => {
+    if(!spotifyPlaying) return;
+    const t = setInterval(() => {
+      setSpotifyElapsed(e => {
+        const dur = SPOTIFY_TRACKS[spotifyTrackIdx].dur;
+        if(e+1 >= dur){ setSpotifyTrackIdx(i => (i+1)%SPOTIFY_TRACKS.length); return 0; }
+        return e+1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [spotifyPlaying, spotifyTrackIdx]);
   const [appleOn,      setAppleOn]      = useState(false);
   const [isBroad,      setIsBroad]      = useState(false);
   const [broadName,    setBroadName]    = useState("");
@@ -1286,9 +1491,55 @@ export default function SonoLane() {
   const [sonoMode,     setSonoMode]     = useState("notes");
   const [aiInput,      setAiInput]      = useState("");
   const [aiChat,       setAiChat]       = useState([{role:"ai",text:"Ready. Say \"Sono\" to ask me anything."}]);
-  const [leftWidget,   setLeftWidget]   = useState("weather");
-  const [rightWidget,  setRightWidget]  = useState("dashcam");
+  // Drive mode's 3 stacked widget slots (top/mid/bottom of the widgets
+  // column) — persisted so your picks survive closing the app, same as
+  // every other saved preference.
+  const [widget1,      setWidget1]      = usePersistedState("sl_driveWidget1", "weather");
+  const [widget2,      setWidget2]      = usePersistedState("sl_driveWidget2", "points");
+  const [widget3,      setWidget3]      = usePersistedState("sl_driveWidget3", "dashcam");
+  // Per-slot "only show when turned on" — when true, that slot disappears
+  // (instead of showing an idle widget) until it's actually active, and the
+  // remaining slot(s) stretch to fill the freed space since they're just
+  // equal flex children of the same row/column.
+  const [widget1OnlyOn, setWidget1OnlyOn] = usePersistedState("sl_driveWidget1OnlyOn", false);
+  const [widget2OnlyOn, setWidget2OnlyOn] = usePersistedState("sl_driveWidget2OnlyOn", false);
+  const [widget3OnlyOn, setWidget3OnlyOn] = usePersistedState("sl_driveWidget3OnlyOn", false);
   const [widgetEdit,   setWidgetEdit]   = useState(null);
+  // Where the widget picker was opened from, so its back button can return
+  // there instead of just closing — "drive" means the small ⚙️ list inside
+  // Drive mode; null means it was opened directly (e.g. from Profile).
+  const [widgetEditFrom, setWidgetEditFrom] = useState(null);
+  // Small "⚙️ Widgets" button at the bottom of Drive mode's apps bar — quick
+  // access to the same 3-slot picker without leaving Drive mode.
+  const [showWidgetSettings, setShowWidgetSettings] = useState(false);
+  // Drive mode's main app area (the ~2/3-width panel) — which of the 5 apps
+  // in the bottom apps bar is currently filling it. Always opens back on
+  // Maps when Drive mode starts.
+  const [driveApp,     setDriveApp]     = useState("map");
+  // Set by "Get Directions" on a route card — carries that route's title
+  // (the actual destination) and stops (intermediate food/parking stops)
+  // into Drive mode's Maps app, so the live map loads straight into that
+  // route instead of a plain current-location view.
+  const [driveDirections, setDriveDirections] = useState(null);
+  // Drive mode's layout adapts to phone orientation: portrait puts the apps
+  // strip along the side and the widgets bar along the bottom; landscape
+  // keeps apps along the bottom of the main area with widgets stacked on
+  // the side. Tracked live via matchMedia so rotating the phone re-flows it.
+  const [driveOrientation, setDriveOrientation] = useState(
+    (typeof window!=="undefined" && window.matchMedia && window.matchMedia("(orientation: portrait)").matches) ? "portrait" : "landscape"
+  );
+  useEffect(() => {
+    if (typeof window==="undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(orientation: portrait)");
+    const onChange = () => setDriveOrientation(mq.matches ? "portrait" : "landscape");
+    onChange();
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
   const [appRadius,    setAppRadius]    = usePersistedState("sl_radius", null); // global radius in miles (null = any)
   const [widgetAction, setWidgetAction] = useState(null); // 'weather'|'music'|'points'|'friends'
   // Reset voice counter when page state changes
@@ -1359,7 +1610,7 @@ export default function SonoLane() {
   // setDashcamConsent(true) doesn't take effect until the next render, so
   // the `dashcamConsent` closed over here would otherwise still read false
   // for the rest of this same click handler.
-  const go = (p, { forceDashcamConsent } = {}) => {
+  const go = (p, { forceDashcamConsent, directions } = {}) => {
     // Exiting Drive mode while the dashcam is recording stops & saves the
     // clip — recording runs continuously for the whole drive regardless of
     // momentary speed, and only ends when Drive mode itself ends.
@@ -1367,9 +1618,14 @@ export default function SonoLane() {
       stopDrive();
     }
     setPanel(p); setSubPanel(null); setShowAgent(false); setMapInteractive(false);
+    // Entering Drive mode always opens straight to Maps — carrying the
+    // just-picked route's directions along if this call came from "Get
+    // Directions" on a route card, or clearing any stale ones from a
+    // previous route otherwise (e.g. tapping the plain Start button).
+    if(p==="drive"){ setDriveApp("map"); setDriveDirections(directions || null); }
     // Using the Dashcam widget? Start recording the instant Drive mode opens,
     // rather than waiting for the speed-based auto-start threshold.
-    if(p==="drive" && (dashcamConsent||forceDashcamConsent) && !dashOn && (leftWidget==="dashcam"||rightWidget==="dashcam")){
+    if(p==="drive" && (dashcamConsent||forceDashcamConsent) && !dashOn && (widget1==="dashcam"||widget2==="dashcam"||widget3==="dashcam")){
       startDrive(forceDashcamConsent);
     }
   };
@@ -1466,13 +1722,15 @@ export default function SonoLane() {
     };
     r.onerror=()=>{};
     recogRef.current=r;
+    // Which setting governs right now depends on where you are: Drive
+    // mode's own "Say Sono to Wake" toggle (Drive mode Settings) while
+    // you're in Drive mode, or the rest-of-app one (Profile > AI)
+    // everywhere else. No manual mic button anymore — purely settings-driven.
+    const wakeActive = panel==="drive" ? driveSayWakeEnabled : sayWakeEnabled;
+    if(wakeActive){ try{ r.start(); setVoiceOn(true); }catch{} }
+    else { setVoiceOn(false); }
     return ()=>{ try{r.stop();}catch{} };
-  },[panel,sonoMode]);
-
-  const toggleVoice = () => {
-    if(!voiceOn){setVoiceOn(true);try{recogRef.current?.start();}catch{}}
-    else{setVoiceOn(false);setVoiceText("");try{recogRef.current?.stop();}catch{}}
-  };
+  },[panel,sonoMode,sayWakeEnabled,driveSayWakeEnabled]);
 
   // Picks a video format the CURRENT browser can actually both record AND
   // play back. Safari/iOS never supported the plain `new MediaRecorder(st)`
@@ -1663,19 +1921,20 @@ export default function SonoLane() {
 
   useEffect(() => {
     if (!dashcamConsent) return;
-    if (gpsSpeed >= 10 && !dashOn) {
+    // Dashcam only ever records while Drive mode is actually open — leaving
+    // Drive mode (go() already calls stopDrive() the moment the panel
+    // changes) means no recording keeps running in the background on any
+    // other page, even if the phone is still reading a driving speed.
+    if (panel!=="drive") {
       if (autoStopTimerRef.current) { clearTimeout(autoStopTimerRef.current); autoStopTimerRef.current = null; }
-      startDrive();
-    } else if (gpsSpeed < 5 && dashOn && panel!=="drive" && !autoStopTimerRef.current) {
-      // Low-speed auto-stop only applies outside Drive mode — while actively
-      // driving, recording continues for the whole session regardless of
-      // momentary speed (stop lights, traffic, etc.) and is only stopped by
-      // explicitly exiting Drive mode.
-      autoStopTimerRef.current = setTimeout(() => { stopDrive(); autoStopTimerRef.current = null; }, 20000);
-    } else if ((gpsSpeed >= 5 || panel==="drive") && autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
+      return;
     }
+    if (gpsSpeed >= 10 && !dashOn) {
+      startDrive();
+    }
+    // While actively in Drive mode, recording continues for the whole
+    // session regardless of momentary speed (stop lights, traffic, etc.) —
+    // it only stops by explicitly exiting Drive mode.
   }, [gpsSpeed, dashOn, dashcamConsent, panel]);
 
   // Re-attach the live camera stream to the preview <video> whenever the
@@ -1705,11 +1964,74 @@ export default function SonoLane() {
     setAiChat(c=>[...c,{role:"ai",text:reply}]); setAiThinking(false);
   };
 
+  // ── AI Co-Pilot voice call (Top 3 Friends) ──────────────────────────────
+  // A live, spoken back-and-forth with your AI Co-Pilot, startable from the
+  // My Profile page. Every turn — yours and the AI's — is written straight
+  // into aiChat, the same store the Lanes sidebar's "Sono AI" channel reads,
+  // so the whole call sits there afterward as a transcribed conversation.
+  const handleAiCallTurn = async (text) => {
+    if(!text.trim()) return;
+    setAiChat(c=>[...c,{role:"user",text:text.trim()}]);
+    setAiCallInterim("");
+    // Stop listening while Sono is thinking/talking so it doesn't hear itself.
+    try{ aiCallRecogRef.current?.stop(); }catch{}
+    setAiCallListening(false);
+    const reply = await callClaude(
+      [{role:"user",content:text.trim()}],
+      "You are "+pal.name+", a "+pal.desc+" AI driving co-pilot, on a live spoken phone call with the driver. Reply in 1-2 short natural sentences, the way you'd actually talk out loud."
+    );
+    setAiChat(c=>[...c,{role:"ai",text:reply}]);
+    const resumeListening = () => {
+      if(!aiCallActiveRef.current) return;
+      try{ aiCallRecogRef.current?.start(); setAiCallListening(true); }catch{}
+    };
+    if(window.speechSynthesis){
+      setAiCallSpeaking(true);
+      const utt = new SpeechSynthesisUtterance(reply);
+      utt.onend = utt.onerror = () => { setAiCallSpeaking(false); resumeListening(); };
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utt);
+    } else {
+      resumeListening();
+    }
+  };
+  const startAiCall = () => {
+    setAiChat(c=>[...c,{role:"ai",text:"📞 Voice call started with "+pal.name+"."}]);
+    setAiCallOpen(true);
+    aiCallActiveRef.current = true;
+    const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR) return; // sheet still opens — shows a "voice isn't supported" notice
+    const r = new SR();
+    r.continuous = true; r.interimResults = true;
+    r.onresult = e => {
+      const allResults = Array.from(e.results);
+      const finals = allResults.filter(x=>x.isFinal).map(x=>x[0].transcript).join(" ").trim();
+      const interim = allResults.filter(x=>!x.isFinal).map(x=>x[0].transcript).join(" ");
+      setAiCallInterim(interim);
+      if(finals) handleAiCallTurn(finals);
+    };
+    r.onerror = () => {};
+    r.onend = () => { if(aiCallActiveRef.current && !aiCallSpeakingRef.current){ try{ r.start(); }catch{} } };
+    aiCallRecogRef.current = r;
+    try{ r.start(); setAiCallListening(true); }catch{}
+  };
+  const endAiCall = () => {
+    aiCallActiveRef.current = false;
+    try{ aiCallRecogRef.current?.stop(); }catch{}
+    aiCallRecogRef.current = null;
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+    setAiCallOpen(false);
+    setAiCallListening(false);
+    setAiCallSpeaking(false);
+    setAiCallInterim("");
+    setAiChat(c=>[...c,{role:"ai",text:"📞 Call ended."}]);
+  };
+
   /* shared styles */
-  const INP  = {width:"100%",padding:"10px 12px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",color:"#111",fontSize:13,boxSizing:"border-box",fontFamily:F,outline:"none"};
+  const INP  = {width:"100%",padding:"10px 12px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",color:"#111",fontSize:15,boxSizing:"border-box",fontFamily:F,outline:"none"};
   const CARD = {background:"#fff",borderRadius:14,border:"1px solid #ebebeb",padding:"14px",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,0.04)"};
-  const SEC  = {fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:4};
-  const TAG  = on => ({padding:"5px 11px",borderRadius:20,fontSize:11,fontWeight:600,cursor:"pointer",background:on?OR:"#f3f3f3",color:on?"#fff":"#888",border:"none",fontFamily:F});
+  const SEC  = {fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:4};
+  const TAG  = on => ({padding:"5px 11px",borderRadius:20,fontSize:13,fontWeight:600,cursor:"pointer",background:on?OR:"#f3f3f3",color:on?"#fff":"#888",border:"none",fontFamily:F});
 
   const weather = {icon:"☀️",temp:72,cond:"Sunny"};
   const WW = {width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2};
@@ -1719,12 +2041,55 @@ export default function SonoLane() {
   ];
   const renderWidget = (id, side) => {
     const openAction = () => setWidgetAction(id);
-    if(id==="weather") return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:22}}>{weather.icon}</div><div style={{fontSize:16,fontWeight:900,color:"#111"}}>{weather.temp}°</div><div style={{fontSize:7,color:"#111"}}>{weather.cond}</div></button>;
-    if(id==="points")  return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:18}}>⭐</div><div style={{fontSize:16,fontWeight:900,color:"#f59e0b"}}>{pts}</div><div style={{fontSize:7,color:"#111"}}>pts</div></button>;
-    if(id==="friends") return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:20}}>👥</div><div style={{fontSize:9,color:"#111"}}>{friends.length} friends</div></button>;
-    if(id==="music")   return <button onClick={()=>{setMusicTab("music");memStore.setItem("sl_radioTab","music");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:20}}>🎵</div><div style={{fontSize:9,color:"#111"}}>Music</div></button>;
-    if(id==="cbradio") return <button onClick={()=>{setMusicTab("lanes");memStore.setItem("sl_radioTab","lanes");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:20}}>📡</div><div style={{fontSize:9,color:"#111"}}>CB Radio</div></button>;
-    if(id==="routes")  return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><DPadIcon id="road" color={DPAD_COLORS.road} size={20}/><div style={{fontSize:16,fontWeight:900,color:"#6366f1"}}>{routes.length}</div><div style={{fontSize:7,color:"#111"}}>routes</div></button>;
+    if(id==="weather") return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:24}}>{weather.icon}</div><div style={{fontSize:18,fontWeight:900,color:"#111"}}>{weather.temp}°</div><div style={{fontSize:9,color:"#111"}}>{weather.cond}</div></button>;
+    if(id==="points")  return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:20}}>⭐</div><div style={{fontSize:18,fontWeight:900,color:"#f59e0b"}}>{pts}</div><div style={{fontSize:9,color:"#111"}}>pts</div></button>;
+    if(id==="friends") return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:22}}>👥</div><div style={{fontSize:11,color:"#111"}}>{friends.length} friends</div></button>;
+    if(id==="topfriends") return (
+      // Same Top 3 row as My Profile (AI Co-Pilot can occupy slot 0) — tap
+      // jumps straight there since that's the one place it's fully managed.
+      <button onClick={()=>go("profile")} style={{...WW,background:"none",border:"none",cursor:"pointer",gap:4}}>
+        <div style={{fontSize:9,fontWeight:800,letterSpacing:1,color:"#111"}}>TOP 3</div>
+        <div style={{display:"flex",gap:4}}>
+          {[0,1,2].map(i=>{
+            if(aiInTop3 && i===0){
+              return <div key="ai" style={{width:24,height:24,borderRadius:"50%",background:pal.color+"22",border:"1.5px solid "+pal.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={12} color={pal.color}/></div>;
+            }
+            const fr = friends[aiInTop3?i-1:i];
+            return (
+              <div key={i} style={{width:24,height:24,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#eee"),border:fr?"none":"1.5px dashed #ccc",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:fr?"#fff":"#bbb",fontWeight:800,overflow:"hidden",flexShrink:0}}>
+                {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
+              </div>
+            );
+          })}
+        </div>
+      </button>
+    );
+    if(id==="music")   return <button onClick={()=>{setMusicTab("music");memStore.setItem("sl_radioTab","music");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:22}}>🎵</div><div style={{fontSize:11,color:"#111"}}>My Music</div></button>;
+    if(id==="cbradio") return <button onClick={()=>{setMusicTab("lanes");memStore.setItem("sl_radioTab","lanes");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:22}}>📡</div><div style={{fontSize:11,color:"#111"}}>CB Radio</div></button>;
+    if(id==="spotify") return (
+      // Real Spotify activity needs their own developer OAuth key, which we
+      // don't have — once linked in My Music, this tap-to-play/pause and the
+      // progress bar are real, ticking state (see the spotifyPlaying effect).
+      <button onClick={()=>{ if(!spotifyLinked){ setMusicTab("music"); memStore.setItem("sl_radioTab","music"); setShowMusic(true); return; } setSpotifyPlaying(p=>!p); }} style={{...WW,background:"none",border:"none",cursor:"pointer",padding:"4px 8px"}}>
+        {!spotifyLinked ? (<>
+          <div style={{fontSize:22}}>🎧</div>
+          <div style={{fontSize:10,color:"#111"}}>Connect Spotify</div>
+        </>) : (<>
+          <div style={{display:"flex",alignItems:"center",gap:6,width:"100%"}}>
+            <div style={{width:26,height:26,borderRadius:6,background:SPOTIFY_TRACKS[spotifyTrackIdx].color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>🎵</div>
+            <div style={{flex:1,minWidth:0,textAlign:"left"}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{SPOTIFY_TRACKS[spotifyTrackIdx].title}</div>
+              <div style={{fontSize:9,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{SPOTIFY_TRACKS[spotifyTrackIdx].artist}</div>
+            </div>
+            <span style={{fontSize:15,flexShrink:0}}>{spotifyPlaying?"⏸":"▶️"}</span>
+          </div>
+          <div style={{width:"100%",height:3,borderRadius:2,background:"#e5e5e5",overflow:"hidden",marginTop:3}}>
+            <div style={{height:"100%",background:"#1DB954",width:(spotifyElapsed/SPOTIFY_TRACKS[spotifyTrackIdx].dur*100)+"%"}}/>
+          </div>
+        </>)}
+      </button>
+    );
+    if(id==="routes")  return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><DPadIcon id="road" color={DPAD_COLORS.road} size={20}/><div style={{fontSize:18,fontWeight:900,color:"#6366f1"}}>{routes.length}</div><div style={{fontSize:9,color:"#111"}}>routes</div></button>;
     if(id==="dashcam") return (
       // Live recording preview only — no navigation. First tap without consent
       // opens a one-time inline setup prompt; the full Dashcam settings page
@@ -1737,18 +2102,105 @@ export default function SonoLane() {
             style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}
           />
         ) : (
-          <div style={{fontSize:20}}>📹</div>
+          <div style={{fontSize:22}}>📹</div>
         )}
         {dashOn && <span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",display:"block",zIndex:2}}/>}
-        {!dashOn && <div style={{fontSize:9,color:"#bbb"}}>{dashcamConsent?"Dashcam":"Tap to enable"}</div>}
+        {!dashOn && <div style={{fontSize:11,color:"#bbb"}}>{dashcamConsent?"Dashcam":"Tap to enable"}</div>}
       </button>
     );
-    return <div style={{...WW,color:"#111"}}><div style={{fontSize:18}}>＋</div><div style={{fontSize:7}}>empty</div></div>;
+    return <div style={{...WW,color:"#111"}}><div style={{fontSize:20}}>＋</div><div style={{fontSize:9}}>empty</div></div>;
   };
 
   const openMaps = addr => {
     if(!addr)return;
     window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(addr)+"&travelmode=driving","_blank");
+  };
+
+  // "Get Directions" on any route card — loads that route's stops + destination
+  // straight into Drive mode's Maps app so you route yourself without ever
+  // leaving the app. The embedded map shows the route + stops inline; a
+  // "Start Navigation" button inside Drive mode hands the same route off to
+  // the phone's Maps app for real turn-by-turn once you're ready to drive.
+  const startRouteDirections = (route) => {
+    go("drive", { directions: { title: route.title, stops: (route.stops||[]).filter(s=>s&&s.trim()) } });
+  };
+  // Builds the legacy "saddr/daddr" chain the embeddable maps.google.com/maps
+  // iframe understands for multi-stop directions (the modern maps/dir/?api=1
+  // link isn't embeddable) — each stop chained with "+to:" ahead of the
+  // route's real destination (its title).
+  const buildEmbedDirectionsSrc = (dd) => {
+    const points = [...(dd.stops||[]), dd.title].filter(Boolean).map(p=>encodeURIComponent(p));
+    return "https://maps.google.com/maps?saddr=My+Location&daddr="+points.join("+to:")+"&output=embed";
+  };
+  // Hands the same route to the phone's own Maps app for real GPS-guided
+  // turn-by-turn — no origin is passed, so Maps starts from wherever you
+  // actually are.
+  const startTurnByTurn = (dd) => {
+    let url = "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(dd.title)+"&travelmode=driving";
+    if(dd.stops?.length) url += "&waypoints="+encodeURIComponent(dd.stops.join("|"));
+    window.open(url,"_blank");
+  };
+
+  // An event only takes RSVPs while it's still upcoming — a plain string
+  // date compare works fine since every date here is stored "YYYY-MM-DD".
+  const isFutureEvent = (dateStr) => !!dateStr && dateStr >= new Date().toISOString().slice(0,10);
+  const toggleRsvp = (id) => setRsvpedEvents(r=>({...r,[id]:!r[id]}));
+  const resetEventForm = () => {
+    setNewEvent({title:"",type:"car meet",desc:"",address:"",date:""});
+    setEventPhotos([]);
+    setEditingEventId(null);
+  };
+  const closeEventSheet = () => { setShowEvent(false); setEditingEventId(null); };
+  // Every event is yours (authorId "me"), so the pencil on any event card
+  // reopens this same sheet pre-filled, in edit mode instead of create mode.
+  const openEditEvent = (ev) => {
+    setNewEvent({ title: ev.title||"", type: ev.type||"car meet", desc: ev.desc||"", address: ev.address||"", date: ev.date||"" });
+    setEventPhotos(ev.photos||[]);
+    setEditingEventId(ev.id);
+    setShowEvent(true);
+  };
+  const submitEvent = () => {
+    if(!newEvent.title.trim()) return;
+    const eventData = { ...newEvent, icon: EV_ICONS[newEvent.type]||"📍", photos: eventPhotos };
+    if(editingEventId){
+      setEvents(p=>p.map(x=>x.id===editingEventId?{...x,...eventData}:x));
+      setFlyerEvent(fe=>fe&&fe.id===editingEventId?{...fe,...eventData}:fe);
+      // Already reached the shared feed (has a real Supabase row)? Keep
+      // that row in sync too, so everyone else's copy updates as well.
+      const existing = events.find(x=>x.id===editingEventId);
+      if(existing?.sbId) updateEventSupabase(existing.sbId, eventData);
+    } else {
+      const ev = { id: Date.now(), ...eventData, authorId:"me", authorName: userName||"You", rsvps:0 };
+      setEvents(p=>{const ne=[ev,...p]; setTimeout(()=>checkAchievements({events:ne}),200); return ne;});
+      setNotifications(n=>[{id:Date.now(),icon:"⚡",text:"Your event \""+newEvent.title+"\" is now live in the community feed!",ts:"now",read:false},...n]);
+      setFlyerEvent(ev);
+      // Save a real row too, so it shows up on EVERY signed-in user's
+      // Events feed — not just this device. Reconciled onto the local copy
+      // by id once the insert resolves, so a later edit/delete finds it.
+      createEventSupabase(ev).then(sbId => {
+        if(!sbId) return;
+        setEvents(p=>p.map(x=>x.id===ev.id?{...x,sbId}:x));
+      });
+    }
+    resetEventForm();
+    setShowEvent(false);
+  };
+
+  // CB Radio broadcasting — shared by the CB Radio page (MusicModal's "lanes"
+  // tab) and Drive mode's inline CB Radio app, so both places talk on lanes
+  // the same way. A finished broadcast gets "transcribed & summarized" into a
+  // traffic report on that lane, with a simulated reply from another CB'er
+  // most of the time.
+  const pushReport = (laneId, handle, color) => {
+    const rep = TRAFFIC_REPORTS[Math.floor(Math.random()*TRAFFIC_REPORTS.length)];
+    setLaneTrafficUpdates(m=>({...m,[laneId]:[{id:Date.now()+Math.random(),icon:rep.icon,text:rep.text,handle,color,ts:Date.now()},...(m[laneId]||[])]}));
+  };
+  const broadcastOnLane = (laneId) => {
+    pushReport(laneId, userName||"You", OR);
+    if(Math.random()<0.7){
+      const h = CB_HANDLES[Math.floor(Math.random()*CB_HANDLES.length)];
+      setTimeout(()=>pushReport(laneId, h.name, h.color), 1500+Math.random()*1500);
+    }
   };
 
 
@@ -1764,7 +2216,7 @@ export default function SonoLane() {
           position:"absolute",top:-7,left:-7,zIndex:30,
           width:18,height:18,borderRadius:"50%",
           background:"#6366f1",color:"#fff",
-          fontSize:n>99?5.5:n>9?6.5:8,fontWeight:900,
+          fontSize:n>99?7.5:n>9?8.5:10,fontWeight:900,
           lineHeight:"18px",textAlign:"center",
           pointerEvents:"none",
           boxShadow:"0 1px 5px rgba(99,102,241,0.5)",
@@ -1797,6 +2249,9 @@ export default function SonoLane() {
     // of the profile, or a car tile inside My Garage — so its back button can
     // return you to wherever you actually came from instead of always one place.
     const [carDetailFrom, setCarDetailFrom] = useState("profile");
+    // Private car info now opens from a wallet button at the bottom of the
+    // car page instead of always sitting inline on the page.
+    const [showPrivateCard, setShowPrivateCard] = useState(false);
 
     // Friends tab — search box filters your existing friends by name; a
     // separate search inside the "Add a Friend" sheet looks people up (by
@@ -1835,13 +2290,13 @@ export default function SonoLane() {
     // (Friends, Shared Garage members) so calling feels the same everywhere.
     const CallOverlay = () => !callingFriend ? null : (
       <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
-        <div style={{fontSize:10,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>{callingFriend.status==="ringing"?"CALLING":"LIVE CALL"}</div>
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>{callingFriend.status==="ringing"?"CALLING":"LIVE CALL"}</div>
         <FriendAvatar fr={callingFriend.friend} size={96} fontSize={32} style={{marginBottom:18,animation:callingFriend.status==="ringing"?"pulse 1.4s ease-in-out infinite":"none"}}/>
-        <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>{callingFriend.friend.name}</div>
-        <div style={{fontSize:12,color:"#aaa",marginBottom:48}}>
+        <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{callingFriend.friend.name}</div>
+        <div style={{fontSize:14,color:"#aaa",marginBottom:48}}>
           {callingFriend.status==="ringing" ? "Ringing…" : String(Math.floor(callingFriend.secs/60)).padStart(2,"0")+":"+String(callingFriend.secs%60).padStart(2,"0")}
         </div>
-        <button onClick={()=>setCallingFriend(null)} style={{width:60,height:60,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:22,cursor:"pointer"}}>✕</button>
+        <button onClick={()=>setCallingFriend(null)} style={{width:60,height:60,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:24,cursor:"pointer"}}>✕</button>
       </div>
     );
 
@@ -1858,23 +2313,23 @@ export default function SonoLane() {
           <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
             <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:quickUser.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",flexShrink:0}}>{quickUser.initials}</div>
+              <div style={{width:52,height:52,borderRadius:"50%",background:quickUser.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff",flexShrink:0}}>{quickUser.initials}</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{quickUser.name}</div>
-                <div style={{fontSize:11,color:"#111"}}>@{quickUser.handle}</div>
+                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{quickUser.name}</div>
+                <div style={{fontSize:13,color:"#111"}}>@{quickUser.handle}</div>
               </div>
             </div>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <button onClick={()=>{
                 if(isF){setFollowing(f=>f.filter(x=>x.id!==quickUser.id));}
                 else{setFollowing(f=>[...f,quickUser]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+quickUser.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
-              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
+              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
                 {isF?"✓ Following":"+ Follow"}
               </button>
               <button disabled={isFriend||reqSent} onClick={()=>{
                 setFriendRequestsSent(r=>[...r,quickUser.id]);
                 setNotifications(n=>[{id:Date.now(),icon:"🤝",text:"Friend request sent to "+quickUser.name+".",ts:"now",read:false},...n]);
-              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:(isFriend||reqSent)?"default":"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:isFriend?"#22c55e11":reqSent?"#f3f3f3":OR+"15",color:isFriend?"#22c55e":reqSent?"#888":OR}}>
+              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:(isFriend||reqSent)?"default":"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isFriend?"#22c55e11":reqSent?"#f3f3f3":OR+"15",color:isFriend?"#22c55e":reqSent?"#888":OR}}>
                 {isFriend?"✓ Friends":reqSent?"Request Sent":"🤝 Send Friend Request"}
               </button>
             </div>
@@ -1884,10 +2339,10 @@ export default function SonoLane() {
               setQuickUser(null);
               setActiveChan(quickUser.id);
               go("create");
-            }} style={{width:"100%",padding:"12px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800}}>
+            }} style={{width:"100%",padding:"12px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800}}>
               💬 Message
             </button>
-            <button onClick={()=>setQuickUser(null)} style={{width:"100%",padding:"10px",marginTop:10,borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:11,fontFamily:F}}>Close</button>
+            <button onClick={()=>setQuickUser(null)} style={{width:"100%",padding:"10px",marginTop:10,borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:13,fontFamily:F}}>Close</button>
           </div>
         </div>
       );
@@ -1905,18 +2360,28 @@ export default function SonoLane() {
     // Reusable photo-gallery grid — used for the garage's exterior/interior
     // shots. Tap the dashed "+" tile to upload (multi-select), tap the ×
     // on a thumbnail to remove it.
-    const PhotoGallery = (photos, setPhotos, fileRef, max=12) => (
+    const PhotoGallery = (photos, setPhotos, fileRef, max=12) => {
+      // One empty slot shown at a time — uploading a photo fills it and adds
+      // a fresh empty slot right after, growing one at a time until `max`
+      // photos are filled. Small galleries (car's 4 exterior/interior slots)
+      // still get the shadowed grid-tile look, just without pre-showing all
+      // the unfilled slots up front.
+      const showAllSlots = max<=4;
+      const cols = showAllSlots ? 2 : 3;
+      const emptyCount = photos.length<max ? 1 : 0;
+      const slotShadow = showAllSlots ? "0 1px 4px rgba(0,0,0,0.08)" : "none";
+      return (
       <>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat("+cols+",1fr)",gap:8,marginBottom:8}}>
           {photos.map(p=>(
-            <div key={p.id} style={{position:"relative",aspectRatio:"1",borderRadius:10,overflow:"hidden",background:"#f5f5f5"}}>
+            <div key={p.id} style={{position:"relative",aspectRatio:"1",borderRadius:10,overflow:"hidden",background:"#f5f5f5",boxShadow:slotShadow}}>
               <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-              <button onClick={()=>setPhotos(ps=>ps.filter(x=>x.id!==p.id))} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+              <button onClick={()=>setPhotos(ps=>ps.filter(x=>x.id!==p.id))} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
             </div>
           ))}
-          {photos.length<max && (
-            <button onClick={()=>fileRef.current?.click()} style={{aspectRatio:"1",borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:22,color:"#111",cursor:"pointer"}}>+</button>
-          )}
+          {Array.from({length:emptyCount}).map((_,i)=>(
+            <button key={"empty"+i} onClick={()=>fileRef.current?.click()} style={{aspectRatio:"1",borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",boxShadow:slotShadow,fontSize:26,color:"#bbb",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          ))}
         </div>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
           Array.from(e.target.files||[]).slice(0,Math.max(0,max-photos.length)).forEach(f=>{
@@ -1927,48 +2392,84 @@ export default function SonoLane() {
           e.target.value="";
         }}/>
       </>
-    );
+      );
+    };
 
     /* routes sub */
+    const myPostedRoutes = posts.filter(p=>p.authorId==="me");
     if(subPanel==="routes") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> My Routes</div>
-          <VN action={()=>{setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""]});setSubPanel("createroute");}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Route</VN>
+          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> My Routes</div>
+          <VN action={()=>{setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});setEditingRouteId(null);setSubPanel("createroute");}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Route</VN>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 24px"}}>
 
           {/* My Created Routes */}
-          {routes.length===0 && savedFromFeed.length===0 && (
+          {routes.length===0 && savedFromFeed.length===0 && myPostedRoutes.length===0 && (
             <div style={{textAlign:"center",padding:"40px 0",color:"#111"}}>
-              <div style={{fontSize:36,marginBottom:8}}>🗺️</div>
-              <div style={{fontSize:12,fontWeight:700,color:"#111",marginBottom:4}}>No saved routes</div>
-              <div style={{fontSize:11,color:"#111"}}>Create your own route or save one from the Route feed.</div>
+              <div style={{fontSize:38,marginBottom:8}}>🗺️</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#111",marginBottom:4}}>No saved routes</div>
+              <div style={{fontSize:13,color:"#111"}}>Create your own route or save one from the Route feed.</div>
             </div>
+          )}
+
+          {/* My Route Posts — routes you've published to the community Route
+              feed (includes the starter San Diego routes posted to your
+              account), each editable only by you via the feed's pencil icon. */}
+          {myPostedRoutes.length>0 && (
+            <>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>MY ROUTE POSTS</div>
+              {myPostedRoutes.map(r => (
+                <div key={r.id} style={{...CARD,border:"1.5px solid "+OR+"22",background:OR+"06"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{r.title}</div>
+                      <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""} · ❤️ {r.likes||0}</div>
+                    </div>
+                    <button onClick={()=>{
+                      setNewPost({title:r.title||"",body:r.body||"",type:r.type||"scenic",distance:r.distance||"",stops:r.stops?.length?[...r.stops,""]:["",""],highlights:r.highlights||""});
+                      setPostPhotos(r.photos||[]); setPostSavedRoute(null); setPostRouteMode("new"); setEditingPostId(r.id); setShowPost(true);
+                      go("discover"); setDiscoverTab("routes");
+                    }} title="Edit route post" style={{width:26,height:26,borderRadius:"50%",background:"#fff",border:"1px solid #ebebeb",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+                  </div>
+                  {r.stops?.length>0 && (
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+                      {r.stops.map((s,i)=><span key={i} style={{fontSize:11,background:OR+"11",borderRadius:20,padding:"2px 7px",color:OR}}>📍 {s}</span>)}
+                    </div>
+                  )}
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>startRouteDirections(r)} style={{flex:1,padding:"7px",borderRadius:8,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭 Get Directions</button>
+                    <button onClick={()=>setPosts(p=>p.filter(x=>x.id!==r.id))} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:12,color:"#111",cursor:"pointer"}}>✕</button>
+                  </div>
+                </div>
+              ))}
+            </>
           )}
 
           {routes.length>0 && (
             <>
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>MY ROUTES</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>MY ROUTES</div>
               {routes.map(r => (
                 <div key={r.id} style={CARD}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                     <div style={{width:10,height:10,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#111"}}>{r.title}</div>
-                      <div style={{fontSize:9,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{r.title}</div>
+                      <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
                     </div>
+                    <button onClick={()=>openEditRoute(r)} title="Edit route" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
                   </div>
-                  {r.bio && <div style={{fontSize:10,color:"#111",fontStyle:"italic",marginBottom:8,lineHeight:1.5}}>{r.bio}</div>}
+                  {r.bio && <div style={{fontSize:12,color:"#111",fontStyle:"italic",marginBottom:8,lineHeight:1.5}}>{r.bio}</div>}
                   {r.stops?.filter(s=>s&&s.trim()).length>0 && (
                     <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
-                      {r.stops.filter(s=>s&&s.trim()).map((s,i)=><span key={i} style={{fontSize:9,background:OR+"11",borderRadius:20,padding:"2px 7px",color:OR}}>📍 {s}</span>)}
+                      {r.stops.filter(s=>s&&s.trim()).map((s,i)=><span key={i} style={{fontSize:11,background:OR+"11",borderRadius:20,padding:"2px 7px",color:OR}}>📍 {s}</span>)}
                     </div>
                   )}
                   <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>openMaps(r.title)} style={{flex:1,padding:"7px",borderRadius:8,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Navigate</button>
-                    <button onClick={()=>setRoutes(rs=>rs.filter(x=>x.id!==r.id))} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:10,color:"#111",cursor:"pointer"}}>✕</button>
+                    <button onClick={()=>startRouteDirections(r)} style={{flex:1,padding:"7px",borderRadius:8,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭 Get Directions</button>
+                    <button onClick={()=>setRoutes(rs=>rs.filter(x=>x.id!==r.id))} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:12,color:"#111",cursor:"pointer"}}>✕</button>
                   </div>
                 </div>
               ))}
@@ -1978,31 +2479,31 @@ export default function SonoLane() {
           {/* Saved from Feed */}
           {savedFromFeed.length>0 && (
             <>
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:routes.length>0?14:0}}>SAVED FROM FEED</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:routes.length>0?14:0}}>SAVED FROM FEED</div>
               {savedFromFeed.map(r => (
                 <div key={r.id} style={{...CARD,border:"1.5px solid #6366f122",background:"#f8f8ff"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                     <div style={{width:10,height:10,borderRadius:"50%",background:r.color,flexShrink:0}}/>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#111"}}>{r.title}</div>
-                      <div style={{fontSize:9,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{r.title}</div>
+                      <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
                     </div>
-                    <div style={{fontSize:8,background:"#6366f1",color:"#fff",borderRadius:20,padding:"2px 7px",fontWeight:700,flexShrink:0}}>Feed</div>
+                    <div style={{fontSize:10,background:"#6366f1",color:"#fff",borderRadius:20,padding:"2px 7px",fontWeight:700,flexShrink:0}}>Feed</div>
                   </div>
-                  {r.highlights && <div style={{fontSize:10,color:"#111",fontStyle:"italic",marginBottom:8}}>✨ {r.highlights}</div>}
+                  {r.highlights && <div style={{fontSize:12,color:"#111",fontStyle:"italic",marginBottom:8}}>✨ {r.highlights}</div>}
                   {r.stops?.length>0 && (
                     <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
-                      {r.stops.map((s,i)=><span key={i} style={{fontSize:9,background:"#ebebf5",borderRadius:20,padding:"2px 7px",color:"#6366f1"}}>📍 {s}</span>)}
+                      {r.stops.map((s,i)=><span key={i} style={{fontSize:11,background:"#ebebf5",borderRadius:20,padding:"2px 7px",color:"#6366f1"}}>📍 {s}</span>)}
                     </div>
                   )}
                   <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>openMaps(r.title)} style={{flex:1,padding:"7px",borderRadius:8,background:"#6366f1",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Navigate</button>
+                    <button onClick={()=>startRouteDirections(r)} style={{flex:1,padding:"7px",borderRadius:8,background:"#6366f1",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭 Get Directions</button>
                     <button onClick={()=>{
                       const C=[OR,"#22c55e","#6366f1","#a855f7"];
                       setRoutes(rs=>{const nr=[{id:Date.now(),title:r.title,type:r.type,distance:r.distance,color:C[rs.length%C.length]},...rs]; setTimeout(()=>checkAchievements({routes:nr}),200); return nr;});
                       setSavedFromFeed(s=>s.filter(x=>x.id!==r.id));
-                    }} style={{padding:"7px 10px",borderRadius:8,background:"#f3f3f3",border:"1px solid #ebebeb",fontSize:9,color:"#6366f1",fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add to Mine</button>
-                    <button onClick={()=>setSavedFromFeed(s=>s.filter(x=>x.id!==r.id))} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:10,color:"#111",cursor:"pointer"}}>✕</button>
+                    }} style={{padding:"7px 10px",borderRadius:8,background:"#f3f3f3",border:"1px solid #ebebeb",fontSize:11,color:"#6366f1",fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add to Mine</button>
+                    <button onClick={()=>setSavedFromFeed(s=>s.filter(x=>x.id!==r.id))} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:12,color:"#111",cursor:"pointer"}}>✕</button>
                   </div>
                 </div>
               ))}
@@ -2022,16 +2523,37 @@ export default function SonoLane() {
         if(!newRoute.title.trim()) return;
         const C=[OR,"#22c55e","#6366f1","#a855f7"];
         const cleanStops = newRoute.stops.map(s=>s.trim()).filter(Boolean);
-        setRoutes(rs=>{const nr=[{id:Date.now(),...newRoute,stops:cleanStops,color:C[rs.length%C.length]},...rs]; setTimeout(()=>checkAchievements({routes:nr}),200); return nr;});
-        setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""]});
+        if(editingRouteId){
+          setRoutes(rs=>rs.map(x=>x.id===editingRouteId?{...x,...newRoute,stops:cleanStops}:x));
+        } else {
+          setRoutes(rs=>{const nr=[{id:Date.now(),...newRoute,stops:cleanStops,color:C[rs.length%C.length]},...rs]; setTimeout(()=>checkAchievements({routes:nr}),200); return nr;});
+          // Public routes also post to the Route feed right away, same shape as
+          // sharing an existing saved route from the feed's own "+ Create" sheet.
+          if(newRoute.public){
+            setPosts(p=>[{
+              id: Date.now()+1, title: newRoute.title, type: newRoute.type, body: newRoute.bio,
+              distance: newRoute.distance, stops: cleanStops, highlights: "", photos: [],
+              fromSaved: true, savedRouteName: newRoute.title, likes: 0,
+              authorId: "me", authorName: userName||"You",
+            },...p]);
+            setNotifications(n=>[{id:Date.now()+2,icon:"🗺️",text:"Your route \""+newRoute.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
+          }
+        }
+        setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
+        setEditingRouteId(null);
+        setSubPanel("routes");
+      };
+      const cancelRoute = () => {
+        setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
+        setEditingRouteId(null);
         setSubPanel("routes");
       };
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={()=>setSubPanel("routes")} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> Create Route</div>
-          <button onClick={saveRoute} style={{padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
+          <button onClick={cancelRoute} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> {editingRouteId?"Edit Route":"Create Route"}</div>
+          <button onClick={saveRoute} style={{padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 32px"}}>
 
@@ -2040,17 +2562,17 @@ export default function SonoLane() {
 
           <div style={SEC}>TYPE</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
-            {["commute","scenic","hike","road trip","bike"].map(t=><button key={t} onClick={()=>setNewRoute(r=>({...r,type:t}))} style={TAG(newRoute.type===t)}>{t}</button>)}
+            {["commute","home","scenic","hike","road trip","bike"].map(t=><button key={t} onClick={()=>setNewRoute(r=>({...r,type:t}))} style={TAG(newRoute.type===t)}>{t}</button>)}
           </div>
 
           <div style={SEC}>STOPS</div>
           {newRoute.stops.map((s,i)=>(
             <div key={i} style={{display:"flex",gap:6,marginBottom:8}}>
               <input value={s} onChange={e=>setStop(i,e.target.value)} placeholder={"Address for stop "+(i+1)+"…"} style={{...INP,flex:1}}/>
-              {newRoute.stops.length>1 && <button onClick={()=>removeStop(i)} style={{padding:"0 12px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:12,color:"#111",cursor:"pointer"}}>✕</button>}
+              {newRoute.stops.length>1 && <button onClick={()=>removeStop(i)} style={{padding:"0 12px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:14,color:"#111",cursor:"pointer"}}>✕</button>}
             </div>
           ))}
-          <button onClick={addStop} style={{width:"100%",padding:"10px",borderRadius:9,background:"none",border:"1.5px dashed "+OR+"66",color:OR,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:14}}>+ Add Stop</button>
+          <button onClick={addStop} style={{width:"100%",padding:"10px",borderRadius:9,background:"none",border:"1.5px dashed "+OR+"66",color:OR,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:14}}>+ Add Stop</button>
 
           <div style={SEC}>DISTANCE (OPTIONAL)</div>
           <input value={newRoute.distance} onChange={e=>setNewRoute(r=>({...r,distance:e.target.value}))} placeholder="e.g. 12 mi" style={{...INP,marginBottom:14}}/>
@@ -2058,7 +2580,17 @@ export default function SonoLane() {
           <div style={SEC}>BIO</div>
           <textarea value={newRoute.bio} onChange={e=>setNewRoute(r=>({...r,bio:e.target.value}))} placeholder="Describe the route — what makes it worth driving, things to look out for…" rows={4} style={{...INP,resize:"none",marginBottom:14}}/>
 
-          <button onClick={saveRoute} style={{width:"100%",padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>💾 Save Route</button>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#f8f8f8",marginBottom:14}}>
+            <div style={{flex:1,paddingRight:10}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Make Public</div>
+              <div style={{fontSize:12,color:"#888",marginTop:2}}>Public routes also show up in the Route feed for others to discover.</div>
+            </div>
+            <button onClick={()=>setNewRoute(r=>({...r,public:!r.public}))} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:newRoute.public?OR:"#ddd",position:"relative",flexShrink:0,padding:0}}>
+              <div style={{position:"absolute",top:2,left:newRoute.public?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+            </button>
+          </div>
+
+          <button onClick={saveRoute} style={{width:"100%",padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>{editingRouteId?"💾 Save Changes":"💾 Save Route"}</button>
         </div>
       </div>
       );
@@ -2071,13 +2603,13 @@ export default function SonoLane() {
     if(subPanel==="garage") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DefaultAvatar size={18} color="#555"/> My Profile</div>
+          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DefaultAvatar size={18} color="#555"/> My Profile</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 7px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <span style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
-            <span style={{fontSize:9,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
+            <span style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
+            <span style={{fontSize:11,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             {/* Active car — reads the live carName/carColor/etc. fields, same as every other screen that shows "your car". */}
@@ -2087,8 +2619,8 @@ export default function SonoLane() {
                   ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                   : <CarSVG color={carColor} mods={carMods} size={62} styleId={carBodyStyle}/>}
               </div>
-              {carName && <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{carName}</div>}
-              <div style={{fontSize:9,color:"#111",marginTop:carName?2:0}}>{carSaved?"✓ saved":carModel}</div>
+              {carName && <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{carName}</div>}
+              <div style={{fontSize:11,color:"#111",marginTop:carName?2:0}}>{carSaved?"✓ saved":carModel}</div>
             </button>
             {/* Other saved cars — tap to make one active and open its details. */}
             {myCars.map(car=>(
@@ -2098,40 +2630,40 @@ export default function SonoLane() {
                     ? <img src={car.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                     : <CarSVG color={car.color} mods={car.mods} size={62} styleId={car.bodyStyle}/>}
                 </div>
-                {car.name && <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{car.name}</div>}
-                <div style={{fontSize:9,color:"#111",marginTop:car.name?2:0}}>{car.saved?"✓ saved":car.model}</div>
+                {car.name && <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{car.name}</div>}
+                <div style={{fontSize:11,color:"#111",marginTop:car.name?2:0}}>{car.saved?"✓ saved":car.model}</div>
               </button>
             ))}
             {/* Add another car — up to MAX_CARS total. */}
             {(1+myCars.length) < MAX_CARS && (
               <button onClick={()=>{addNewCar();setCarDetailFrom("garage");setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
-                <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,flexShrink:0,fontSize:28,color:"#ccc"}}>＋</div>
-                <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center"}}>Add Another Car</div>
-                <div style={{fontSize:9,color:"#111",marginTop:2}}>{MAX_CARS-1-myCars.length} slot{MAX_CARS-1-myCars.length===1?"":"s"} left</div>
+                <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,flexShrink:0,fontSize:30,color:"#ccc"}}>＋</div>
+                <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center"}}>Add Another Car</div>
+                <div style={{fontSize:11,color:"#111",marginTop:2}}>{MAX_CARS-1-myCars.length} slot{MAX_CARS-1-myCars.length===1?"":"s"} left</div>
               </button>
             )}
           </div>
 
           <button onClick={()=>setShowCreateSharedGarage(true)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:14,border:"1.5px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,textAlign:"left",marginBottom:14}}>
-            <div style={{width:40,height:40,borderRadius:10,background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#ccc",flexShrink:0}}>＋</div>
+            <div style={{width:40,height:40,borderRadius:10,background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#ccc",flexShrink:0}}>＋</div>
             <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
-              <div style={{fontSize:9,color:"#111",marginTop:1}}>Invite friends to add their own vehicle, chat, and call.</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
+              <div style={{fontSize:11,color:"#111",marginTop:1}}>Invite friends to add their own vehicle, chat, and call.</div>
             </div>
           </button>
 
           {sharedGarages.length>0 && (
             <>
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,margin:"22px 0 12px"}}>SHARED GARAGES</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,margin:"22px 0 12px"}}>SHARED GARAGES</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {sharedGarages.map(g=>(
                   <button key={g.id} onClick={()=>{setSelSharedGarage(g.id);setSubPanel("sharedgarage");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid #ebebeb",background:"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                    <div style={{width:44,height:44,borderRadius:12,background:g.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🚗</div>
+                    <div style={{width:44,height:44,borderRadius:12,background:g.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚗</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
-                      <div style={{fontSize:10,color:"#111"}}>{g.vehicles.length} vehicle{g.vehicles.length===1?"":"s"} · {g.memberIds.length+1} member{g.memberIds.length===0?"":"s"}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
+                      <div style={{fontSize:12,color:"#111"}}>{g.vehicles.length} vehicle{g.vehicles.length===1?"":"s"} · {g.memberIds.length+1} member{g.memberIds.length===0?"":"s"}</div>
                     </div>
-                    <span style={{fontSize:14,color:"#ccc"}}>›</span>
+                    <span style={{fontSize:16,color:"#ccc"}}>›</span>
                   </button>
                 ))}
               </div>
@@ -2143,19 +2675,19 @@ export default function SonoLane() {
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowCreateSharedGarage(false);setNewGarageInvitees([]);}}>
             <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:4}}>Create a Shared Garage</div>
-              <div style={{fontSize:10,color:"#111",marginBottom:14}}>Invite friends to add their own vehicle, chat as a group, and call each other — all in one place.</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Create a Shared Garage</div>
+              <div style={{fontSize:12,color:"#111",marginBottom:14}}>Invite friends to add their own vehicle, chat as a group, and call each other — all in one place.</div>
               <input value={newSharedGarageName} onChange={e=>setNewSharedGarageName(e.target.value)} placeholder="e.g. The Crew's Builds" style={{...INP,marginBottom:14}}/>
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.8,marginBottom:8}}>INVITE FRIENDS</div>
-              {friends.length===0 && <div style={{fontSize:11,color:"#111",marginBottom:14}}>Add some friends first to invite them.</div>}
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.8,marginBottom:8}}>INVITE FRIENDS</div>
+              {friends.length===0 && <div style={{fontSize:13,color:"#111",marginBottom:14}}>Add some friends first to invite them.</div>}
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
                 {friends.map(fr=>{
                   const picked = newGarageInvitees.includes(fr.id);
                   return (
                     <button key={fr.id} onClick={()=>setNewGarageInvitees(p=>picked?p.filter(x=>x!==fr.id):[...p,fr.id])} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:picked?"1.5px solid "+OR:"1px solid #ebebeb",background:picked?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                       <FriendAvatar fr={fr} size={30} fontSize={11}/>
-                      <div style={{flex:1,fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div>
-                      <div style={{width:18,height:18,borderRadius:5,border:picked?"none":"1.5px solid #ddd",background:picked?OR:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>{picked?"✓":""}</div>
+                      <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                      <div style={{width:18,height:18,borderRadius:5,border:picked?"none":"1.5px solid #ddd",background:picked?OR:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{picked?"✓":""}</div>
                     </button>
                   );
                 })}
@@ -2186,7 +2718,7 @@ export default function SonoLane() {
                   });
                   setNewSharedGarageName("");setNewGarageInvitees([]);setShowCreateSharedGarage(false);
                   setSelSharedGarage(gid);setSubPanel("sharedgarage");
-                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create</button>
+                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create</button>
                 <button onClick={()=>{setShowCreateSharedGarage(false);setNewGarageInvitees([]);}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
               </div>
             </div>
@@ -2207,30 +2739,30 @@ export default function SonoLane() {
       return (
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={()=>{setSubPanel("garage");setSelSharedGarage(null);}} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-            <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {g.name}</div>
-            <VN action={()=>{setActiveChan(g.laneId);go("create");}} style={{padding:"6px 12px",borderRadius:20,background:"#5865f2",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>💬 Group Chat</VN>
+            <button onClick={()=>{setSubPanel("garage");setSelSharedGarage(null);}} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+            <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {g.name}</div>
+            <VN action={()=>{setActiveChan(g.laneId);go("create");}} style={{padding:"6px 12px",borderRadius:20,background:"#5865f2",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>💬 Group Chat</VN>
           </div>
           <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 7px"}}>
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
 
             {/* Your vehicle */}
             {myVehicle ? (
               <div style={{...CARD,marginBottom:10,border:"1.5px solid "+OR+"33"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:40,height:40,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🚘</div>
+                  <div style={{width:40,height:40,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🚘</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:800,color:"#111"}}>{myVehicle.name} <span style={{fontSize:9,fontWeight:700,color:OR}}>· You</span></div>
-                    <div style={{fontSize:10,color:"#111",marginTop:2}}>{myVehicle.bio}</div>
+                    <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{myVehicle.name} <span style={{fontSize:11,fontWeight:700,color:OR}}>· You</span></div>
+                    <div style={{fontSize:12,color:"#111",marginTop:2}}>{myVehicle.bio}</div>
                   </div>
                 </div>
               </div>
             ) : (
               <button onClick={()=>setShowAddVehicle(true)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:14,borderRadius:14,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,marginBottom:10,textAlign:"left"}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:"#ccc",flexShrink:0}}>＋</div>
+                <div style={{width:40,height:40,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#ccc",flexShrink:0}}>＋</div>
                 <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Add Your Vehicle</div>
-                  <div style={{fontSize:9,color:"#111"}}>Give it a name and a short bio</div>
+                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Add Your Vehicle</div>
+                  <div style={{fontSize:11,color:"#111"}}>Give it a name and a short bio</div>
                 </div>
               </button>
             )}
@@ -2243,14 +2775,14 @@ export default function SonoLane() {
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:v?10:0}}>
                     <FriendAvatar fr={fr} size={40} fontSize={14}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:800,color:"#111"}}>{fr.name}</div>
-                      <div style={{fontSize:10,color:"#111"}}>{v ? v.name : "Invited · waiting to add their vehicle…"}</div>
+                      <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{fr.name}</div>
+                      <div style={{fontSize:12,color:"#111"}}>{v ? v.name : "Invited · waiting to add their vehicle…"}</div>
                     </div>
                   </div>
-                  {v && <div style={{fontSize:10,color:"#111",marginBottom:10}}>{v.bio}</div>}
+                  {v && <div style={{fontSize:12,color:"#111",marginBottom:10}}>{v.bio}</div>}
                   <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>setCallingFriend({friend:fr,status:"ringing",secs:0})} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:10,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
-                    <button onClick={()=>{setActiveChan(fr.id);go("create");}} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:10,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
+                    <button onClick={()=>setCallingFriend({friend:fr,status:"ringing",secs:0})} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
+                    <button onClick={()=>{setActiveChan(fr.id);go("create");}} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
                   </div>
                 </div>
               );
@@ -2259,12 +2791,12 @@ export default function SonoLane() {
             {/* Invite more friends */}
             {invitableFriends.length>0 && (
               <div style={{marginTop:8}}>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>INVITE MORE FRIENDS</div>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>INVITE MORE FRIENDS</div>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {invitableFriends.map(fr=>(
                     <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
                       <FriendAvatar fr={fr} size={30} fontSize={11}/>
-                      <div style={{flex:1,fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                      <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
                       <button onClick={()=>{
                         setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:[...x.memberIds,fr.id]}:x));
                         setTimeout(()=>{
@@ -2272,7 +2804,7 @@ export default function SonoLane() {
                           setSharedGarages(gs=>gs.map(x=>x.id===g.id ? {...x,vehicles:[...x.vehicles,{id:"v_"+Date.now(),ownerId:fr.id,ownerName:fr.name,ownerInitials:fr.initials,ownerColor:fr.color,name:car.name,bio:car.bio}]} : x));
                           setNotifications(n=>[{id:Date.now(),icon:"🚗",text:fr.name+" joined "+g.name+" and added their "+car.name+".",ts:"now",read:false},...n]);
                         }, 1800);
-                      }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Invite</button>
+                      }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Invite</button>
                     </div>
                   ))}
                 </div>
@@ -2284,7 +2816,7 @@ export default function SonoLane() {
             <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowAddVehicle(false)}>
               <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
                 <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-                <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:14}}>Add Your Vehicle</div>
+                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Add Your Vehicle</div>
                 <input value={newVehicle.name} onChange={e=>setNewVehicle(v=>({...v,name:e.target.value}))} placeholder="e.g. '20 Civic Type R" style={{...INP,marginBottom:8}}/>
                 <textarea value={newVehicle.bio} onChange={e=>setNewVehicle(v=>({...v,bio:e.target.value}))} placeholder="Short bio — mods, story, whatever you want the crew to know" style={{...INP,minHeight:70,resize:"vertical",marginBottom:14}}/>
                 <div style={{display:"flex",gap:8}}>
@@ -2292,7 +2824,7 @@ export default function SonoLane() {
                     if(!newVehicle.name.trim())return;
                     setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,vehicles:[...x.vehicles,{id:"v_me_"+Date.now(),ownerId:"me",ownerName:userName||"You",ownerInitials:"ME",ownerColor:OR,name:newVehicle.name.trim(),bio:newVehicle.bio.trim()||"No bio yet."}]}:x));
                     setNewVehicle({name:"",bio:""});setShowAddVehicle(false);
-                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
+                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
                   <button onClick={()=>setShowAddVehicle(false)} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
                 </div>
               </div>
@@ -2309,11 +2841,11 @@ export default function SonoLane() {
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={()=>setSubPanel(carDetailFrom==="garage"?"garage":null)} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}>
+          <button onClick={()=>setSubPanel(carDetailFrom==="garage"?"garage":null)} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}>
             {carDetailFrom==="garage" ? <><GarageDoorIcon size={18} color="#555"/> My Garage</> : <><DefaultAvatar size={18} color="#555"/> My Profile</>}
           </div>
-          <button onClick={()=>setSubPanel("editcar")} title="Edit car" style={{width:34,height:34,borderRadius:"50%",fontSize:19,background:"none",color:"#111",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
+          <button onClick={()=>setSubPanel("editcar")} title="Edit car" style={{width:34,height:34,borderRadius:"50%",fontSize:21,background:"none",color:"#111",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 7px"}}>
 
@@ -2326,15 +2858,21 @@ export default function SonoLane() {
                 : <CarSVG color={carColor} mods={carMods} size={200} styleId={carBodyStyle}/>}
             </div>
             <div style={{marginTop:10,textAlign:"center",zIndex:1}}>
-              <div style={{fontSize:18,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carName||"Unnamed"}</div>
-              <div style={{fontSize:11,color:"#ddd",marginTop:2,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carBrand ? (CAR_BRANDS.find(b=>b.id===carBrand)?.name+" ") : ""}{carModel} · {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length} mods</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carName || CAR_BRANDS.find(b=>b.id===carBrand)?.name || "My Car"}</div>
+              {(carName || carModel) && <div style={{fontSize:13,color:"#ddd",marginTop:2,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{(carName && carBrand) ? (CAR_BRANDS.find(b=>b.id===carBrand)?.name+" ") : ""}{carModel} · {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length} mods</div>}
             </div>
+            {/* Private car info — opens from this wallet button on the car
+                avatar window instead of always sitting inline on the page.
+                Same data, edited from Edit Car, only ever visible to you. */}
+            <button onClick={()=>setShowPrivateCard(true)} title="Private Car Info" style={{position:"absolute",bottom:10,right:10,width:38,height:38,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,zIndex:2}}>
+              👛
+            </button>
           </div>
 
           {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length>0&&(
             <div style={{padding:"12px 16px 0",display:"flex",gap:5,flexWrap:"wrap"}}>
               {Object.entries(carMods).filter(([,v])=>v&&v!=="None"&&v!=="Stock").map(([k,v])=>(
-                <div key={k} style={{background:OR+"15",border:"1px solid "+OR+"33",borderRadius:20,padding:"3px 10px",fontSize:9,fontWeight:700,color:OR}}>{k}: {v}</div>
+                <div key={k} style={{background:OR+"15",border:"1px solid "+OR+"33",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,color:OR}}>{k}: {v}</div>
               ))}
             </div>
           )}
@@ -2344,13 +2882,13 @@ export default function SonoLane() {
                 right above Photos, only when the owner has written one. */}
             {carBio && carBio.trim() && (<>
               <div style={SEC}>BIO</div>
-              <div style={{...CARD,fontSize:12,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carBio}</div>
+              <div style={{...CARD,fontSize:14,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carBio}</div>
             </>)}
 
             <div style={SEC}>PHOTOS</div>
-            <div style={{fontSize:10,color:"#111",fontWeight:700,marginBottom:6}}>EXTERIOR (UP TO 4)</div>
+            <div style={{fontSize:12,color:"#111",fontWeight:700,marginBottom:6}}>EXTERIOR (UP TO 4)</div>
             {PhotoGallery(carExteriorPhotos, setCarExteriorPhotos, carExteriorPhotoRef, 4)}
-            <div style={{fontSize:10,color:"#111",fontWeight:700,marginTop:10,marginBottom:6}}>INTERIOR (UP TO 4)</div>
+            <div style={{fontSize:12,color:"#111",fontWeight:700,marginTop:10,marginBottom:6}}>INTERIOR (UP TO 4)</div>
             {PhotoGallery(carInteriorPhotos, setCarInteriorPhotos, carInteriorPhotoRef, 4)}
 
             <div style={{...SEC,marginTop:16}}>DRIVING STATS</div>
@@ -2367,56 +2905,11 @@ export default function SonoLane() {
               ].map(s=>(
                 <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",padding:"12px 14px"}}>
                   <div style={{marginBottom:6}}>{s.icKind==="dpad" ? <DPadIcon id={s.ic} color={s.dc} size={20}/> : <ProfileIcon id={s.ic} size={20} color={s.pc||"#8a8f98"}/>}</div>
-                  <div style={{fontSize:16,fontWeight:900,color:"#111",lineHeight:1}}>{s.val}</div>
-                  <div style={{fontSize:8,color:"#111",marginTop:3}}>{s.label}</div>
+                  <div style={{fontSize:18,fontWeight:900,color:"#111",lineHeight:1}}>{s.val}</div>
+                  <div style={{fontSize:10,color:"#111",marginTop:3}}>{s.label}</div>
                 </div>
               ))}
             </div>
-
-            {(carPlate||carRegDate||carMileage||carPrivateNotes||carPrivatePhotos.length>0)&&<>
-              {/* Private car info — only visible to the owner here on their
-                  own device; never shown on posts, the home hero, or anywhere
-                  else public. Quick-reference card, edited from Edit Car.
-                  Tinted (instead of the plain white every other card uses)
-                  so it visually reads as "not like the rest of this page". */}
-              <div style={{...SEC,display:"flex",alignItems:"center",gap:5}}><span>🔒</span> PRIVATE CAR INFO</div>
-              <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0",marginBottom:14}}>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,marginBottom:8}}>Only visible to you.</div>
-                {carPrivatePhotos.length>0 && (
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:carPlate||carRegDate||carMileage||carPrivateNotes?10:0}}>
-                    {carPrivatePhotos.map(p=>(
-                      <div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#f0e6c8"}}>
-                        <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {carPlate && (
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
-                    <span style={{fontSize:10,color:"#111"}}>License Plate</span>
-                    <span style={{fontSize:11,fontWeight:700,color:"#111"}}>{carPlate}</span>
-                  </div>
-                )}
-                {carRegDate && (
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
-                    <span style={{fontSize:10,color:"#111"}}>Registration Date</span>
-                    <span style={{fontSize:11,fontWeight:700,color:"#111"}}>{new Date(carRegDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>
-                  </div>
-                )}
-                {carMileage && (
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:(carPrivateNotes?"1px solid #f2f2f2":"none")}}>
-                    <span style={{fontSize:10,color:"#111"}}>Current Mileage</span>
-                    <span style={{fontSize:11,fontWeight:700,color:"#111"}}>{Number(carMileage).toLocaleString()} mi</span>
-                  </div>
-                )}
-                {carPrivateNotes && (
-                  <div style={{padding:"8px 0 0"}}>
-                    <div style={{fontSize:10,color:"#111",marginBottom:4}}>Other Notes</div>
-                    <div style={{fontSize:11,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carPrivateNotes}</div>
-                  </div>
-                )}
-              </div>
-            </>}
 
             {routes.length>0&&<>
               <div style={SEC}>RECENT ROUTES</div>
@@ -2424,15 +2917,77 @@ export default function SonoLane() {
                 <div key={r.id} style={{...CARD,display:"flex",alignItems:"center",gap:10,padding:"10px 12px"}}>
                   <div style={{width:8,height:8,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{r.title}</div>
-                    <div style={{fontSize:9,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{r.title}</div>
+                    <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
                   </div>
-                  <button onClick={()=>openMaps(r.title)} style={{padding:"4px 10px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶</button>
+                  <button onClick={()=>startRouteDirections(r)} title="Get Directions" style={{padding:"4px 10px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭</button>
                 </div>
               ))}
             </>}
+
+            {/* Private car info is no longer shown inline on this page at
+                all — the only way to open it is the 👛 wallet button on the
+                car avatar banner above. Same data, edited from Edit Car,
+                only ever visible to you on your own device. */}
           </div>
         </div>
+
+        {/* Private car info sheet — only visible to the owner here on their
+            own device; never shown on posts, the home hero, or anywhere else
+            public. Opened only via the wallet button above. */}
+        {showPrivateCard && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowPrivateCard(false)}>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:30,height:3,background:"#e8e8e8",borderRadius:2,margin:"12px auto 0",flexShrink:0}}/>
+              <div style={{padding:"10px 16px 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+                <span style={{fontSize:18}}>👛</span>
+                <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>Private Car Info</div>
+                <button onClick={()=>setShowPrivateCard(false)} style={{width:28,height:28,borderRadius:"50%",border:"none",background:"#f3f3f3",color:"#111",fontSize:15,cursor:"pointer"}}>✕</button>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
+                <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0"}}>
+                  <div style={{fontSize:11,color:"#111",fontWeight:700,marginBottom:8}}>🔒 Only visible to you.</div>
+                  {carPrivatePhotos.length>0 && (
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:carPlate||carRegDate||carMileage||carPrivateNotes?10:0}}>
+                      {carPrivatePhotos.map(p=>(
+                        <div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#f0e6c8"}}>
+                          <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {carPlate && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
+                      <span style={{fontSize:12,color:"#111"}}>License Plate</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{carPlate}</span>
+                    </div>
+                  )}
+                  {carRegDate && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
+                      <span style={{fontSize:12,color:"#111"}}>Registration Date</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{new Date(carRegDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>
+                    </div>
+                  )}
+                  {carMileage && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:(carPrivateNotes?"1px solid #f2f2f2":"none")}}>
+                      <span style={{fontSize:12,color:"#111"}}>Current Mileage</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{Number(carMileage).toLocaleString()} mi</span>
+                    </div>
+                  )}
+                  {carPrivateNotes && (
+                    <div style={{padding:"8px 0 0"}}>
+                      <div style={{fontSize:12,color:"#111",marginBottom:4}}>Other Notes</div>
+                      <div style={{fontSize:13,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carPrivateNotes}</div>
+                    </div>
+                  )}
+                  {!(carPlate||carRegDate||carMileage||carPrivateNotes||carPrivatePhotos.length>0) && (
+                    <div style={{fontSize:13,color:"#111",textAlign:"center",padding:"10px 0"}}>No private info added yet — add it from Edit Car.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       );
     }
@@ -2445,9 +3000,9 @@ export default function SonoLane() {
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={()=>setSubPanel("car")} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1}}>Edit Car</div>
-          <button onClick={()=>{setCarSaved(true);setTimeout(()=>checkAchievements({carSaved:true}),200);setSubPanel("car");}} style={{padding:"5px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
+          <button onClick={()=>setSubPanel("car")} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>Edit Car</div>
+          <button onClick={()=>{setCarSaved(true);setTimeout(()=>checkAchievements({carSaved:true}),200);setSubPanel("car");}} style={{padding:"5px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
 
@@ -2460,8 +3015,8 @@ export default function SonoLane() {
                 border:"1.5px solid "+(carAvatarMode===id?OR:"#ebebeb"),
                 background:carAvatarMode===id?OR+"0f":"#f8f8f8",
               }}>
-                <div style={{fontSize:18,marginBottom:2}}>{ic}</div>
-                <div style={{fontSize:10,fontWeight:700,color:carAvatarMode===id?OR:"#111"}}>{label}</div>
+                <div style={{fontSize:20,marginBottom:2}}>{ic}</div>
+                <div style={{fontSize:12,fontWeight:700,color:carAvatarMode===id?OR:"#111"}}>{label}</div>
               </button>
             ))}
           </div>
@@ -2476,15 +3031,15 @@ export default function SonoLane() {
             <div style={{...CARD,padding:0,overflow:"hidden",marginBottom:14,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
               <div style={{width:"100%",background:editBannerBg,padding:"14px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
                 <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{width:140,height:140,borderRadius:16,overflow:"hidden",border:"1.5px dashed "+(carAvatarPhoto?"transparent":"rgba(255,255,255,0.6)"),background:carAvatarPhoto?"transparent":"rgba(255,255,255,0.15)",cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  {carAvatarPhoto ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:30,color:"#fff"}}>+</span>}
+                  {carAvatarPhoto ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:32,color:"#fff"}}>+</span>}
                 </button>
                 <input ref={carAvatarPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setCarAvatarPhoto(ev.target.result);r.readAsDataURL(f);e.target.value="";}}/>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{padding:"7px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>{carAvatarPhoto?"Replace Photo":"Upload Photo"}</button>
-                  {carAvatarPhoto && <button onClick={()=>setCarAvatarPhoto(null)} style={{padding:"7px 14px",borderRadius:20,background:"rgba(255,255,255,0.9)",border:"none",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
+                  <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{padding:"7px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>{carAvatarPhoto?"Replace Photo":"Upload Photo"}</button>
+                  {carAvatarPhoto && <button onClick={()=>setCarAvatarPhoto(null)} style={{padding:"7px 14px",borderRadius:20,background:"rgba(255,255,255,0.9)",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
                 </div>
               </div>
-              {!carAvatarPhoto && <div style={{fontSize:9,color:"#111",textAlign:"center",padding:"8px 10px"}}>Uploaded photo appears wherever your car avatar shows up.</div>}
+              {!carAvatarPhoto && <div style={{fontSize:11,color:"#111",textAlign:"center",padding:"8px 10px"}}>Uploaded photo appears wherever your car avatar shows up.</div>}
             </div>
           )}
 
@@ -2495,7 +3050,7 @@ export default function SonoLane() {
           <div style={{display:"flex",gap:5,marginBottom:12,overflowX:"auto"}}>
             {[["banner","Banner"],["bodystyle","Body Style"],["color","Color"],["brand","Brand"],["mods","Mods"]].map(([id,label])=>(
               <button key={id} onClick={()=>setCarEditTab(id)} style={{
-                flexShrink:0,padding:"7px 13px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:700,
+                flexShrink:0,padding:"7px 13px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:700,
                 border:"1.5px solid "+(carEditTab===id?OR:"#ebebeb"),
                 background:carEditTab===id?OR+"0f":"#f8f8f8",
                 color:carEditTab===id?OR:"#111",
@@ -2505,7 +3060,7 @@ export default function SonoLane() {
 
           {carEditTab==="banner" && (
             <div style={{...CARD,marginBottom:14}}>
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>SELECT A BANNER</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>SELECT A BANNER</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 <button onClick={()=>carBannerPhotoRef.current?.click()} style={{
                   height:56,borderRadius:12,cursor:"pointer",position:"relative",overflow:"hidden",
@@ -2513,22 +3068,22 @@ export default function SonoLane() {
                   background:carBannerPhoto?"url("+carBannerPhoto+") center/cover no-repeat":OR+"08",
                   display:"flex",alignItems:"center",justifyContent:"center",
                 }}>
-                  {!carBannerPhoto && <span style={{fontSize:10,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:14}}>📤</span>Upload Photo</span>}
-                  {carBannerPhoto && <span style={{position:"absolute",bottom:4,left:6,fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>Your Photo</span>}
-                  {carBannerPhoto && <span style={{position:"absolute",top:4,right:5,fontSize:10,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                  {!carBannerPhoto && <span style={{fontSize:12,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:16}}>📤</span>Upload Photo</span>}
+                  {carBannerPhoto && <span style={{position:"absolute",bottom:4,left:6,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>Your Photo</span>}
+                  {carBannerPhoto && <span style={{position:"absolute",top:4,right:5,fontSize:12,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
                 </button>
                 {CAR_BANNERS.map(b=>(
                   <button key={b.id} onClick={()=>{setCarBannerPreset(b.id);setCarBannerPhoto(null);}} style={{
                     height:56,borderRadius:12,border:(!carBannerPhoto&&carBannerPreset===b.id)?"2.5px solid "+OR:"1.5px solid #ebebeb",
                     background:b.css,cursor:"pointer",position:"relative",overflow:"hidden",
                   }}>
-                    <span style={{position:"absolute",bottom:4,left:6,fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>{b.label}</span>
-                    {(!carBannerPhoto&&carBannerPreset===b.id) && <span style={{position:"absolute",top:4,right:5,fontSize:10,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                    <span style={{position:"absolute",bottom:4,left:6,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>{b.label}</span>
+                    {(!carBannerPhoto&&carBannerPreset===b.id) && <span style={{position:"absolute",top:4,right:5,fontSize:12,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
                   </button>
                 ))}
               </div>
               <input ref={carBannerPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setCarBannerPhoto(ev.target.result);};r.readAsDataURL(f);e.target.value="";}}/>
-              {carBannerPhoto && <button onClick={()=>setCarBannerPhoto(null)} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:12}}>Remove Uploaded Photo</button>}
+              {carBannerPhoto && <button onClick={()=>setCarBannerPhoto(null)} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:12}}>Remove Uploaded Photo</button>}
             </div>
           )}
 
@@ -2543,7 +3098,7 @@ export default function SonoLane() {
                   <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
                     <CarSVG color={carColor} mods={{}} size={46} styleId={s.id}/>
                   </div>
-                  <div style={{fontSize:7.5,fontWeight:700,color:carBodyStyle===s.id?OR:"#111",marginTop:2,textAlign:"center",lineHeight:1.15}}>{s.label}</div>
+                  <div style={{fontSize:9.5,fontWeight:700,color:carBodyStyle===s.id?OR:"#111",marginTop:2,textAlign:"center",lineHeight:1.15}}>{s.label}</div>
                 </button>
               ))}
             </div>
@@ -2560,7 +3115,7 @@ export default function SonoLane() {
               <button onClick={()=>{setCarBrand(null);setCarSaved(false);}} style={TAG(carBrand===null)}>None</button>
               {CAR_BRANDS.map(b=>(
                 <button key={b.id} onClick={()=>{setCarBrand(b.id);setCarSaved(false);}} style={{
-                  padding:"6px 11px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:800,
+                  padding:"6px 11px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,
                   border:"1.5px solid "+(carBrand===b.id?b.color:"#ebebeb"),
                   background:carBrand===b.id?b.color+"1a":"#f8f8f8",
                   color:carBrand===b.id?b.color:"#111",
@@ -2571,9 +3126,9 @@ export default function SonoLane() {
 
           {carEditTab==="mods" && (
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:6}}>MODS — {activeModCat}</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:6}}>MODS — {activeModCat}</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
-                {Object.keys(CAR_MODS).map(c=><button key={c} onClick={()=>setActiveModCat(c)} style={{...TAG(activeModCat===c),flexShrink:0,fontSize:10,padding:"4px 9px"}}>{c}</button>)}
+                {Object.keys(CAR_MODS).map(c=><button key={c} onClick={()=>setActiveModCat(c)} style={{...TAG(activeModCat===c),flexShrink:0,fontSize:12,padding:"4px 9px"}}>{c}</button>)}
               </div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
                 {(CAR_MODS[activeModCat]||[]).map(o=><button key={o} onClick={()=>{setCarMods(m=>({...m,[activeModCat]:o}));setCarSaved(false);}} style={TAG(carMods[activeModCat]===o)}>{o}</button>)}
@@ -2593,8 +3148,8 @@ export default function SonoLane() {
           <div style={SEC}>HOME AVATAR WINDOW</div>
           <button onClick={()=>setCarShowInfoHome(v=>!v)} style={{...CARD,display:"flex",alignItems:"center",gap:12,cursor:"pointer",border:"1px solid #ebebeb",width:"100%",textAlign:"left",fontFamily:F}}>
             <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#111"}}>Show name &amp; model</div>
-              <div style={{fontSize:10,color:"#111",marginTop:2,lineHeight:1.5}}>Display your car's name and model as text under the avatar on the home page.</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Show name &amp; model</div>
+              <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Display your car's name and model as text under the avatar on the home page.</div>
             </div>
             <div style={{width:40,height:23,borderRadius:20,background:carShowInfoHome?OR:"#e0e0e0",position:"relative",flexShrink:0,transition:"background 0.15s"}}>
               <div style={{position:"absolute",top:2,left:carShowInfoHome?19:2,width:19,height:19,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.3)",transition:"left 0.15s"}}/>
@@ -2609,21 +3164,21 @@ export default function SonoLane() {
           <div style={SEC}>PRIVATE CAR INFO</div>
           <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0",marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,color:"#111"}}>
-              <span style={{fontSize:12}}>🔒</span>
-              <span style={{fontSize:10,fontWeight:700,color:"#111"}}>Only visible to you — never shown on your car's page or profile.</span>
+              <span style={{fontSize:14}}>🔒</span>
+              <span style={{fontSize:12,fontWeight:700,color:"#111"}}>Only visible to you — never shown on your car's page or profile.</span>
             </div>
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>LICENSE PLATE</div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>LICENSE PLATE</div>
             <input value={carPlate} onChange={e=>{setCarPlate(e.target.value);setCarSaved(false);}} placeholder="e.g. 8ABC123" style={{...INP,marginBottom:12}}/>
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>REGISTRATION DATE</div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>REGISTRATION DATE</div>
             <input type="date" value={carRegDate} onChange={e=>{setCarRegDate(e.target.value);setCarSaved(false);}} style={{...INP,marginBottom:12}}/>
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>CURRENT MILEAGE</div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>CURRENT MILEAGE</div>
             <input type="number" inputMode="numeric" value={carMileage} onChange={e=>{setCarMileage(e.target.value);setCarSaved(false);}} placeholder="e.g. 42500" style={{...INP,marginBottom:12}}/>
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>OTHER NOTES</div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>OTHER NOTES</div>
             <textarea value={carPrivateNotes} onChange={e=>{setCarPrivateNotes(e.target.value);setCarSaved(false);}} placeholder="VIN, insurance info, service reminders, anything else handy to have on hand…" rows={3} style={{...INP,resize:"none",marginBottom:12}}/>
             {/* Snapshots of things like your insurance card or registration —
                 tapping + brings up your device's normal choice between taking
                 a new photo with the camera or picking an existing one. */}
-            <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>PHOTOS — INSURANCE CARD, ETC.</div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>PHOTOS — INSURANCE CARD, ETC.</div>
             {PhotoGallery(carPrivatePhotos, setCarPrivatePhotos, carPrivatePhotoRef, 6)}
           </div>
         </div>
@@ -2642,9 +3197,9 @@ export default function SonoLane() {
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           {/* Header */}
           <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={()=>{setSelTrip(null);back();}} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-            <div style={{flex:1,fontSize:14,fontWeight:800,color:"#111"}}>🛤️ Drive History</div>
-            <div style={{fontSize:11,fontWeight:700,color:OR}}>{tripHistory.length} trip{tripHistory.length!==1?"s":""}</div>
+            <button onClick={()=>{setSelTrip(null);back();}} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>🛤️ Drive History</div>
+            <div style={{fontSize:13,fontWeight:700,color:OR}}>{tripHistory.length} trip{tripHistory.length!==1?"s":""}</div>
           </div>
 
           {selTrip ? (
@@ -2686,21 +3241,21 @@ export default function SonoLane() {
                 <div style={{position:"absolute",top:10,left:10,display:"flex",flexDirection:"column",gap:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"3px 8px"}}>
                     <div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/>
-                    <span style={{fontSize:8,color:"#fff",fontWeight:700}}>Start</span>
+                    <span style={{fontSize:10,color:"#fff",fontWeight:700}}>Start</span>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"3px 8px"}}>
                     <div style={{width:6,height:6,borderRadius:"50%",background:"#ef4444"}}/>
-                    <span style={{fontSize:8,color:"#fff",fontWeight:700}}>End</span>
+                    <span style={{fontSize:10,color:"#fff",fontWeight:700}}>End</span>
                   </div>
                 </div>
                 {/* Back from detail */}
-                <button onClick={()=>setSelTrip(null)} style={{position:"absolute",top:10,right:10,padding:"5px 10px",borderRadius:20,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>← All Trips</button>
+                <button onClick={()=>setSelTrip(null)} style={{position:"absolute",top:10,right:10,padding:"5px 10px",borderRadius:20,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>← All Trips</button>
               </div>
 
               {/* Trip stats */}
               <div style={{padding:"14px 16px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-                <div style={{fontSize:15,fontWeight:900,color:"#111",marginBottom:2}}>{selTrip.date} · {selTrip.time}</div>
-                <div style={{fontSize:11,color:"#111",marginBottom:12}}>{selTrip.startAddr} → {selTrip.endAddr}</div>
+                <div style={{fontSize:17,fontWeight:900,color:"#111",marginBottom:2}}>{selTrip.date} · {selTrip.time}</div>
+                <div style={{fontSize:13,color:"#111",marginBottom:12}}>{selTrip.startAddr} → {selTrip.endAddr}</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   {[
                     {ic:"🛣️", val:selTrip.dist+" mi", label:"Distance"},
@@ -2711,9 +3266,9 @@ export default function SonoLane() {
                     ...(selTrip.lights!=null ? [{ic:"🚦", val:selTrip.lights, label:"Green Lights"}] : []),
                   ].map(s=>(
                     <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,padding:"10px",textAlign:"center",border:"1px solid #ebebeb"}}>
-                      <div style={{fontSize:18,marginBottom:3}}>{s.ic}</div>
-                      <div style={{fontSize:13,fontWeight:800,color:"#111"}}>{s.val}</div>
-                      <div style={{fontSize:8,color:"#111",marginTop:2}}>{s.label}</div>
+                      <div style={{fontSize:20,marginBottom:3}}>{s.ic}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{s.val}</div>
+                      <div style={{fontSize:10,color:"#111",marginTop:2}}>{s.label}</div>
                     </div>
                   ))}
                 </div>
@@ -2722,13 +3277,13 @@ export default function SonoLane() {
               {/* Linked clip if any */}
               {clips.find(c=>c.date===selTrip.date) && (
                 <div style={{padding:"12px 16px",flexShrink:0}}>
-                  <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>DASHCAM FOOTAGE</div>
+                  <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>DASHCAM FOOTAGE</div>
                   {clips.filter(c=>c.date===selTrip.date).slice(0,2).map(clip=>(
                     <div key={clip.id} style={{background:"#111",borderRadius:10,overflow:"hidden",marginBottom:8}}>
                       <video src={clip.url} controls style={{width:"100%",display:"block",maxHeight:160,background:"#000"}}/>
                       <div style={{padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:9,color:"#aaa",flex:1}}>{clip.time} · {clip.dist} mi</span>
-                        <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"4px 8px",borderRadius:20,background:"#222",color:"#aaa",border:"none",fontSize:9,cursor:"pointer"}}>⬇</button>
+                        <span style={{fontSize:11,color:"#aaa",flex:1}}>{clip.time} · {clip.dist} mi</span>
+                        <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"4px 8px",borderRadius:20,background:"#222",color:"#aaa",border:"none",fontSize:11,cursor:"pointer"}}>⬇</button>
                       </div>
                     </div>
                   ))}
@@ -2740,10 +3295,10 @@ export default function SonoLane() {
             <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 7px"}}>
               {tripHistory.length===0 ? (
                 <div style={{textAlign:"center",padding:"52px 20px",color:"#111"}}>
-                  <div style={{fontSize:48,marginBottom:12}}>🛤️</div>
-                  <div style={{fontSize:14,fontWeight:700,color:"#111",marginBottom:6}}>No trips yet</div>
-                  <div style={{fontSize:11,lineHeight:1.7,marginBottom:20}}>Drives record automatically once you're moving over 10 mph — open the map and every trip will appear here with speed, duration, and route.</div>
-                  <button onClick={()=>go("drive")} style={{padding:"10px 22px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:7}}><DPadIcon id="map" color="#fff" size={14}/> Open Map</button>
+                  <div style={{fontSize:50,marginBottom:12}}>🛤️</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#111",marginBottom:6}}>No trips yet</div>
+                  <div style={{fontSize:13,lineHeight:1.7,marginBottom:20}}>Drives record automatically once you're moving over 10 mph — open the map and every trip will appear here with speed, duration, and route.</div>
+                  <button onClick={()=>go("drive")} style={{padding:"10px 22px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:7}}><DPadIcon id="map" color="#fff" size={14}/> Open Map</button>
                 </div>
               ) : (
                 <>
@@ -2757,9 +3312,9 @@ export default function SonoLane() {
                       ...(tripHistory.some(t=>t.lights!=null) ? [{ic:"🚦", val:tripHistory.reduce((a,t)=>a+(t.lights||0),0), label:"Green Lights"}] : []),
                     ].map(s=>(
                       <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid #ebebeb"}}>
-                        <div style={{fontSize:16,marginBottom:2}}>{s.ic}</div>
-                        <div style={{fontSize:12,fontWeight:800,color:"#111"}}>{s.val}</div>
-                        <div style={{fontSize:7,color:"#111",marginTop:1}}>{s.label}</div>
+                        <div style={{fontSize:18,marginBottom:2}}>{s.ic}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{s.val}</div>
+                        <div style={{fontSize:9,color:"#111",marginTop:1}}>{s.label}</div>
                       </div>
                     ))}
                   </div>
@@ -2800,22 +3355,22 @@ export default function SonoLane() {
                             <circle cx={270} cy={25} r={5} fill="#ef4444" stroke="#fff" strokeWidth="1.5"/>
                           </svg>
                           {/* Date badge */}
-                          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:8,color:"#fff",fontWeight:700}}>{trip.date}</div>
-                          {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:8,color:"#111"}}>📹</div>}
+                          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#fff",fontWeight:700}}>{trip.date}</div>
+                          {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#111"}}>📹</div>}
                         </div>
                         {/* Trip info */}
                         <div style={{padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
                           <div style={{width:8,height:28,borderRadius:4,background:color,flexShrink:0}}/>
                           <div style={{flex:1}}>
-                            <div style={{fontSize:12,fontWeight:800,color:"#111",marginBottom:2}}>{trip.time} · {trip.startAddr}</div>
+                            <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:2}}>{trip.time} · {trip.startAddr}</div>
                             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                              <span style={{fontSize:9,color:"#111"}}>🛣️ {trip.dist} mi</span>
-                              <span style={{fontSize:9,color:"#111"}}>⏱ {fmt2(trip.dur||0)}</span>
-                              {trip.avgSpeed!=null && <span style={{fontSize:9,color:"#111"}}>⚡ {trip.avgSpeed} mph</span>}
-                              <span style={{fontSize:9,color:OR}}>+{trip.pts} pts</span>
+                              <span style={{fontSize:11,color:"#111"}}>🛣️ {trip.dist} mi</span>
+                              <span style={{fontSize:11,color:"#111"}}>⏱ {fmt2(trip.dur||0)}</span>
+                              {trip.avgSpeed!=null && <span style={{fontSize:11,color:"#111"}}>⚡ {trip.avgSpeed} mph</span>}
+                              <span style={{fontSize:11,color:OR}}>+{trip.pts} pts</span>
                             </div>
                           </div>
-                          <div style={{fontSize:14,color:"#111"}}>›</div>
+                          <div style={{fontSize:16,color:"#111"}}>›</div>
                         </div>
                       </button>
                     );
@@ -2832,16 +3387,16 @@ export default function SonoLane() {
       if(!dashcamConsent) return (
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-            <div style={{flex:1,fontSize:14,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
+            <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"22px 18px 7px"}}>
             <div style={{textAlign:"center",marginBottom:18}}>
-              <div style={{fontSize:44,marginBottom:8}}>📹</div>
-              <div style={{fontSize:15,fontWeight:900,color:"#111",marginBottom:4}}>Terms of Service &amp; Privacy Notice</div>
-              <div style={{fontSize:11,color:"#111",lineHeight:1.6}}>Review and accept before SonoLane can record your drives.</div>
+              <div style={{fontSize:46,marginBottom:8}}>📹</div>
+              <div style={{fontSize:17,fontWeight:900,color:"#111",marginBottom:4}}>Terms of Service &amp; Privacy Notice</div>
+              <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>Review and accept before SonoLane can record your drives.</div>
             </div>
-            <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"16px",marginBottom:16,fontSize:11,color:"#111",lineHeight:1.75}}>
+            <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"16px",marginBottom:16,fontSize:13,color:"#111",lineHeight:1.75}}>
               <div style={{fontWeight:800,color:"#111",marginBottom:6}}>What this turns on</div>
               <div style={{marginBottom:10}}>Once enabled, SonoLane automatically starts recording video (and audio, if your device provides it) any time it detects you're moving over 10 mph, and stops shortly after you slow down. This requires SonoLane to stay open in the foreground — camera and mic access pause if you switch apps or lock your device. You can also start or stop a recording manually from this screen any time.</div>
               <div style={{fontWeight:800,color:"#111",marginBottom:6}}>What gets recorded</div>
@@ -2851,10 +3406,10 @@ export default function SonoLane() {
               <div style={{fontWeight:800,color:"#111",marginBottom:6}}>Your control</div>
               <div>You can revoke this permission at any time from this screen — doing so immediately stops any active or future automatic recording.</div>
             </div>
-            <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
+            <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
               I Agree — Enable Dashcam
             </button>
-            <button onClick={back} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+            <button onClick={back} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>
               Not Now
             </button>
           </div>
@@ -2873,13 +3428,13 @@ export default function SonoLane() {
               return to Profile, no AI star/name or Map button. The dashcam
               widget itself shows the live feed while a drive is recording. */}
           <div style={{padding:"10px 14px",display:"flex",alignItems:"center",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+            <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
           </div>
           <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 24px"}}>
-            <div style={{fontSize:8,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6,marginTop:4}}>{ml.toUpperCase()}</div>
+            <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6,marginTop:4}}>{ml.toUpperCase()}</div>
             <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",marginBottom:14}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:"#f0f0f0",borderBottom:"1px solid #ebebeb",borderRadius:"12px 12px 0 0"}}>
-                {["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{padding:"6px 0",textAlign:"center",fontSize:9,fontWeight:700,color:"#111"}}>{d}</div>)}
+                {["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{padding:"6px 0",textAlign:"center",fontSize:11,fontWeight:700,color:"#111"}}>{d}</div>)}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
                 {Array.from({length:fd}).map((_,i)=><div key={"e"+i} style={{minHeight:36}}/>)}
@@ -2889,7 +3444,7 @@ export default function SonoLane() {
                   return (
                     <button key={day} onClick={()=>setSelCalDate(isSel?null:key)}
                       style={{minHeight:36,padding:"4px 2px",background:isSel?OR:isT?OR+"11":"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                      <span style={{fontSize:11,fontWeight:isT||isSel?800:400,color:isSel?"#fff":isT?OR:"#333"}}>{day}</span>
+                      <span style={{fontSize:13,fontWeight:isT||isSel?800:400,color:isSel?"#fff":isT?OR:"#333"}}>{day}</span>
                       {dc.length>0 && (
                         <div style={{display:"flex",gap:2,marginTop:1}}>
                           {Array.from({length:Math.min(dc.length,3)}).map((_,di)=>(
@@ -2904,13 +3459,13 @@ export default function SonoLane() {
             </div>
             {selCalDate && calMap[selCalDate] ? (
               <div>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
                 {calMap[selCalDate].map(clip=>(
                   <div key={clip.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
                     <div style={{background:"#111",position:"relative",cursor:"pointer",height:80}} onClick={()=>setPlayingClip(p=>p===clip.id?null:clip.id)}>
                       <video src={clip.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.55,display:"block",pointerEvents:"none"}}/>
                       <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
+                        <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
                           {playingClip===clip.id?"⏸":"▶"}
                         </div>
                       </div>
@@ -2918,23 +3473,23 @@ export default function SonoLane() {
                     {playingClip===clip.id && <video src={clip.url} controls autoPlay style={{width:"100%",maxHeight:200,display:"block",background:"#000"}}/>}
                     <div style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:11,fontWeight:700,color:"#111"}}>{clip.time}</div>
-                        <div style={{fontSize:9,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{clip.time}</div>
+                        <div style={{fontSize:11,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
                       </div>
-                      <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:10,cursor:"pointer"}}>⬇</button>
-                      <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:10,cursor:"pointer"}}>🗑</button>
+                      <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,cursor:"pointer"}}>⬇</button>
+                      <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer"}}>🗑</button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : selCalDate ? (
-              <div style={{textAlign:"center",padding:"20px",color:"#111",fontSize:11}}>No recordings on {selCalDate}</div>
+              <div style={{textAlign:"center",padding:"20px",color:"#111",fontSize:13}}>No recordings on {selCalDate}</div>
             ) : (
-              <div style={{textAlign:"center",padding:"20px 0",color:"#111",fontSize:11}}>
+              <div style={{textAlign:"center",padding:"20px 0",color:"#111",fontSize:13}}>
                 {clips.length===0 ? "Drives record automatically once you're moving over 10 mph." : "Tap a date with dots to view footage."}
               </div>
             )}
-            <button onClick={()=>{setDashcamConsent(false);memStore.removeItem("sl_dashcamConsent");if(dashOn)stopDrive();}} style={{width:"100%",marginTop:18,padding:"10px",borderRadius:10,background:"transparent",border:"1px solid #fde8d8",color:"#ef4444",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+            <button onClick={()=>{setDashcamConsent(false);memStore.removeItem("sl_dashcamConsent");if(dashOn)stopDrive();}} style={{width:"100%",marginTop:18,padding:"10px",borderRadius:10,background:"transparent",border:"1px solid #fde8d8",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
               Revoke Dashcam Access
             </button>
           </div>
@@ -2946,25 +3501,25 @@ export default function SonoLane() {
     if(subPanel==="following") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><ProfileIcon id="people" size={14} color="#111"/> Following</div>
-          <div style={{fontSize:10,color:"#111"}}>{following.length}</div>
+          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><ProfileIcon id="people" size={14} color="#111"/> Following</div>
+          <div style={{fontSize:12,color:"#111"}}>{following.length}</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 24px"}}>
           {following.length===0 && (
-            <div style={{textAlign:"center",color:"#111",fontSize:11,paddingTop:40}}>
+            <div style={{textAlign:"center",color:"#111",fontSize:13,paddingTop:40}}>
               <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="people" size={34} color="#ddd"/></div>
               Not following anyone yet.<br/>Follow people from Friends or Followers to see them here.
             </div>
           )}
           {following.map(person=>(
             <button key={person.id} onClick={()=>setQuickUser(person)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"11px 8px",borderRadius:12,border:"none",background:"none",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <div style={{width:42,height:42,borderRadius:"50%",background:person.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff",flexShrink:0}}>{person.initials}</div>
+              <div style={{width:42,height:42,borderRadius:"50%",background:person.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"#fff",flexShrink:0}}>{person.initials}</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{person.name}</div>
-                <div style={{fontSize:10,color:"#111"}}>@{person.handle}</div>
+                <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{person.name}</div>
+                <div style={{fontSize:12,color:"#111"}}>@{person.handle}</div>
               </div>
-              <span onClick={e=>{e.stopPropagation();setFollowing(f=>f.filter(x=>x.id!==person.id));}} style={{padding:"5px 10px",borderRadius:20,fontSize:10,fontWeight:700,fontFamily:F,background:"#5865f2",color:"#fff"}}>✓ Following</span>
+              <span onClick={e=>{e.stopPropagation();setFollowing(f=>f.filter(x=>x.id!==person.id));}} style={{padding:"5px 10px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:F,background:"#5865f2",color:"#fff"}}>✓ Following</span>
             </button>
           ))}
         </div>
@@ -2979,49 +3534,49 @@ export default function SonoLane() {
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1}}>📻 Radio Stations</div>
+          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>📻 Radio Stations</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 24px"}}>
 
           <div style={SEC}>SAVED STATIONS</div>
           {_saved.length===0 ? (
-            <div style={{...CARD,textAlign:"center",color:"#111",fontSize:11,padding:"24px 16px"}}>
+            <div style={{...CARD,textAlign:"center",color:"#111",fontSize:13,padding:"24px 16px"}}>
               <div style={{marginBottom:12}}>Star a station from SonoLane Radio.</div>
-              <VN action={()=>{setMusicTab("nearby");setShowMusic(true);}} style={{padding:"9px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Go to SonoLane Radio</VN>
+              <VN action={()=>{setMusicTab("nearby");setShowMusic(true);}} style={{padding:"9px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Go to SonoLane Radio</VN>
             </div>
           ) : _saved.map((h,i)=>(
             <div key={i} style={{...CARD,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📻</div>
+              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{h.name}</div>
-                <div style={{fontSize:10,color:"#111"}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
+                <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{h.name}</div>
+                <div style={{fontSize:12,color:"#111"}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
               </div>
-              <button onClick={()=>toggleSavedStation(h.name)} title="Remove from saved" style={{background:"none",border:"none",color:OR,fontSize:16,cursor:"pointer",padding:4,flexShrink:0}}>★</button>
+              <button onClick={()=>toggleSavedStation(h.name)} title="Remove from saved" style={{background:"none",border:"none",color:OR,fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>★</button>
             </div>
           ))}
 
           <div style={{...SEC,marginTop:16}}>MY STATIONS</div>
           {radioHosts.length===0 ? (
-            <div style={{...CARD,textAlign:"center",color:"#111",fontSize:11,padding:"24px 16px"}}>
+            <div style={{...CARD,textAlign:"center",color:"#111",fontSize:13,padding:"24px 16px"}}>
               {!showReg ? (
                 <>
                   <div style={{marginBottom:12}}>You haven't registered a station yet.</div>
-                  <VN action={()=>setShowReg(true)} style={{padding:"9px 18px",borderRadius:20,background:"transparent",border:"1.5px dashed "+OR,color:OR,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Apply to be a Radio Host</VN>
+                  <VN action={()=>setShowReg(true)} style={{padding:"9px 18px",borderRadius:20,background:"transparent",border:"1.5px dashed "+OR,color:OR,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Apply to be a Radio Host</VN>
                 </>
               ) : (
                 <div style={{textAlign:"left"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:12}}>Host Registration</div>
+                  <div style={{fontSize:15,fontWeight:800,color:"#111",marginBottom:12}}>Host Registration</div>
                   <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,marginBottom:8}}/>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                     {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
-                      <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#f3f3f3",color:hostForm.genre===g?"#fff":"#888",border:"none",fontFamily:F}}>{g}</button>
+                      <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#f3f3f3",color:hostForm.genre===g?"#fff":"#888",border:"none",fontFamily:F}}>{g}</button>
                     ))}
                   </div>
                   <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,marginBottom:8}}/>
                   <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,resize:"none",marginBottom:12}}/>
                   <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
+                    <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
                     <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
                   </div>
                 </div>
@@ -3029,16 +3584,16 @@ export default function SonoLane() {
             </div>
           ) : radioHosts.map((h,i)=>(
             <div key={i} style={{...CARD,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📻</div>
+              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{h.name}</div>
-                <div style={{fontSize:10,color:"#111"}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
-                {h.bio && <div style={{fontSize:10,color:"#111",marginTop:3}}>{h.bio}</div>}
+                <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{h.name}</div>
+                <div style={{fontSize:12,color:"#111"}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
+                {h.bio && <div style={{fontSize:12,color:"#111",marginTop:3}}>{h.bio}</div>}
               </div>
               {isBroad&&broadName===h.name && (
                 <div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px",flexShrink:0}}>
                   <div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/>
-                  <span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>LIVE</span>
+                  <span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span>
                 </div>
               )}
             </div>
@@ -3052,13 +3607,13 @@ export default function SonoLane() {
     if(subPanel==="followerslist") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><ProfileIcon id="people" size={14} color="#111"/> Followers</div>
-          <div style={{fontSize:10,color:"#111"}}>{followersList.length}</div>
+          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><ProfileIcon id="people" size={14} color="#111"/> Followers</div>
+          <div style={{fontSize:12,color:"#111"}}>{followersList.length}</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 24px"}}>
           {followersList.length===0 && (
-            <div style={{textAlign:"center",color:"#111",fontSize:11,paddingTop:40}}>
+            <div style={{textAlign:"center",color:"#111",fontSize:13,paddingTop:40}}>
               <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="people" size={34} color="#ddd"/></div>
               No followers yet.
             </div>
@@ -3067,16 +3622,16 @@ export default function SonoLane() {
             const isF = following.some(f=>f.id===person.id);
             return (
               <button key={person.id} onClick={()=>setQuickUser(person)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"11px 8px",borderRadius:12,border:"none",background:"none",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-                <div style={{width:42,height:42,borderRadius:"50%",background:person.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff",flexShrink:0}}>{person.initials}</div>
+                <div style={{width:42,height:42,borderRadius:"50%",background:person.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"#fff",flexShrink:0}}>{person.initials}</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{person.name}</div>
-                  <div style={{fontSize:10,color:"#111"}}>@{person.handle}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{person.name}</div>
+                  <div style={{fontSize:12,color:"#111"}}>@{person.handle}</div>
                 </div>
                 <span onClick={e=>{
                   e.stopPropagation();
                   if(isF){setFollowing(f=>f.filter(x=>x.id!==person.id));}
                   else{setFollowing(f=>[...f,person]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+person.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
-                }} style={{padding:"5px 10px",borderRadius:20,fontSize:10,fontWeight:700,fontFamily:F,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
+                }} style={{padding:"5px 10px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:F,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
                   {isF?"✓ Following":"Follow back"}
                 </span>
               </button>
@@ -3091,22 +3646,22 @@ export default function SonoLane() {
     if(subPanel==="friends") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1}}>👥 Friends</div>
-          <VN action={()=>setShowAddFriend(true)} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</VN>
+          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>👥 Friends</div>
+          <VN action={()=>setShowAddFriend(true)} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</VN>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 24px"}}>
-          <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:14}}>TOP 3 FRIENDS</div>
+          <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:14}}>TOP 3 FRIENDS</div>
           <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:24}}>
             {[0,1,2].map(i=>{
               const fr=friends[i];
               return (
                 <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                   <button onClick={()=>fr?setSelFriend(selFriend?.id===fr.id?null:fr):setShowAddFriend(true)}
-                    style={{width:72,height:72,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?(selFriend?.id===fr.id?"3px solid "+OR:"2px solid "+fr.color+"44"):"2px dashed #ddd",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?24:26,color:fr?"#fff":"#ccc",fontWeight:800,fontFamily:F,overflow:"hidden",padding:0}}>
+                    style={{width:72,height:72,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?(selFriend?.id===fr.id?"3px solid "+OR:"2px solid "+fr.color+"44"):"2px dashed #ddd",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?26:28,color:fr?"#fff":"#ccc",fontWeight:800,fontFamily:F,overflow:"hidden",padding:0}}>
                     {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
                   </button>
-                  <div style={{fontSize:10,fontWeight:fr?700:400,color:fr?"#111":"#bbb"}}>{fr?fr.name:"Open slot"}</div>
+                  <div style={{fontSize:12,fontWeight:fr?700:400,color:fr?"#111":"#bbb"}}>{fr?fr.name:"Open slot"}</div>
                 </div>
               );
             })}
@@ -3122,33 +3677,33 @@ export default function SonoLane() {
             return (
               <div style={{...CARD,border:"1.5px solid "+OR+"33",marginBottom:14}}>
                 <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-                  <div style={{width:44,height:44,borderRadius:"50%",background:selFriend.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"#fff"}}>{selFriend.initials}</div>
+                  <div style={{width:44,height:44,borderRadius:"50%",background:selFriend.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff"}}>{selFriend.initials}</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{selFriend.name}</div>
-                    <div style={{fontSize:10,color:"#111"}}>@{selFriend.handle}</div>
+                    <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{selFriend.name}</div>
+                    <div style={{fontSize:12,color:"#111"}}>@{selFriend.handle}</div>
                   </div>
-                  <button onClick={()=>{if(window.confirm("Remove "+selFriend.name+"?")){removeFriendSupabase(selFriend.id);setFriends(f=>f.filter(x=>x.id!==selFriend.id));setSelFriend(null);}}} style={{padding:"5px 8px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:10,cursor:"pointer",fontFamily:F}}>✕</button>
+                  <button onClick={()=>{if(window.confirm("Remove "+selFriend.name+"?")){removeFriendSupabase(selFriend.id);setFriends(f=>f.filter(x=>x.id!==selFriend.id));setSelFriend(null);}}} style={{padding:"5px 8px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer",fontFamily:F}}>✕</button>
                 </div>
                 {/* Special connections — direct call & text, and a follow toggle */}
                 <div style={{display:"flex",gap:8,marginBottom:isTop3?12:0}}>
-                  <button onClick={()=>setCallingFriend({friend:selFriend,status:"ringing",secs:0})} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
-                  <button onClick={()=>{setActiveChan(selFriend.id);go("create");}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
+                  <button onClick={()=>setCallingFriend({friend:selFriend,status:"ringing",secs:0})} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
+                  <button onClick={()=>{setActiveChan(selFriend.id);go("create");}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
                   <button onClick={()=>{
                     const isF=following.some(f=>f.id===selFriend.id);
                     if(isF){setFollowing(f=>f.filter(x=>x.id!==selFriend.id));}
                     else{setFollowing(f=>[...f,selFriend]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+selFriend.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
-                  }} style={{flex:1,padding:"10px",borderRadius:10,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:following.some(f=>f.id===selFriend.id)?"#5865f2":"#f3f3f3",color:following.some(f=>f.id===selFriend.id)?"#fff":"#555"}}>
+                  }} style={{flex:1,padding:"10px",borderRadius:10,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:following.some(f=>f.id===selFriend.id)?"#5865f2":"#f3f3f3",color:following.some(f=>f.id===selFriend.id)?"#fff":"#555"}}>
                     {following.some(f=>f.id===selFriend.id)?"✓ Following":"+ Follow"}
                   </button>
                 </div>
                 {/* Top 3 Friend perks — live location sharing & collaboration */}
                 {isTop3 && (
                   <div style={{borderTop:"1px solid #f5f5f5",paddingTop:12}}>
-                    <div style={{fontSize:8,fontWeight:700,letterSpacing:1,color:"#8a8f98",marginBottom:8}}>⭐ TOP 3 FRIEND PERKS</div>
+                    <div style={{fontSize:10,fontWeight:700,letterSpacing:1,color:"#8a8f98",marginBottom:8}}>⭐ TOP 3 FRIEND PERKS</div>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                       <div>
-                        <div style={{fontSize:11,fontWeight:700,color:"#111"}}>📍 Share Live Location</div>
-                        <div style={{fontSize:9,color:"#8a8f98"}}>{locOn?"On — stays on until you turn it off.":"Off"}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#111"}}>📍 Share Live Location</div>
+                        <div style={{fontSize:11,color:"#8a8f98"}}>{locOn?"On — stays on until you turn it off.":"Off"}</div>
                       </div>
                       <button onClick={()=>{
                         toggleLocationSharing(selFriend.id);
@@ -3157,7 +3712,7 @@ export default function SonoLane() {
                         <div style={{position:"absolute",top:2,left:locOn?20:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .15s"}}/>
                       </button>
                     </div>
-                    <div style={{fontSize:10,fontWeight:700,color:"#111",marginBottom:6}}>Collaborate together on:</div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#111",marginBottom:6}}>Collaborate together on:</div>
                     <div style={{display:"flex",gap:6}}>
                       {collabState.map(([label,list,toggle,icon])=>{
                         const on=list.includes(selFriend.id);
@@ -3165,7 +3720,7 @@ export default function SonoLane() {
                           <button key={label} onClick={()=>{
                             toggle(selFriend.id);
                             setNotifications(n=>[{id:Date.now(),icon,text:(on?"Ended":"Started")+" collaborating on "+label.toLowerCase()+" with "+selFriend.name+".",ts:"now",read:false},...n]);
-                          }} style={{flex:1,padding:"8px 4px",borderRadius:9,fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:F,border:on?"1px solid "+OR:"1px solid #ebebeb",background:on?OR+"15":"#fafafa",color:on?OR:"#555"}}>
+                          }} style={{flex:1,padding:"8px 4px",borderRadius:9,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,border:on?"1px solid "+OR:"1px solid #ebebeb",background:on?OR+"15":"#fafafa",color:on?OR:"#555"}}>
                             {icon} {label}{on?" ✓":""}
                           </button>
                         );
@@ -3179,23 +3734,23 @@ export default function SonoLane() {
           {friends.length>0 && (
             <input value={friendSearch} onChange={e=>setFriendSearch(e.target.value)} placeholder="🔍 Search your friends by name" style={{...INP,marginBottom:14}}/>
           )}
-          {friends.length===0 && <div style={{textAlign:"center",color:"#111",fontSize:11,paddingTop:8}}>Add friends to share drives.</div>}
+          {friends.length===0 && <div style={{textAlign:"center",color:"#111",fontSize:13,paddingTop:8}}>Add friends to share drives.</div>}
           {friends.length>0 && (() => {
             const q=friendSearch.trim().toLowerCase();
             const list = q ? friends.filter(f=>f.name.toLowerCase().includes(q)) : friends;
             return (
               <>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>{q?"RESULTS":"ALL FRIENDS"} ({list.length})</div>
-                {list.length===0 && <div style={{textAlign:"center",color:"#8a8f98",fontSize:11,padding:"8px 0"}}>No friends match "{friendSearch}".</div>}
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>{q?"RESULTS":"ALL FRIENDS"} ({list.length})</div>
+                {list.length===0 && <div style={{textAlign:"center",color:"#8a8f98",fontSize:13,padding:"8px 0"}}>No friends match "{friendSearch}".</div>}
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {list.map(fr=>(
                     <button key={fr.id} onClick={()=>setSelFriend(selFriend?.id===fr.id?null:fr)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,border:selFriend?.id===fr.id?"1.5px solid "+OR:"1px solid #ebebeb",background:selFriend?.id===fr.id?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                       <FriendAvatar fr={fr} size={34} fontSize={12}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div>
-                        <div style={{fontSize:9,color:"#8a8f98"}}>@{fr.handle}</div>
+                        <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                        <div style={{fontSize:11,color:"#8a8f98"}}>@{fr.handle}</div>
                       </div>
-                      {friends.slice(0,3).some(x=>x.id===fr.id) && <span style={{fontSize:8,fontWeight:700,color:OR}}>⭐ TOP 3</span>}
+                      {friends.slice(0,3).some(x=>x.id===fr.id) && <span style={{fontSize:10,fontWeight:700,color:OR}}>⭐ TOP 3</span>}
                     </button>
                   ))}
                 </div>
@@ -3207,7 +3762,7 @@ export default function SonoLane() {
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowAddFriend(false);setAddFriendSearch("");}}>
             <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:14}}>Add a Friend</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Add a Friend</div>
               <input value={addFriendSearch} onChange={e=>setAddFriendSearch(e.target.value)} placeholder="🔍 Search people by name" style={{...INP,marginBottom:12}}/>
               {addFriendSearch.trim() && (() => {
                 const q=addFriendSearch.trim().toLowerCase();
@@ -3216,14 +3771,14 @@ export default function SonoLane() {
                   : (()=>{const dir=[...SAMPLE_PEOPLE,...followersList].filter((p,i,arr)=>arr.findIndex(x=>x.id===p.id)===i); return dir.filter(p=>p.name.toLowerCase().includes(q) && !friends.some(f=>f.id===p.id));})();
                 return (
                   <div style={{marginBottom:16}}>
-                    {results.length===0 && <div style={{fontSize:11,color:"#8a8f98",padding:"6px 0 14px"}}>No one found matching "{addFriendSearch}"{isSupabaseConfigured?" — they may not have signed up yet.":"."}</div>}
+                    {results.length===0 && <div style={{fontSize:13,color:"#8a8f98",padding:"6px 0 14px"}}>No one found matching "{addFriendSearch}"{isSupabaseConfigured?" — they may not have signed up yet.":"."}</div>}
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {results.map(p=>(
                         <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px"}}>
                           <FriendAvatar fr={{...p, photo:p.photo_url}} size={36} fontSize={13}/>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{p.name||"Unnamed"}</div>
-                            <div style={{fontSize:9,color:"#8a8f98"}}>@{p.handle||"—"}</div>
+                            <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{p.name||"Unnamed"}</div>
+                            <div style={{fontSize:11,color:"#8a8f98"}}>@{p.handle||"—"}</div>
                           </div>
                           <button onClick={()=>{
                             const friendObj = {...p, photo:p.photo_url};
@@ -3232,7 +3787,7 @@ export default function SonoLane() {
                             setFriends(f=>{const nf=[...f,friendObj]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
                             setNotifications(n=>[{id:Date.now(),icon:"🤝",text:(p.name||"Your friend")+" was added to your friends.",ts:"now",read:false},...n]);
                             setAddFriendSearch("");setShowAddFriend(false);
-                          }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</button>
+                          }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</button>
                         </div>
                       ))}
                     </div>
@@ -3240,9 +3795,9 @@ export default function SonoLane() {
                 );
               })()}
               {isSupabaseConfigured ? (
-                <div style={{fontSize:10,color:"#8a8f98",textAlign:"center",padding:"4px 0 6px"}}>Don't see them? They'll show up here once they sign up for SonoLane too.</div>
+                <div style={{fontSize:12,color:"#8a8f98",textAlign:"center",padding:"4px 0 6px"}}>Don't see them? They'll show up here once they sign up for SonoLane too.</div>
               ) : (<>
-              <div style={{fontSize:9,fontWeight:700,letterSpacing:1,color:"#8a8f98",marginBottom:10}}>OR ADD MANUALLY</div>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:1,color:"#8a8f98",marginBottom:10}}>OR ADD MANUALLY</div>
               <input value={newFriend.name} onChange={e=>setNewFriend(f=>({...f,name:e.target.value}))} placeholder="Name *" style={{...INP,marginBottom:8}}/>
               <input value={newFriend.handle} onChange={e=>setNewFriend(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,marginBottom:14}}/>
               <div style={{display:"flex",gap:8}}>
@@ -3252,7 +3807,7 @@ export default function SonoLane() {
                   const ini=newFriend.name.trim().split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
                   setFriends(f=>{const nf=[...f,{id:Date.now(),name:newFriend.name,handle:newFriend.handle||newFriend.name.toLowerCase(),initials:ini,color:C[f.length%C.length]}]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
                   setNewFriend({name:"",handle:""});setShowAddFriend(false);setAddFriendSearch("");
-                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>Add</button>
+                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Add</button>
                 <button onClick={()=>{setShowAddFriend(false);setAddFriendSearch("");}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
               </div>
               </>)}
@@ -3270,9 +3825,9 @@ export default function SonoLane() {
     if(subPanel==="edit") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1}}>Edit Profile</div>
-          <button onClick={()=>{setEditMode(false);saveProfileToSupabase();back();}} style={{padding:"5px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
+          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>Edit Profile</div>
+          <button onClick={()=>{setEditMode(false);saveProfileToSupabase();back();}} style={{padding:"5px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
 
@@ -3285,12 +3840,12 @@ export default function SonoLane() {
                   ? (<img src={profilePhoto} alt="profile" style={{width:"100%",height:"100%",objectFit:"cover"}}/>)
                   : <DefaultAvatar size={64} color="#111"/>}
               </button>
-              <div style={{position:"absolute",bottom:0,right:0,width:20,height:20,borderRadius:"50%",background:OR,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",pointerEvents:"none"}}>✎</div>
+              <div style={{position:"absolute",bottom:0,right:0,width:20,height:20,borderRadius:"50%",background:OR,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#fff",pointerEvents:"none"}}>✎</div>
               <input ref={profilePhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setProfilePhoto(ev.target.result);r.readAsDataURL(f);}}/>
             </div>
             <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#111",marginBottom:3}}>Tap to change photo</div>
-              {profilePhoto&&<button onClick={()=>setProfilePhoto(null)} style={{padding:"3px 10px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",fontSize:10,color:"#ef4444",cursor:"pointer",fontFamily:F}}>Remove</button>}
+              <div style={{fontSize:14,fontWeight:700,color:"#111",marginBottom:3}}>Tap to change photo</div>
+              {profilePhoto&&<button onClick={()=>setProfilePhoto(null)} style={{padding:"3px 10px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",fontSize:12,color:"#ef4444",cursor:"pointer",fontFamily:F}}>Remove</button>}
             </div>
           </div>
 
@@ -3302,14 +3857,49 @@ export default function SonoLane() {
           <div style={SEC}>BIO</div>
           <input value={userBio} onChange={e=>setUserBio(e.target.value)} placeholder="Short bio" style={{...INP,marginBottom:14}}/>
 
-          {/* Discovery Radius — the only place this can be changed; every
-              other screen just displays the current value and links here. */}
-          <div style={SEC}>DISCOVERY RADIUS</div>
+          {/* Discovery Radius has moved — it's no longer edited from this
+              page. The only way to change it now is the Edit button on the
+              Discovery Radius card at the top of your Profile. */}
+
+          {/* Drive Mode Settings (Startup Sound, Widgets, and Drive mode's
+              own voice toggle) now live only inside Drive mode itself — the
+              small ⚙️ at the end of its apps bar — instead of being
+              duplicated here on the Profile Edit page. */}
+
+          {/* AI (Select Co-Pilot + the outside-Drive-mode voice toggle) now
+              lives on the Settings tab instead of here — see subPanel
+              "settings" below. Drive mode has its own separate voice toggle
+              in its own Settings sheet. */}
+
+          {/* Wheel side */}
+          <div style={SEC}>STATS</div>
+          <div style={CARD}>
+            {[["⭐",pts,"Points"],["event",events.length,"Events"],["road",routes.length,"Routes"],["👥",friends.length,"Friends"],["📹",clips.length,"Clips"]].map(([ic,v,l])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
+                <span style={{fontSize:13,color:"#111",display:"flex",alignItems:"center",gap:5}}>{ic==="event"||ic==="road"?<DPadIcon id={ic} color={DPAD_COLORS[ic]} size={12}/>:ic} {l}</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </div>
+    );
+
+    /* radius sub — the ONLY place Discovery Radius can be edited now, opened
+       only via the Edit button on the Discovery Radius card in Profile. */
+    if(subPanel==="radius") return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>Discovery Radius</div>
+        </div>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
           <div style={{...CARD,marginBottom:14}}>
-            <div style={{fontSize:11,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
+            <div style={{fontSize:13,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
-              <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
-              <span style={{fontSize:10,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
+              <span style={{fontSize:22,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
+              <span style={{fontSize:12,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
             </div>
             <input
               type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
@@ -3318,16 +3908,43 @@ export default function SonoLane() {
               onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
               style={{width:"100%",accentColor:OR,height:20,cursor:"pointer"}}
             />
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#111"}}>
               <span>{RADIUS_MIN} mi</span>
               <span>100+ mi</span>
             </div>
           </div>
+        </div>
+      </div>
+    );
 
-          {/* AI Co-Pilot */}
-          <div style={SEC}>AI CO-PILOT</div>
+    /* settings sub — the AI Co-Pilot picker + outside-Drive-mode voice
+       toggle live here now instead of on the Edit Profile page. */
+    if(subPanel==="settings") return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>⚙️ Settings</div>
+        </div>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
+
+          <button onClick={()=>setSubPanel("edit")} style={{width:"100%",padding:"9px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:12}}>Edit full profile →</button>
+
+          {/* AI — Co-Pilot picker, plus the voice-control setting for
+              everywhere OUTSIDE Drive mode. Drive mode has its own separate
+              voice toggle in its own Settings sheet. */}
+          <div style={SEC}>AI</div>
           <div style={{...CARD,marginBottom:12}}>
-            <div style={{fontSize:11,color:"#111",marginBottom:10,lineHeight:1.5}}>Choose who talks back when you say "Sono" or tap the car avatar while driving.</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
+              <div style={{flex:1,paddingRight:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Say "Sono" to Wake</div>
+                <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Keep voice control on everywhere outside Drive mode, so you can talk to your Co-Pilot hands-free without tapping the mic first. This setting saves.</div>
+              </div>
+              <button onClick={()=>setSayWakeEnabled(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:sayWakeEnabled?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+                <div style={{position:"absolute",top:2,left:sayWakeEnabled?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+              </button>
+            </div>
+            <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>Select Co-Pilot</div>
+            <div style={{fontSize:12,color:"#111",marginBottom:10,lineHeight:1.5}}>Choose who talks back when you say "Sono" or tap the car avatar while driving.</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               {AI_PALS.map(p=>(
                 <button key={p.id} onClick={()=>setAiPalId(p.id)} style={{
@@ -3338,106 +3955,27 @@ export default function SonoLane() {
                 }}>
                   <div style={{width:34,height:34,borderRadius:"50%",background:p.color+"22",border:"1.5px solid "+p.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={19} color={p.color}/></div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:700,color:aiPalId===p.id?p.color:"#111"}}>{p.name}</div>
-                    <div style={{fontSize:9,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.desc}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:aiPalId===p.id?p.color:"#111"}}>{p.name}</div>
+                    <div style={{fontSize:11,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.desc}</div>
                   </div>
-                  {aiPalId===p.id && <div style={{width:18,height:18,borderRadius:"50%",background:p.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",flexShrink:0}}>✓</div>}
+                  {aiPalId===p.id && <div style={{width:18,height:18,borderRadius:"50%",background:p.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>✓</div>}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Startup Sound */}
-          <div style={SEC}>STARTUP SOUND</div>
-          <div style={{...CARD,marginBottom:12}}>
-            <div style={{fontSize:11,color:"#111",marginBottom:10,lineHeight:1.5}}>Plays every time you tap Start to begin a drive.</div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {Object.entries(STARTUP_SOUNDS).map(([key,cfg])=>(
-                <button key={key} onClick={()=>{setStartupSound(key);memStore.setItem("sl_startupSound",key);playStartupSound(key);}} style={{
-                  display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
-                  cursor:"pointer",fontFamily:F,textAlign:"left",
-                  border:"1.5px solid "+(startupSound===key?OR:"#ebebeb"),
-                  background:startupSound===key?OR+"0f":"#f8f8f8",
-                }}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:startupSound===key?OR+"22":"#eee",border:"1.5px solid "+(startupSound===key?OR+"44":"#ddd"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>
-                    {key==="none"?"🔇":key==="engine"?"🏎":key==="digital"?"🔔":key==="warm"?"🎶":"🎵"}
-                  </div>
-                  <div style={{flex:1,fontSize:12,fontWeight:700,color:startupSound===key?OR:"#111"}}>{cfg.label}</div>
-                  {startupSound===key && <div style={{width:18,height:18,borderRadius:"50%",background:OR,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",flexShrink:0}}>✓</div>}
-                </button>
-              ))}
-            </div>
-            <div style={{fontSize:9,color:"#111",marginTop:8,textAlign:"center"}}>Tap a sound to preview it</div>
-          </div>
-
-          {/* Widgets */}
-          <div style={SEC}>DASHBOARD WIDGETS</div>
-          <div style={{...CARD,display:"flex",gap:8,marginBottom:12}}>
-            {[["left","Left",leftWidget],["right","Right",rightWidget]].map(([side,label,w])=>(
-              <button key={side} onClick={()=>setWidgetEdit(side)} style={{flex:1,padding:"12px 8px",borderRadius:10,border:"1.5px solid "+OR+"44",background:OR+"08",cursor:"pointer",textAlign:"center",fontFamily:F}}>
-                <div style={{fontSize:22,marginBottom:4,display:"flex",justifyContent:"center"}}>{w==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={22}/>:w==="weather"?"☀️":w==="music"?"🎵":w==="cbradio"?"📡":w==="points"?"⭐":w==="friends"?"👥":w==="dashcam"?"📹":"＋"}</div>
-                <div style={{fontSize:9,fontWeight:700,color:OR}}>{label.toUpperCase()}</div>
-                <div style={{fontSize:9,color:"#111",textTransform:"capitalize",marginTop:1}}>{w}</div>
-              </button>
-            ))}
-          </div>
-
-          {/* Wheel side */}
           <div style={SEC}>STATS</div>
           <div style={CARD}>
             {[["⭐",pts,"Points"],["event",events.length,"Events"],["road",routes.length,"Routes"],["👥",friends.length,"Friends"],["📹",clips.length,"Clips"]].map(([ic,v,l])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <span style={{fontSize:11,color:"#111",display:"flex",alignItems:"center",gap:5}}>{ic==="event"||ic==="road"?<DPadIcon id={ic} color={DPAD_COLORS[ic]} size={12}/>:ic} {l}</span>
-                <span style={{fontSize:11,fontWeight:700,color:"#111"}}>{v}</span>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </div>
-    );
-
-    /* settings sub — keep for legacy, redirect to edit */
-    if(subPanel==="settings") return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111"}}>⚙️ Settings</div>
-        </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-
-          <div style={SEC}>LOCATION RADIUS</div>
-          <div style={{...CARD,marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
-              <div style={{fontSize:11,color:"#111",lineHeight:1.5}}>Sets how far to look for events, CB radio lanes, and route feeds near you.</div>
-            </div>
-            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6,marginTop:8}}>
-              <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
-              <span style={{fontSize:10,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
-            </div>
-            <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:8}}>
-              <div style={{height:"100%",borderRadius:3,background:OR,width:(Math.min(100,Math.max(0,(radiusDraft-RADIUS_MIN)/(RADIUS_MAX-RADIUS_MIN)*100)))+"%"}}/>
-            </div>
-            <button onClick={()=>{setSubPanel("edit");}} style={{width:"100%",padding:"8px",borderRadius:9,background:"#fff",border:"1px solid "+OR+"44",color:OR,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change in Edit Profile</button>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111",marginTop:8}}>
-              <span>{RADIUS_MIN} mi</span>
-              <span>100+ mi</span>
-            </div>
-          </div>
-          <button onClick={()=>setSubPanel("edit")} style={{width:"100%",padding:"9px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:12}}>Edit full profile →</button>
-
-          <div style={SEC}>STATS</div>
-          <div style={CARD}>
-            {[["⭐",pts,"Points"],["event",events.length,"Events"],["road",routes.length,"Routes"],["👥",friends.length,"Friends"],["📹",clips.length,"Clips"]].map(([ic,v,l])=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <span style={{fontSize:11,color:"#111",display:"flex",alignItems:"center",gap:5}}>{ic==="event"||ic==="road"?<DPadIcon id={ic} color={DPAD_COLORS[ic]} size={12}/>:ic} {l}</span>
-                <span style={{fontSize:11,fontWeight:700,color:"#111"}}>{v}</span>
+                <span style={{fontSize:13,color:"#111",display:"flex",alignItems:"center",gap:5}}>{ic==="event"||ic==="road"?<DPadIcon id={ic} color={DPAD_COLORS[ic]} size={12}/>:ic} {l}</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{v}</span>
               </div>
             ))}
           </div>
 
           {isSupabaseConfigured && (
-            <button onClick={()=>supabase.auth.signOut()} style={{width:"100%",padding:"11px",borderRadius:9,background:"#fff",border:"1px solid #ef444444",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:14}}>Log Out</button>
+            <button onClick={()=>supabase.auth.signOut()} style={{width:"100%",padding:"11px",borderRadius:9,background:"#fff",border:"1px solid #ef444444",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:14}}>Log Out</button>
           )}
         </div>
       </div>
@@ -3447,16 +3985,16 @@ export default function SonoLane() {
     if(subPanel==="myevents") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/> My Events</div>
-          <button onClick={()=>{setShowEvent(true);}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Event</button>
+          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/> My Events</div>
+          <button onClick={()=>{resetEventForm();setShowEvent(true);}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Event</button>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 7px"}}>
           {events.length===0 ? (
             <div style={{textAlign:"center",padding:"48px 20px",color:"#111"}}>
               <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}><CompassStar size={48}/></div>
-              <div style={{fontSize:14,fontWeight:700,color:"#111",marginBottom:6}}>No events yet</div>
-              <div style={{fontSize:11,lineHeight:1.7}}>Create your first event and it will show up here and in the community Events feed.</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#111",marginBottom:6}}>No events yet</div>
+              <div style={{fontSize:13,lineHeight:1.7}}>Create your first event and it will show up here and in the community Events feed.</div>
             </div>
           ) : events.map(ev => {
             const accent = EV_COLORS[ev.type]||OR;
@@ -3465,25 +4003,34 @@ export default function SonoLane() {
                 {/* Cover */}
                 <div style={{height:140,position:"relative",background:ev.photos?.length?"#111":"linear-gradient(145deg,"+accent+"cc,"+accent+"55)"}}>
                   {ev.photos?.length>0 && <img src={ev.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
-                  {!ev.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44}}>{ev.icon}</div>}
-                  <div style={{position:"absolute",top:10,left:10,background:accent,borderRadius:20,padding:"3px 10px",fontSize:9,fontWeight:700,color:"#fff",textTransform:"uppercase"}}>{ev.type}</div>
+                  {!ev.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:46}}>{ev.icon}</div>}
+                  <div style={{position:"absolute",top:10,left:10,background:accent,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,color:"#fff",textTransform:"uppercase"}}>{ev.type}</div>
                   <div style={{position:"absolute",top:10,right:10,display:"flex",gap:6}}>
                     <div style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444"}}/>
                   </div>
                 </div>
                 {/* Info */}
                 <div style={{padding:"12px 14px"}}>
-                  <div style={{fontSize:15,fontWeight:900,color:"#111",marginBottom:4}}>{ev.title}</div>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:4}}>
+                    <div style={{fontSize:17,fontWeight:900,color:"#111",flex:1}}>{ev.title}</div>
+                    {ev.authorId==="me" && (
+                      <button onClick={()=>openEditEvent(ev)} title="Edit event" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+                    )}
+                  </div>
+                  {ev.date && <div style={{fontSize:12,color:"#111",fontWeight:600,marginBottom:5}}>📅 {new Date(ev.date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>}
                   {ev.address && (
                     <button onClick={()=>openMaps(ev.address)} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:6,fontFamily:F}}>
-                      <span style={{fontSize:11,color:"#22c55e",fontWeight:600}}>📍 {ev.address}</span>
+                      <span style={{fontSize:13,color:"#22c55e",fontWeight:600}}>📍 {ev.address}</span>
                     </button>
                   )}
-                  {ev.desc && <div style={{fontSize:12,color:"#111",lineHeight:1.6,marginBottom:10}}>{ev.desc}</div>}
-                  <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>setFlyerEvent(ev)} style={{flex:1,padding:"8px",borderRadius:9,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>View Flyer</button>
-                    {ev.address && <button onClick={()=>openMaps(ev.address)} style={{flex:1,padding:"8px",borderRadius:9,background:"#4285F4",color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>🚗 Directions</button>}
-                    <button onClick={()=>setEvents(p=>p.filter(x=>x.id!==ev.id))} style={{padding:"8px 10px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,cursor:"pointer",fontFamily:F}}>✕</button>
+                  {ev.desc && <div style={{fontSize:14,color:"#111",lineHeight:1.6,marginBottom:10}}>{ev.desc}</div>}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button onClick={()=>setFlyerEvent(ev)} style={{flex:1,padding:"8px",borderRadius:9,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>View Flyer</button>
+                    {ev.address && <button onClick={()=>openMaps(ev.address)} style={{flex:1,padding:"8px",borderRadius:9,background:"#4285F4",color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>🚗 Directions</button>}
+                    {isFutureEvent(ev.date) && (
+                      <button onClick={()=>toggleRsvp(ev.id)} style={{flex:1,padding:"8px",borderRadius:9,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,border:"none",background:rsvpedEvents[ev.id]?"#22c55e":"#f3f3f3",color:rsvpedEvents[ev.id]?"#fff":"#111"}}>{rsvpedEvents[ev.id]?"✓ Going":"RSVP"} · {(ev.rsvps||0)+(rsvpedEvents[ev.id]?1:0)}</button>
+                    )}
+                    <button onClick={()=>{if(ev.sbId)deleteEventSupabase(ev.sbId);setEvents(p=>p.filter(x=>x.id!==ev.id));}} style={{padding:"8px 10px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:13,cursor:"pointer",fontFamily:F}}>✕</button>
                   </div>
                 </div>
               </div>
@@ -3496,24 +4043,33 @@ export default function SonoLane() {
             <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"92vh",background:"#fff",borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
               <div style={{height:200,position:"relative",overflow:"hidden",flexShrink:0,background:flyerEvent.photos?.length?"#111":"linear-gradient(160deg,"+(EV_COLORS[flyerEvent.type]||OR)+","+(EV_COLORS[flyerEvent.type]||OR)+"55,#111)"}}>
                 {flyerEvent.photos?.length>0 && <img src={flyerEvent.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
-                {!flyerEvent.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:60}}>{flyerEvent.icon}</div>}
+                {!flyerEvent.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:62}}>{flyerEvent.icon}</div>}
                 <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.4)"}}/>
-                <button onClick={()=>setFlyerEvent(null)} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:14,cursor:"pointer"}}>×</button>
-                <div style={{position:"absolute",bottom:12,left:12,background:EV_COLORS[flyerEvent.type]||OR,borderRadius:20,padding:"3px 10px",fontSize:9,fontWeight:800,color:"#fff",textTransform:"uppercase"}}>{flyerEvent.type}</div>
+                <button onClick={()=>setFlyerEvent(null)} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:16,cursor:"pointer"}}>×</button>
+                <div style={{position:"absolute",bottom:12,left:12,background:EV_COLORS[flyerEvent.type]||OR,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase"}}>{flyerEvent.type}</div>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"16px 16px 24px"}}>
-                <div style={{fontSize:20,fontWeight:900,color:"#111",marginBottom:8}}>{flyerEvent.title}</div>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:4}}>
+                  <div style={{fontSize:22,fontWeight:900,color:"#111",flex:1}}>{flyerEvent.title}</div>
+                  {flyerEvent.authorId==="me" && (
+                    <button onClick={()=>openEditEvent(flyerEvent)} title="Edit event" style={{width:30,height:30,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:15,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+                  )}
+                </div>
+                {flyerEvent.date && <div style={{fontSize:13,color:"#111",fontWeight:600,marginBottom:8}}>📅 {new Date(flyerEvent.date+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"})}</div>}
                 {flyerEvent.address && (
                   <button onClick={()=>openMaps(flyerEvent.address)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:"#f0fdf4",border:"1.5px solid #22c55e33",cursor:"pointer",fontFamily:F,marginBottom:12,textAlign:"left"}}>
-                    <div style={{width:34,height:34,borderRadius:9,background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🗺️</div>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:10,fontWeight:700,color:"#22c55e"}}>Get Directions</div><div style={{fontSize:10,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flyerEvent.address}</div></div>
-                    <div style={{fontSize:16,color:"#22c55e"}}>›</div>
+                    <div style={{width:34,height:34,borderRadius:9,background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🗺️</div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>Get Directions</div><div style={{fontSize:12,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flyerEvent.address}</div></div>
+                    <div style={{fontSize:18,color:"#22c55e"}}>›</div>
                   </button>
                 )}
-                {flyerEvent.desc && <div style={{fontSize:13,color:"#111",lineHeight:1.65,marginBottom:14}}>{flyerEvent.desc}</div>}
-                <div style={{display:"flex",gap:8}}>
-                  {flyerEvent.address && <button onClick={()=>openMaps(flyerEvent.address)} style={{flex:2,padding:"12px",borderRadius:11,background:"#4285F4",color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>🚗 Start Route</button>}
-                  <button onClick={()=>setFlyerEvent(null)} style={{flex:1,padding:"12px",borderRadius:11,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Close</button>
+                {flyerEvent.desc && <div style={{fontSize:15,color:"#111",lineHeight:1.65,marginBottom:14}}>{flyerEvent.desc}</div>}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {flyerEvent.address && <button onClick={()=>openMaps(flyerEvent.address)} style={{flex:2,padding:"12px",borderRadius:11,background:"#4285F4",color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>🚗 Start Route</button>}
+                  {isFutureEvent(flyerEvent.date) && (
+                    <button onClick={()=>toggleRsvp(flyerEvent.id)} style={{flex:1,padding:"12px",borderRadius:11,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:rsvpedEvents[flyerEvent.id]?"#22c55e":"#f3f3f3",color:rsvpedEvents[flyerEvent.id]?"#fff":"#111"}}>{rsvpedEvents[flyerEvent.id]?"✓ Going":"✋ RSVP"} · {(flyerEvent.rsvps||0)+(rsvpedEvents[flyerEvent.id]?1:0)}</button>
+                  )}
+                  <button onClick={()=>setFlyerEvent(null)} style={{flex:1,padding:"12px",borderRadius:11,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Close</button>
                 </div>
               </div>
             </div>
@@ -3521,43 +4077,35 @@ export default function SonoLane() {
         )}
         {/* Create event sheet */}
         {showEvent && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEvent(false)}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeEventSheet}>
             <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div>
-                <button onClick={()=>setShowEvent(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{editingEventId?"Edit Event":"⚡ Create Event"}</div>
+                <button onClick={closeEventSheet} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:12}}>
                   {eventPhotos.map((p,i)=>(
                     <div key={i} style={{flex:1,height:80,borderRadius:10,overflow:"hidden",position:"relative"}}>
                       <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      <button onClick={()=>setEventPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:9,cursor:"pointer"}}>×</button>
+                      <button onClick={()=>setEventPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:11,cursor:"pointer"}}>×</button>
                     </div>
                   ))}
-                  {eventPhotos.length<3 && <button onClick={()=>eventPhotoRef.current?.click()} style={{flex:1,height:80,borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:24,color:"#111",cursor:"pointer"}}>+</button>}
+                  {eventPhotos.length<3 && <button onClick={()=>eventPhotoRef.current?.click()} style={{flex:1,height:80,borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:26,color:"#111",cursor:"pointer"}}>+</button>}
                   {Array.from({length:Math.max(0,2-eventPhotos.length)}).map((_,i)=><div key={i} style={{flex:1,height:80,borderRadius:10,background:"#f5f5f5"}}/>)}
                   <input ref={eventPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>Array.from(e.target.files||[]).slice(0,3-eventPhotos.length).forEach(f=>{const r=new FileReader();r.onload=ev=>setEventPhotos(p=>[...p,{url:ev.target.result}]);r.readAsDataURL(f);})}/>
                 </div>
                 <input value={newEvent.title} onChange={e=>setNewEvent(p=>({...p,title:e.target.value}))} placeholder="Event name *" style={{...INP,marginBottom:8}}/>
                 <input value={newEvent.address} onChange={e=>setNewEvent(p=>({...p,address:e.target.value}))} placeholder="Address or venue" style={{...INP,marginBottom:8}}/>
+                <input type="date" value={newEvent.date} onChange={e=>setNewEvent(p=>({...p,date:e.target.value}))} style={{...INP,marginBottom:8,color:newEvent.date?"#111":"#999"}}/>
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                   {Object.keys(EV_ICONS).map(t=><button key={t} onClick={()=>setNewEvent(p=>({...p,type:t}))} style={{...TAG(newEvent.type===t),background:newEvent.type===t?(EV_COLORS[t]||OR):"#f3f3f3"}}>{EV_ICONS[t]} {t}</button>)}
                 </div>
                 <textarea value={newEvent.desc} onChange={e=>setNewEvent(p=>({...p,desc:e.target.value}))} placeholder="Description…" rows={3} style={{...INP,resize:"none",marginBottom:16}}/>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{
-                    if(!newEvent.title.trim())return;
-                    const ev={id:Date.now(),...newEvent,icon:EV_ICONS[newEvent.type]||"📍",photos:eventPhotos,authorId:"me",authorName:userName||"You"};
-                    setEvents(p=>{const ne=[ev,...p]; setTimeout(()=>checkAchievements({events:ne}),200); return ne;});
-                    setNotifications(n=>[{id:Date.now(),icon:"⚡",text:"Your event \""+newEvent.title+"\" is now live in the community feed!",ts:"now",read:false},...n]);
-                    setNewEvent({title:"",type:"car meet",desc:"",address:""});
-                    setEventPhotos([]);
-                    setShowEvent(false);
-                    setFlyerEvent(ev);
-                  }} style={{flex:1,padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📍 Post Event</button>
-                  <button onClick={()=>setShowEvent(false)} style={{padding:"13px 16px",borderRadius:11,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                  <button onClick={submitEvent} style={{flex:1,padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>{editingEventId?"✓ Save Changes":"📍 Post Event"}</button>
+                  <button onClick={closeEventSheet} style={{padding:"13px 16px",borderRadius:11,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
                 </div>
               </div>
             </div>
@@ -3588,9 +4136,9 @@ export default function SonoLane() {
       return (
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-            <div style={{flex:1,fontSize:14,fontWeight:800,color:"#111"}}>🏅 Achievements</div>
-            <div style={{fontSize:11,fontWeight:700,color:"#e94560"}}>{unlockedAch.length}/{ACHIEVEMENTS.length}</div>
+            <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>🏅 Achievements</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#e94560"}}>{unlockedAch.length}/{ACHIEVEMENTS.length}</div>
           </div>
 
           {/* Progress bar */}
@@ -3598,13 +4146,13 @@ export default function SonoLane() {
             <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:4}}>
               <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#e94560,#f5a623)",width:(unlockedAch.length/ACHIEVEMENTS.length*100)+"%",transition:"width 0.5s ease"}}/>
             </div>
-            <div style={{fontSize:9,color:"#111",textAlign:"right"}}>{Math.round(unlockedAch.length/ACHIEVEMENTS.length*100)}% complete</div>
+            <div style={{fontSize:11,color:"#111",textAlign:"right"}}>{Math.round(unlockedAch.length/ACHIEVEMENTS.length*100)}% complete</div>
           </div>
 
           <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 7px"}}>
             {cats.map(cat=>(
               <div key={cat}>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:10}}>{CAT_LABELS[cat]||cat.toUpperCase()}</div>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:10}}>{CAT_LABELS[cat]||cat.toUpperCase()}</div>
                 {ACHIEVEMENTS.filter(a=>a.cat===cat).map(ach=>{
                   const done = unlockedAch.includes(ach.id);
                   return (
@@ -3617,18 +4165,18 @@ export default function SonoLane() {
                     }}>
                       <div style={{
                         width:44,height:44,borderRadius:12,flexShrink:0,
-                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
                         background:done?"linear-gradient(135deg,#e94560,#f5a623)":"#e0e0e0",
                         filter:done?"none":"grayscale(1)",
                       }}>{done?ach.icon:"🔒"}</div>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:800,color:done?"#fff":"#111",marginBottom:2}}>{ach.title}</div>
-                        <div style={{fontSize:10,color:done?"#aaa":"#111",lineHeight:1.4}}>{ach.desc}</div>
+                        <div style={{fontSize:15,fontWeight:800,color:done?"#fff":"#111",marginBottom:2}}>{ach.title}</div>
+                        <div style={{fontSize:12,color:done?"#aaa":"#111",lineHeight:1.4}}>{ach.desc}</div>
                       </div>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,flexShrink:0}}>
-                        <span style={{fontSize:12,fontWeight:900,color:done?"#f5a623":"#111"}}>+{ach.pts}</span>
-                        <span style={{fontSize:7,color:done?"#aaa":"#111"}}>pts</span>
-                        {done&&<span style={{fontSize:8,marginTop:2}}>✓</span>}
+                        <span style={{fontSize:14,fontWeight:900,color:done?"#f5a623":"#111"}}>+{ach.pts}</span>
+                        <span style={{fontSize:9,color:done?"#aaa":"#111"}}>pts</span>
+                        {done&&<span style={{fontSize:10,marginTop:2}}>✓</span>}
                       </div>
                     </div>
                   );
@@ -3644,15 +4192,15 @@ export default function SonoLane() {
     if(subPanel==="rewards") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"linear-gradient(180deg,#1a1a2e 0%,#16213e 40%,#0f3460 100%)"}}>
         <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ffffff18",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:18,background:"none",border:"none",color:"#aaa",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:14,fontWeight:800,color:"#fff",flex:1}}>🏆 SonoLane Rewards</div>
+          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#aaa",cursor:"pointer"}}>←</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#fff",flex:1}}>🏆 SonoLane Rewards</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"24px 20px 40px",display:"flex",flexDirection:"column",alignItems:"center"}}>
 
           {/* Coming soon hero */}
-          <div style={{width:96,height:96,borderRadius:"50%",background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,marginBottom:16,boxShadow:"0 0 0 10px rgba(233,69,96,0.12), 0 0 0 20px rgba(233,69,96,0.06)"}}>🏆</div>
-          <div style={{fontSize:24,fontWeight:900,color:"#fff",marginBottom:6,textAlign:"center"}}>Coming Soon</div>
-          <div style={{fontSize:13,color:"#aaa",textAlign:"center",lineHeight:1.7,marginBottom:32,maxWidth:280}}>Earn points every time you drive, share routes, attend events, and connect with the SonoLane community.</div>
+          <div style={{width:96,height:96,borderRadius:"50%",background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:46,marginBottom:16,boxShadow:"0 0 0 10px rgba(233,69,96,0.12), 0 0 0 20px rgba(233,69,96,0.06)"}}>🏆</div>
+          <div style={{fontSize:26,fontWeight:900,color:"#fff",marginBottom:6,textAlign:"center"}}>Coming Soon</div>
+          <div style={{fontSize:15,color:"#aaa",textAlign:"center",lineHeight:1.7,marginBottom:32,maxWidth:280}}>Earn points every time you drive, share routes, attend events, and connect with the SonoLane community.</div>
 
           {/* Feature preview cards */}
           {[
@@ -3663,19 +4211,19 @@ export default function SonoLane() {
             {icon:"👥",title:"Referral Bonus",desc:"Invite friends and earn bonus points together"},
           ].map(f=>(
             <div key={f.title} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",marginBottom:10}}>
-              <div style={{width:40,height:40,borderRadius:11,background:"linear-gradient(135deg,#e9456033,#f5a62333)",border:"1px solid #e9456033",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{f.icon}</div>
+              <div style={{width:40,height:40,borderRadius:11,background:"linear-gradient(135deg,#e9456033,#f5a62333)",border:"1px solid #e9456033",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{f.icon}</div>
               <div>
-                <div style={{fontSize:12,fontWeight:800,color:"#fff",marginBottom:2}}>{f.title}</div>
-                <div style={{fontSize:10,color:"#666"}}>{f.desc}</div>
+                <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:2}}>{f.title}</div>
+                <div style={{fontSize:12,color:"#666"}}>{f.desc}</div>
               </div>
             </div>
           ))}
 
           {/* Sign-up CTA */}
           <div style={{width:"100%",marginTop:8,padding:"20px",borderRadius:16,background:"rgba(233,69,96,0.1)",border:"1.5px solid rgba(233,69,96,0.3)",textAlign:"center"}}>
-            <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:4}}>Get Early Access</div>
-            <div style={{fontSize:10,color:"#888",marginBottom:14}}>Sign up to be notified when Rewards launches and lock in your founding member status.</div>
-            <button style={{width:"100%",padding:"13px",borderRadius:11,background:"linear-gradient(90deg,#e94560,#f5a623)",color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>🏆 Join the Waitlist</button>
+            <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4}}>Get Early Access</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:14}}>Sign up to be notified when Rewards launches and lock in your founding member status.</div>
+            <button style={{width:"100%",padding:"13px",borderRadius:11,background:"linear-gradient(90deg,#e94560,#f5a623)",color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>🏆 Join the Waitlist</button>
           </div>
         </div>
       </div>
@@ -3693,9 +4241,9 @@ export default function SonoLane() {
             {carAvatarMode==="photo" && carAvatarPhoto
               ? <img src={carAvatarPhoto} alt="" style={{width:104,height:104,borderRadius:16,objectFit:"cover",border:"2px solid rgba(255,255,255,0.85)",boxShadow:"0 6px 20px rgba(0,0,0,0.4)"}}/>
               : <CarSVG color={carColor} mods={carMods} size={140} styleId={carBodyStyle}/>}
-            {carShowInfoHome && carName && (<>
-              <div style={{marginTop:8,fontSize:16,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carName}</div>
-              <div style={{fontSize:10,color:"#ddd",marginTop:2,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carBrand ? (CAR_BRANDS.find(b=>b.id===carBrand)?.name+" ") : ""}{carModel}</div>
+            {carShowInfoHome && (carName || carBrand) && (<>
+              <div style={{marginTop:8,fontSize:18,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carName || CAR_BRANDS.find(b=>b.id===carBrand)?.name}</div>
+              {(carName && (carBrand||carModel)) && <div style={{fontSize:12,color:"#ddd",marginTop:2,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carBrand ? (CAR_BRANDS.find(b=>b.id===carBrand)?.name+" ") : ""}{carModel}</div>}
             </>)}
           </button>
         </div>
@@ -3717,7 +4265,7 @@ export default function SonoLane() {
           <span style={{
             flexShrink:0,padding:"7px 22px",borderRadius:9,
             background:"#f0f0f0",border:"2.5px solid #000",
-            fontSize:22,fontWeight:900,fontStyle:"italic",letterSpacing:1,textTransform:"uppercase",
+            fontSize:24,fontWeight:900,fontStyle:"italic",letterSpacing:1,textTransform:"uppercase",
             color:"#000",
           }}>Start Drive</span>
           <div style={{
@@ -3747,18 +4295,18 @@ export default function SonoLane() {
                 ? (<img src={profilePhoto} alt="profile" style={{width:"100%",height:"100%",objectFit:"cover"}}/>)
                 : <DefaultAvatar size={58} color="#111"/>}
             </button>
-            {editMode&&<div style={{position:"absolute",bottom:0,right:0,width:18,height:18,borderRadius:"50%",background:OR,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",pointerEvents:"none"}}>✎</div>}
+            {editMode&&<div style={{position:"absolute",bottom:0,right:0,width:18,height:18,borderRadius:"50%",background:OR,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",pointerEvents:"none"}}>✎</div>}
             <input ref={profilePhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setProfilePhoto(ev.target.result);r.readAsDataURL(f);}}/>
           </div>
 
           {/* Name / bio */}
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:17,fontWeight:800,color:userName?"#111":"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName||"Your name"}</div>
-            <div style={{fontSize:11,color:"#111",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userBio||"No bio yet"}</div>
+            <div style={{fontSize:19,fontWeight:800,color:userName?"#111":"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName||"Your name"}</div>
+            <div style={{fontSize:13,color:"#111",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userBio||"No bio yet"}</div>
           </div>
 
           {/* Edit button — opens the edit sub-page (icon only, no label, no background plate) */}
-          <button onClick={()=>setSubPanel("edit")} title="Edit profile" style={{width:34,height:34,borderRadius:"50%",fontSize:22,background:"none",color:"#111",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={()=>setSubPanel("edit")} title="Edit profile" style={{width:34,height:34,borderRadius:"50%",fontSize:24,background:"none",color:"#111",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
             ✎
           </button>
         </div>
@@ -3768,8 +4316,8 @@ export default function SonoLane() {
           {[["star",pts,"Pts","points"],["people",following.length,"Following","following"],["people",followersList.length,"Followers","followerslist"]].map(([ic,v,l,sp])=>(
             <button key={l} onClick={()=>sp==="points"?setWidgetAction("points"):setSubPanel(sp)} style={{flex:1,padding:"9px 4px",textAlign:"center",borderRight:"1px solid #ebebeb",background:"none",border:"none",borderRightWidth:1,borderRightStyle:"solid",borderRightColor:"#ebebeb",cursor:"pointer",fontFamily:F}}>
               <div style={{display:"flex",justifyContent:"center"}}>{ic==="road"?<DPadIcon id="road" color={DPAD_COLORS.road} size={15}/>:<ProfileIcon id={ic} size={15} color="#8a8f98"/>}</div>
-              <div style={{fontSize:12,fontWeight:800,color:"#111",marginTop:2}}>{v}</div>
-              <div style={{fontSize:8,color:"#111"}}>{l}</div>
+              <div style={{fontSize:14,fontWeight:800,color:"#111",marginTop:2}}>{v}</div>
+              <div style={{fontSize:10,color:"#111"}}>{l}</div>
             </button>
           ))}
         </div>
@@ -3780,18 +4328,18 @@ export default function SonoLane() {
           {/* ── Discovery radius — display only; change it from Edit Profile ── */}
           <div style={{flexShrink:0,background:"#fff",borderRadius:16,border:"1px solid #ebebeb",padding:"14px",marginBottom:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#111"}}>Discovery Radius</div>
-              <button onClick={()=>setSubPanel("edit")} style={{background:"none",border:"none",color:OR,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,padding:0}}>Edit</button>
+              <div style={{fontSize:14,fontWeight:800,color:"#111"}}>Discovery Radius</div>
+              <button onClick={()=>setSubPanel("radius")} style={{background:"none",border:"none",color:OR,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,padding:0}}>Edit</button>
             </div>
-            <div style={{fontSize:11,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
+            <div style={{fontSize:13,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
-              <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
-              <span style={{fontSize:10,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
+              <span style={{fontSize:22,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
+              <span style={{fontSize:12,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
             </div>
             <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden"}}>
               <div style={{height:"100%",borderRadius:3,background:OR,width:(Math.min(100,Math.max(0,(radiusDraft-RADIUS_MIN)/(RADIUS_MAX-RADIUS_MIN)*100)))+"%"}}/>
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#111",marginTop:4}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#111",marginTop:4}}>
               <span>{RADIUS_MIN} mi</span>
               <span>100+ mi</span>
             </div>
@@ -3803,11 +4351,11 @@ export default function SonoLane() {
                 {/* Header */}
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:800,color:"#111"}}>Profile Completion</div>
-                    <div style={{fontSize:9,color:"#111",marginTop:1}}>{_doneCount} of {_OBJECTIVES.length} objectives done</div>
+                    <div style={{fontSize:14,fontWeight:800,color:"#111"}}>Profile Completion</div>
+                    <div style={{fontSize:11,color:"#111",marginTop:1}}>{_doneCount} of {_OBJECTIVES.length} objectives done</div>
                   </div>
-                  <div style={{fontSize:18,fontWeight:900,color:_pct===100?"#22c55e":OR}}>{_pct}%</div>
-                  <button onClick={dismissObjectives} title="Dismiss" style={{background:"none",border:"none",color:"#bbb",fontSize:16,fontWeight:700,cursor:"pointer",padding:"0 0 0 2px",lineHeight:1,flexShrink:0}}>×</button>
+                  <div style={{fontSize:20,fontWeight:900,color:_pct===100?"#22c55e":OR}}>{_pct}%</div>
+                  <button onClick={dismissObjectives} title="Dismiss" style={{background:"none",border:"none",color:"#bbb",fontSize:18,fontWeight:700,cursor:"pointer",padding:"0 0 0 2px",lineHeight:1,flexShrink:0}}>×</button>
                 </div>
                 {/* Progress bar */}
                 <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:12}}>
@@ -3817,12 +4365,12 @@ export default function SonoLane() {
                     shows every objective (done and not) with its point value. */}
                 {!showAllObjectives && _incomplete.length>0 && (
                   <div>
-                    <div style={{fontSize:8,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>NEXT UP</div>
+                    <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>NEXT UP</div>
                     {_incomplete.slice(0,3).map(obj=>(
                       <div key={obj.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #f8f8f8"}}>
                         <div style={{width:24,height:24,borderRadius:8,background:"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><ObjIcon icon={obj.icon} size={13}/></div>
-                        <div style={{flex:1,fontSize:11,color:"#111"}}>{obj.label}</div>
-                        <div style={{fontSize:9,fontWeight:700,color:OR}}>+{obj.pts} pts</div>
+                        <div style={{flex:1,fontSize:13,color:"#111"}}>{obj.label}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:OR}}>+{obj.pts} pts</div>
                       </div>
                     ))}
                   </div>
@@ -3830,28 +4378,28 @@ export default function SonoLane() {
                 {/* All done, collapsed view */}
                 {!showAllObjectives && _incomplete.length===0 && (
                   <div style={{textAlign:"center",padding:"6px 0"}}>
-                    <div style={{fontSize:20,marginBottom:3}}>🏆</div>
-                    <div style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>Profile complete!</div>
+                    <div style={{fontSize:22,marginBottom:3}}>🏆</div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Profile complete!</div>
                   </div>
                 )}
                 {/* Expanded — every objective, done or not, with its points */}
                 {showAllObjectives && (
                   <div>
-                    <div style={{fontSize:8,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>ALL OBJECTIVES</div>
+                    <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>ALL OBJECTIVES</div>
                     {_OBJECTIVES.map(obj=>(
                       <div key={obj.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #f8f8f8",opacity:obj.done?0.55:1}}>
                         <div style={{width:24,height:24,borderRadius:8,background:obj.done?"#22c55e11":"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><ObjIcon icon={obj.icon} size={13}/></div>
-                        <div style={{flex:1,fontSize:11,color:"#111",textDecoration:obj.done?"line-through":"none"}}>{obj.label}</div>
+                        <div style={{flex:1,fontSize:13,color:"#111",textDecoration:obj.done?"line-through":"none"}}>{obj.label}</div>
                         {obj.done
-                          ? <div style={{fontSize:9,fontWeight:700,color:"#22c55e"}}>✓ done</div>
-                          : <div style={{fontSize:9,fontWeight:700,color:OR}}>+{obj.pts} pts</div>}
+                          ? <div style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>✓ done</div>
+                          : <div style={{fontSize:11,fontWeight:700,color:OR}}>+{obj.pts} pts</div>}
                       </div>
                     ))}
                   </div>
                 )}
                 {/* Expand/collapse toggle */}
                 {_OBJECTIVES.length>3 && (
-                  <button onClick={()=>setShowAllObjectives(v=>!v)} style={{width:"100%",background:"none",border:"none",padding:"8px 0 0",marginTop:showAllObjectives?8:0,fontSize:10,fontWeight:700,color:OR,cursor:"pointer",fontFamily:F}}>
+                  <button onClick={()=>setShowAllObjectives(v=>!v)} style={{width:"100%",background:"none",border:"none",padding:"8px 0 0",marginTop:showAllObjectives?8:0,fontSize:12,fontWeight:700,color:OR,cursor:"pointer",fontFamily:F}}>
                     {showAllObjectives ? "Show less ▲" : "View all "+_OBJECTIVES.length+" objectives ▼"}
                   </button>
                 )}
@@ -3862,8 +4410,8 @@ export default function SonoLane() {
                       {_OBJECTIVES.filter(o=>o.done).map(obj=>(
                         <div key={obj.id} style={{display:"flex",alignItems:"center",gap:3,background:"#22c55e11",border:"1px solid #22c55e33",borderRadius:20,padding:"2px 7px"}}>
                           <ObjIcon icon={obj.icon} size={10}/>
-                          <span style={{fontSize:8,fontWeight:600,color:"#22c55e"}}>{obj.label}</span>
-                          <span style={{fontSize:8,color:"#22c55e"}}>✓</span>
+                          <span style={{fontSize:10,fontWeight:600,color:"#22c55e"}}>{obj.label}</span>
+                          <span style={{fontSize:10,color:"#22c55e"}}>✓</span>
                         </div>
                       ))}
                     </div>
@@ -3876,9 +4424,9 @@ export default function SonoLane() {
                "TOP 3" on the left, "Friends" + a list icon in the corner on
                the right; the whole bar opens the full Friends tab. ── */}
           <button onClick={()=>setSubPanel("friends")} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",margin:"0 0 6px",padding:"2px 1px",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
-            <span style={{fontSize:9,fontWeight:800,letterSpacing:1.2,color:"#111"}}>TOP 3</span>
+            <span style={{fontSize:11,fontWeight:800,letterSpacing:1.2,color:"#111"}}>TOP 3</span>
             <span style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{fontSize:11,fontWeight:700,color:"#8a8f98"}}>Friends</span>
+              <span style={{fontSize:13,fontWeight:700,color:"#8a8f98"}}>Friends</span>
               <ListBarsIcon size={15} color="#8a8f98"/>
             </span>
           </button>
@@ -3887,17 +4435,54 @@ export default function SonoLane() {
                friend in Friends; empty slots open Friends to add one. ── */}
           <div style={{display:"flex",margin:"0 -14px 12px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb"}}>
             {[0,1,2].map(i=>{
-              const fr=friends[i];
+              // The AI Co-Pilot can take up the first Top 3 slot — tapping it
+              // starts a live voice call instead of opening the Friends tab.
+              if(aiInTop3 && i===0){
+                return (
+                  <button key="ai" onClick={startAiCall} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:"1px solid #ebebeb",cursor:"pointer",fontFamily:F}}>
+                    <div style={{width:42,height:42,borderRadius:"50%",background:pal.color+"22",border:"1.5px solid "+pal.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={20} color={pal.color}/></div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#111",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pal.name}</div>
+                  </button>
+                );
+              }
+              const fr=friends[aiInTop3?i-1:i];
               return (
-                <button key={i} onClick={()=>{setSubPanel("friends");setSelFriend(fr||null);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:i<2?"1px solid #ebebeb":"none",cursor:"pointer",fontFamily:F}}>
-                  <div style={{width:42,height:42,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?15:18,color:fr?"#fff":"#ccc",fontWeight:800,overflow:"hidden"}}>
+                <button key={i} onClick={()=>{if(fr){setSubPanel("friends");setSelFriend(fr);}else{setShowTop3Chooser(true);}}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:i<2?"1px solid #ebebeb":"none",cursor:"pointer",fontFamily:F}}>
+                  <div style={{width:42,height:42,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?17:20,color:fr?"#fff":"#ccc",fontWeight:800,overflow:"hidden"}}>
                     {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
                   </div>
-                  <div style={{fontSize:10,fontWeight:fr?700:400,color:fr?"#111":"#bbb",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr?fr.name:"Add Friend"}</div>
+                  <div style={{fontSize:12,fontWeight:fr?700:400,color:fr?"#111":"#bbb",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr?fr.name:"Add Friend"}</div>
                 </button>
               );
             })}
           </div>
+
+          {/* Choosing what to add to an empty Top 3 slot — a real friend, or
+              the AI Co-Pilot (only offered once, and only if not already in). */}
+          {showTop3Chooser && (
+            <div onClick={()=>setShowTop3Chooser(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{fontSize:15,fontWeight:800,color:"#111",marginBottom:14}}>Add to Top 3</div>
+                <button onClick={()=>{setShowTop3Chooser(false);setSubPanel("friends");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",fontFamily:F,textAlign:"left",marginBottom:10}}>
+                  <div style={{width:38,height:38,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>👥</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Add a Friend</div>
+                    <div style={{fontSize:12,color:"#888",marginTop:1}}>Find someone you know on SonoLane.</div>
+                  </div>
+                </button>
+                {!aiInTop3 && (
+                  <button onClick={()=>{setAiInTop3(true);setShowTop3Chooser(false);}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid "+pal.color+"44",background:pal.color+"0f",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                    <div style={{width:38,height:38,borderRadius:"50%",background:pal.color+"22",border:"1.5px solid "+pal.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={18} color={pal.color}/></div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Add {pal.name} (AI Co-Pilot)</div>
+                      <div style={{fontSize:12,color:"#888",marginTop:1}}>Tap to start a live voice call anytime.</div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"repeat(4,1fr)",gap:10,flex:1}}>
 
@@ -3907,58 +4492,58 @@ export default function SonoLane() {
                 changes to show the car's name. */}
             <VN action={()=>setSubPanel("garage")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
               <span style={{marginBottom:8}}><GarageDoorIcon size={26} color={carSaved?OR:"#8a8f98"}/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>My Garage</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{carSaved?(carName||"Saved"):carModel}</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>My Garage</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{carSaved?(carName||"Saved"):carModel}</div>
             </VN>
 
             {/* My Routes */}
             <VN action={()=>setSubPanel("routes")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
               <span style={{marginBottom:8}}><DPadIcon id="road" color={DPAD_COLORS.road} size={26}/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>My Routes</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{routes.length} saved</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>My Routes</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{routes.length} saved</div>
             </VN>
 
             {/* My Events tile — shows only events the user created */}
             <VN action={()=>setSubPanel("myevents")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
               <span style={{marginBottom:8}}><DPadIcon id="event" color={DPAD_COLORS.event} size={26}/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>My Events</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{events.length} created</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>My Events</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{events.length} created</div>
             </VN>
 
             {/* Driving History */}
             <VN action={()=>setSubPanel("history")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
               <span style={{marginBottom:8}}><ProfileIcon id="history" size={26} color="#8a8f98"/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Drive History</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{tripHistory.length} trips</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Drive History</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{tripHistory.length} trips</div>
             </VN>
 
             {/* Dashcam */}
             <VN action={()=>setSubPanel("dashcam")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
               <span style={{marginBottom:8}}><ProfileIcon id="video" size={26} color="#8a8f98"/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Dashcam</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{clips.length} clips</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Dashcam</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{clips.length} clips</div>
             </VN>
 
             {/* Achievements */}
             <VN action={()=>setSubPanel("achievements")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,background:"#f8f8f8",border:"1.5px solid #ebebeb",cursor:"pointer",textAlign:"left",fontFamily:F,position:"relative",overflow:"hidden"}}>
               {newAchQueue.length>0 && <div style={{position:"absolute",top:8,right:8,width:8,height:8,borderRadius:"50%",background:"#e94560",boxShadow:"0 0 6px #e94560"}}/>}
               <span style={{marginBottom:8}}><ProfileIcon id="trophy" size={26} color="#f5a623"/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Achievements</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{unlockedAch.length}/{ACHIEVEMENTS.length} unlocked</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Achievements</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{unlockedAch.length}/{ACHIEVEMENTS.length} unlocked</div>
             </VN>
 
             {/* Radio Stations — saved & created */}
             <VN action={()=>setSubPanel("radiostations")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8,fontSize:26}}>📻</span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Radio Stations</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>{savedStations.length} saved</div>
+              <span style={{marginBottom:8,fontSize:28}}>📻</span>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Radio Stations</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>{savedStations.length} saved</div>
             </VN>
 
             {/* Settings — 8th tile, fills the 2x4 grid exactly */}
             <VN action={()=>setSubPanel("settings")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
               <span style={{marginBottom:8}}><ProfileIcon id="gear" size={26} color="#8a8f98"/></span>
-              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Settings</div>
-              <div style={{fontSize:10,color:"#111",marginTop:3}}>Preferences</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Settings</div>
+              <div style={{fontSize:12,color:"#111",marginTop:3}}>Preferences</div>
             </VN>
 
           </div>
@@ -3970,12 +4555,12 @@ export default function SonoLane() {
             background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
             border:"1.5px solid #e94560",cursor:"pointer",textAlign:"left",fontFamily:F,
           }}>
-            <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🏆</div>
+            <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🏆</div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:900,color:"#fff",marginBottom:2}}>SonoLane Rewards</div>
-              <div style={{fontSize:10,color:"#111",lineHeight:1.4}}>Earn points driving. Unlock perks & exclusive features.</div>
+              <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>SonoLane Rewards</div>
+              <div style={{fontSize:12,color:"#111",lineHeight:1.4}}>Earn points driving. Unlock perks & exclusive features.</div>
             </div>
-            <div style={{fontSize:18,color:"#e94560",flexShrink:0}}>›</div>
+            <div style={{fontSize:20,color:"#e94560",flexShrink:0}}>›</div>
           </VN>
         </div>
       </div>
@@ -3983,7 +4568,7 @@ export default function SonoLane() {
   });
 
   /* ── FEED ── */
-  const FEED_CATS = ["All","Following","scenic","hike","commute","road trip","bike"];
+  const FEED_CATS = ["All","Following","scenic","hike","commute","home","road trip","bike"];
   const FeedPanel = useStablePanel(() => {
     // Multi-select category filter — tap "All" to reset, tap any other chip to
     // toggle it in/out of the active set (posts matching ANY selected chip show).
@@ -4014,13 +4599,35 @@ export default function SonoLane() {
         </div>
       </div>
     );
+    const resetPostForm = () => {
+      setNewPost({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
+      setPostPhotos([]);
+      setPostSavedRoute(null);
+      setPostRouteMode("new");
+      setEditingPostId(null);
+    };
+    const closePostSheet = () => { setShowPost(false); setEditingPostId(null); };
+    // Every route is yours (authorId "me"), so tapping the pencil on any
+    // route card — feed or its full-screen info page — reopens this same
+    // sheet pre-filled, in edit mode instead of create mode.
+    const openEditPost = (post) => {
+      setNewPost({
+        title: post.title||"", body: post.body||"", type: post.type||"scenic",
+        distance: post.distance||"", stops: post.stops?.length ? [...post.stops,""] : ["",""],
+        highlights: post.highlights||"",
+      });
+      setPostPhotos(post.photos||[]);
+      setPostSavedRoute(null);
+      setPostRouteMode("new");
+      setEditingPostId(post.id);
+      setShowPost(true);
+    };
     const submitPost = () => {
       if(!newPost.title.trim()) return;
       const saved = postRouteMode==="existing" && postSavedRoute
         ? routes.find(r=>r.id===postSavedRoute)
         : null;
-      const post = {
-        id: Date.now(),
+      const postData = {
         title: newPost.title,
         type: saved?.type || newPost.type,
         body: newPost.body,
@@ -4030,16 +4637,15 @@ export default function SonoLane() {
         photos: postPhotos,
         fromSaved: !!saved,
         savedRouteName: saved?.title,
-        likes: 0,
-        authorId: "me",
-        authorName: userName||"You",
       };
-      setPosts(p=>[post,...p]);
-      setNotifications(n=>[{id:Date.now(),icon:"🗺️",text:"Your route \""+post.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
-      setNewPost({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
-      setPostPhotos([]);
-      setPostSavedRoute(null);
-      setPostRouteMode("new");
+      if(editingPostId){
+        setPosts(p=>p.map(x=>x.id===editingPostId?{...x,...postData}:x));
+      } else {
+        const post = { id: Date.now(), ...postData, likes: 0, authorId: "me", authorName: userName||"You" };
+        setPosts(p=>[post,...p]);
+        setNotifications(n=>[{id:Date.now(),icon:"🗺️",text:"Your route \""+post.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
+      }
+      resetPostForm();
       setShowPost(false);
     };
     return (
@@ -4049,8 +4655,7 @@ export default function SonoLane() {
       <div style={{padding:"10px 14px 8px",borderBottom:"1px solid #ebebeb",flexShrink:0,background:"#fff"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> Routes</div>
-            <div style={{fontSize:9,color:"#111"}}>{filtered.length} showing{appRadius ? " · within "+appRadius+" mi" : ""}</div>
+            <div style={{fontSize:17,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> Routes</div>
           </div>
           {/* Routes/Events toggle — now lives up here since the main nav moved to the bottom */}
           <div style={{display:"flex",gap:4,background:"#f3f3f3",borderRadius:40,padding:4,flexShrink:0}}>
@@ -4063,20 +4668,20 @@ export default function SonoLane() {
           </div>
         </div>
         <div style={{display:"flex",gap:6,marginBottom:8}}>
-          <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Routes</VN>
-          <VN action={()=>setShowPost(true)} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
+          <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Routes</VN>
+          <VN action={()=>{resetPostForm();setShowPost(true);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
         </div>
         <input value={feedSearch} onChange={e=>setFeedSearch(e.target.value)} placeholder="Search routes…" style={{...INP,marginBottom:6}}/>
         <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2}}>
           {FEED_CATS.map(c=>(
-            <button key={c} onClick={()=>toggleFeedCat(c)} style={{...TAG(feedCats.includes(c)),whiteSpace:"nowrap",flexShrink:0,fontSize:10,padding:"4px 10px"}}>{c==="Following"?"👥 Following":c}</button>
+            <button key={c} onClick={()=>toggleFeedCat(c)} style={{...TAG(feedCats.includes(c)),whiteSpace:"nowrap",flexShrink:0,fontSize:12,padding:"4px 10px"}}>{c==="Following"?"👥 Following":c}</button>
           ))}
         </div>
         {/* Radius indicator — set in Profile Settings */}
         {appRadius&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
-          <span style={{fontSize:9,color:"#111"}}>📍</span>
-          <span style={{fontSize:9,color:"#111"}}>{appRadius} mi radius</span>
-          <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("settings"),100);}} style={{fontSize:9,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
+          <span style={{fontSize:11,color:"#111"}}>📍</span>
+          <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
+          <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
         </div>}
       </div>
 
@@ -4085,38 +4690,49 @@ export default function SonoLane() {
         {filtered.length===0 && feedCats.length===1 && feedCats[0]==="Following" && (
           <div style={{textAlign:"center",padding:"30px 20px",color:"#111"}}>
             <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="people" size={34} color="#ddd"/></div>
-            <div style={{fontSize:12,color:"#111"}}>No routes from people you follow yet.</div>
+            <div style={{fontSize:14,color:"#111"}}>No routes from people you follow yet.</div>
           </div>
         )}
         {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && appRadius && posts.length>0 && (
           <div style={{textAlign:"center",padding:"30px 20px",color:"#111"}}>
             <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="road" size={34} color="#ddd"/></div>
-            <div style={{fontSize:12,color:"#111",marginBottom:4}}>No routes within {appRadius} mi.</div>
-            <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:10,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
+            <div style={{fontSize:14,color:"#111",marginBottom:4}}>No routes within {appRadius} mi.</div>
+            <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
           </div>
         )}
         {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && !(appRadius && posts.length>0) && <><GhostPost/><GhostPost/><GhostPost/></>}
         {filtered.map(post=>(
-          <div key={post.id} style={{...CARD,padding:0,overflow:"hidden"}}>
-            {post.photos?.length>0 && <img src={post.photos[0].url} alt="" style={{width:"100%",height:160,objectFit:"cover",display:"block"}}/>}
+          <div key={post.id} onClick={()=>setViewRouteId(post.id)} style={{...CARD,padding:0,overflow:"hidden",cursor:"pointer"}}>
+            {post.photos?.length>0 && (
+              <div style={{display:"grid",gridTemplateColumns: post.photos.length===1?"1fr":"1fr 1fr",gap:2}}>
+                {post.photos.slice(0,4).map((p,i)=>(
+                  <img key={i} src={p.url} alt="" style={{width:"100%",height: post.photos.length===1?160:100,objectFit:"cover",display:"block"}}/>
+                ))}
+              </div>
+            )}
             <div style={{padding:"12px 14px"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                <span style={{fontSize:9,color:"#fff",background:OR,borderRadius:20,padding:"2px 7px",fontWeight:700,textTransform:"uppercase"}}>{post.type}</span>
-                {post.fromSaved && <span style={{fontSize:9,color:"#6366f1",fontWeight:600}}>🗺️ {post.savedRouteName}</span>}
-                {post.distance && <span style={{fontSize:9,color:"#111"}}>{post.distance}</span>}
-                {post.authorId!=="me" && <span style={{fontSize:9,color:"#111",marginLeft:"auto"}}>📍 {milesAwayFor(post.id)} mi away</span>}
+                <span style={{fontSize:11,color:"#fff",background:OR,borderRadius:20,padding:"2px 7px",fontWeight:700,textTransform:"uppercase"}}>{post.type}</span>
+                {post.fromSaved && <span style={{fontSize:11,color:"#6366f1",fontWeight:600}}>🗺️ {post.savedRouteName}</span>}
+                {post.distance && <span style={{fontSize:11,color:"#111"}}>{post.distance}</span>}
+                {post.authorId!=="me" && <span style={{fontSize:11,color:"#111",marginLeft:"auto"}}>📍 {milesAwayFor(post.id)} mi away</span>}
+                {post.authorId==="me" && (
+                  <button onClick={e=>{e.stopPropagation();openEditPost(post);}} title="Edit route" style={{marginLeft:"auto",width:24,height:24,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+                )}
               </div>
-              <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:post.body?5:0}}>{post.title}</div>
-              {post.body && <div style={{fontSize:12,color:"#111",lineHeight:1.6,marginBottom:6}}>{post.body}</div>}
-              {post.highlights && <div style={{fontSize:11,color:"#111",fontStyle:"italic",marginBottom:6}}>✨ {post.highlights}</div>}
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:post.body?5:0}}>{post.title}</div>
+              {post.body && <div style={{fontSize:14,color:"#111",lineHeight:1.6,marginBottom:6}}>{post.body}</div>}
+              {post.highlights && <div style={{fontSize:13,color:"#111",fontStyle:"italic",marginBottom:6}}>✨ {post.highlights}</div>}
               {post.stops?.length>0 && (
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
-                  {post.stops.map((s,i)=><span key={i} style={{fontSize:9,background:"#f3f3f3",border:"1px solid #ebebeb",borderRadius:20,padding:"2px 8px",color:"#111"}}>📍 {s}</span>)}
+                  {post.stops.map((s,i)=><span key={i} style={{fontSize:11,background:"#f3f3f3",border:"1px solid #ebebeb",borderRadius:20,padding:"2px 8px",color:"#111"}}>📍 {s}</span>)}
                 </div>
               )}
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <button onClick={()=>setLikedPosts(l=>({...l,[post.id]:!l[post.id]}))} style={{...TAG(likedPosts[post.id]),padding:"5px 12px",fontSize:11}}>♥ {(post.likes||0)+(likedPosts[post.id]?1:0)}</button>
-                <button onClick={()=>{
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <button onClick={e=>{e.stopPropagation();startRouteDirections(post);}} style={{padding:"5px 12px",borderRadius:20,fontSize:13,fontWeight:700,background:OR,color:"#fff",border:"none",cursor:"pointer",fontFamily:F}}>🧭 Get Directions</button>
+                <button onClick={e=>{e.stopPropagation();setLikedPosts(l=>({...l,[post.id]:!l[post.id]}));}} style={{...TAG(likedPosts[post.id]),padding:"5px 12px",fontSize:13}}>♥ {(post.likes||0)+(likedPosts[post.id]?1:0)}</button>
+                <button onClick={e=>{
+                  e.stopPropagation();
                   const already=savedFromFeed.some(r=>r.feedId===post.id);
                   if(already){setSavedFromFeed(s=>s.filter(r=>r.feedId!==post.id));}
                   else{
@@ -4129,7 +4745,7 @@ export default function SonoLane() {
                     }]);
                   }
                 }} style={{
-                  padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:600,cursor:"pointer",
+                  padding:"5px 12px",borderRadius:20,fontSize:13,fontWeight:600,cursor:"pointer",
                   background:savedFromFeed.some(r=>r.feedId===post.id)?"#22c55e":"#f3f3f3",
                   color:savedFromFeed.some(r=>r.feedId===post.id)?"#fff":"#888",
                   border:"none",fontFamily:F,
@@ -4142,17 +4758,62 @@ export default function SonoLane() {
         ))}
       </div>
 
-      {/* Create Route Post sheet */}
+      {/* Route Info — full-screen page opened by tapping a route card,
+          expanding it out of the feed entirely. Every route is yours, so
+          it always offers an Edit action. */}
+      {viewRouteId && (() => {
+        const vr = posts.find(p=>p.id===viewRouteId);
+        if(!vr) return null;
+        return (
+          <div style={{position:"fixed",inset:0,background:"#fff",zIndex:750,display:"flex",flexDirection:"column"}}>
+            <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+              <button onClick={()=>setViewRouteId(null)} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{vr.title}</div>
+              <button onClick={()=>openEditPost(vr)} title="Edit route" style={{width:34,height:34,borderRadius:"50%",fontSize:18,background:"none",color:"#111",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"0 0 24px"}}>
+              {vr.photos?.length>0 && (
+                <div style={{display:"grid",gridTemplateColumns: vr.photos.length===1?"1fr":"1fr 1fr",gap:2}}>
+                  {vr.photos.slice(0,4).map((p,i)=>(
+                    <img key={i} src={p.url} alt="" style={{width:"100%",height: vr.photos.length===1?220:150,objectFit:"cover",display:"block"}}/>
+                  ))}
+                </div>
+              )}
+              <div style={{padding:"14px 16px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                  <span style={{fontSize:11,color:"#fff",background:OR,borderRadius:20,padding:"2px 7px",fontWeight:700,textTransform:"uppercase"}}>{vr.type}</span>
+                  {vr.fromSaved && <span style={{fontSize:11,color:"#6366f1",fontWeight:600}}>🗺️ {vr.savedRouteName}</span>}
+                  {vr.distance && <span style={{fontSize:12,color:"#111"}}>{vr.distance}</span>}
+                </div>
+                {vr.body && <div style={{fontSize:15,color:"#111",lineHeight:1.7,marginBottom:10}}>{vr.body}</div>}
+                {vr.highlights && <div style={{fontSize:14,color:"#111",fontStyle:"italic",marginBottom:10}}>✨ {vr.highlights}</div>}
+                {vr.stops?.length>0 && (
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+                    {vr.stops.map((s,i)=><span key={i} style={{fontSize:12,background:"#f3f3f3",border:"1px solid #ebebeb",borderRadius:20,padding:"4px 10px",color:"#111"}}>📍 {s}</span>)}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>startRouteDirections(vr)} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭 Get Directions</button>
+                  <button onClick={()=>setLikedPosts(l=>({...l,[vr.id]:!l[vr.id]}))} style={{...TAG(likedPosts[vr.id]),padding:"11px 16px",fontSize:14}}>♥ {(vr.likes||0)+(likedPosts[vr.id]?1:0)}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Create Route Post sheet — doubles as the Edit Route sheet whenever
+          editingPostId is set (opened via a route card's pencil). */}
       {showPost && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowPost(false)}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closePostSheet}>
           <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"94vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
 
             {/* Header */}
             <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 10px"}}/>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>Create Route Post</div>
-                <button onClick={()=>setShowPost(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{editingPostId?"Edit Route":"Create Route Post"}</div>
+                <button onClick={closePostSheet} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
             </div>
 
@@ -4166,25 +4827,25 @@ export default function SonoLane() {
                 border:"1.5px solid "+(postSavedRoute?OR:"#e0e0e0"),
                 cursor:"pointer",fontFamily:F,textAlign:"left",
               }}>
-                <div style={{width:32,height:32,borderRadius:9,background:postSavedRoute?OR:"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                <div style={{width:32,height:32,borderRadius:9,background:postSavedRoute?OR:"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
                   🗺️
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   {postSavedRoute && routes.find(x=>x.id===postSavedRoute) ? (
                     <>
-                      <div style={{fontSize:11,fontWeight:700,color:OR}}>Auto-filled from saved route</div>
-                      <div style={{fontSize:10,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{routes.find(x=>x.id===postSavedRoute)?.title}{routes.find(x=>x.id===postSavedRoute)?.distance?" · "+routes.find(x=>x.id===postSavedRoute).distance:""}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:OR}}>Auto-filled from saved route</div>
+                      <div style={{fontSize:12,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{routes.find(x=>x.id===postSavedRoute)?.title}{routes.find(x=>x.id===postSavedRoute)?.distance?" · "+routes.find(x=>x.id===postSavedRoute).distance:""}</div>
                     </>
                   ) : (
                     <>
-                      <div style={{fontSize:11,fontWeight:700,color:"#111"}}>Add from My Saved Routes</div>
-                      <div style={{fontSize:10,color:"#111"}}>Auto-fill title, type & distance</div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Add from My Saved Routes</div>
+                      <div style={{fontSize:12,color:"#111"}}>Auto-fill title, type & distance</div>
                     </>
                   )}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                  {postSavedRoute && <button onClick={e=>{e.stopPropagation();setPostSavedRoute(null);setNewPost(p=>({...p,title:"",distance:""}));}} style={{padding:"3px 8px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:10,cursor:"pointer",fontFamily:F}}>× Clear</button>}
-                  <div style={{fontSize:14,color:"#111"}}>›</div>
+                  {postSavedRoute && <button onClick={e=>{e.stopPropagation();setPostSavedRoute(null);setNewPost(p=>({...p,title:"",distance:""}));}} style={{padding:"3px 8px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,cursor:"pointer",fontFamily:F}}>× Clear</button>}
+                  <div style={{fontSize:16,color:"#111"}}>›</div>
                 </div>
               </button>
 
@@ -4194,15 +4855,15 @@ export default function SonoLane() {
                   <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"70vh",display:"flex",flexDirection:"column"}}>
                     <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
                       <div style={{width:28,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 10px"}}/>
-                      <div style={{fontSize:14,fontWeight:800,color:"#111"}}>My Saved Routes</div>
-                      <div style={{fontSize:10,color:"#111",marginTop:2}}>Tap a route to auto-fill the form</div>
+                      <div style={{fontSize:16,fontWeight:800,color:"#111"}}>My Saved Routes</div>
+                      <div style={{fontSize:12,color:"#111",marginTop:2}}>Tap a route to auto-fill the form</div>
                     </div>
                     <div style={{flex:1,overflowY:"auto",padding:"10px 14px 24px"}}>
                       {routes.length===0 ? (
                         <div style={{textAlign:"center",padding:"30px 20px",color:"#111"}}>
-                          <div style={{fontSize:36,marginBottom:8}}>🗺️</div>
-                          <div style={{fontSize:12,color:"#111",marginBottom:12}}>No saved routes yet.</div>
-                          <button onClick={()=>{setShowRoutePicker(false);setShowPost(false);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"8px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save a Route First</button>
+                          <div style={{fontSize:38,marginBottom:8}}>🗺️</div>
+                          <div style={{fontSize:14,color:"#111",marginBottom:12}}>No saved routes yet.</div>
+                          <button onClick={()=>{setShowRoutePicker(false);setShowPost(false);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"8px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save a Route First</button>
                         </div>
                       ) : routes.map(r=>(
                         <button key={r.id} onClick={()=>{
@@ -4218,12 +4879,12 @@ export default function SonoLane() {
                         }}>
                           <div style={{width:10,height:10,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
                           <div style={{flex:1}}>
-                            <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{r.title}</div>
-                            <div style={{fontSize:10,color:"#111",marginTop:2}}>{r.type}{r.distance?" · "+r.distance:""}</div>
+                            <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{r.title}</div>
+                            <div style={{fontSize:12,color:"#111",marginTop:2}}>{r.type}{r.distance?" · "+r.distance:""}</div>
                           </div>
                           {postSavedRoute===r.id
-                            ? (<div style={{width:22,height:22,borderRadius:"50%",background:OR,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>✓</div>)
-                            : (<div style={{fontSize:14,color:"#111",flexShrink:0}}>›</div>)}
+                            ? (<div style={{width:22,height:22,borderRadius:"50%",background:OR,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>✓</div>)
+                            : (<div style={{fontSize:16,color:"#111",flexShrink:0}}>›</div>)}
                         </button>
                       ))}
                     </div>
@@ -4234,7 +4895,7 @@ export default function SonoLane() {
               {/* Dashcam footage share */}
               {clips.length>0 && (
                 <div style={{marginBottom:12}}>
-                  <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>SHARE DASHCAM FOOTAGE</div>
+                  <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>SHARE DASHCAM FOOTAGE</div>
                   <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
                     {clips.map(c=>{
                       const attached=postPhotos.some(p=>p.clipId===c.id);
@@ -4249,9 +4910,9 @@ export default function SonoLane() {
                         }}>
                           <video src={c.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.7,display:"block",pointerEvents:"none"}}/>
                           <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            <span style={{fontSize:attached?16:14,color:"#fff"}}>{attached?"✓":"📹"}</span>
+                            <span style={{fontSize:attached?18:16,color:"#fff"}}>{attached?"✓":"📹"}</span>
                           </div>
-                          <div style={{position:"absolute",bottom:2,left:0,right:0,textAlign:"center",fontSize:7,color:"#fff",fontWeight:700}}>{c.date}</div>
+                          <div style={{position:"absolute",bottom:2,left:0,right:0,textAlign:"center",fontSize:9,color:"#fff",fontWeight:700}}>{c.date}</div>
                         </button>
                       );
                     })}
@@ -4260,57 +4921,57 @@ export default function SonoLane() {
               )}
 
               {/* Photos */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>PHOTOS (up to 4)</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>PHOTOS (up to 4)</div>
               <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto"}}>
                 {postPhotos.filter(p=>!p.isClip).map((p,i)=>(
                   <div key={i} style={{width:80,height:80,borderRadius:10,overflow:"hidden",flexShrink:0,position:"relative"}}>
                     <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                    <button onClick={()=>setPostPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:9,cursor:"pointer"}}>×</button>
+                    <button onClick={()=>setPostPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:11,cursor:"pointer"}}>×</button>
                   </div>
                 ))}
                 {postPhotos.filter(p=>!p.isClip).length<4 && (
-                  <button onClick={()=>postPhotoRef.current?.click()} style={{width:80,height:80,borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:22,color:"#111",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  <button onClick={()=>postPhotoRef.current?.click()} style={{width:80,height:80,borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:24,color:"#111",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                 )}
                 <input ref={postPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>Array.from(e.target.files||[]).slice(0,4-postPhotos.filter(p=>!p.isClip).length).forEach(f=>{const r=new FileReader();r.onload=ev=>setPostPhotos(p=>[...p,{url:ev.target.result}]);r.readAsDataURL(f);})}/>
               </div>
 
               {/* Route title */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>ROUTE TITLE *</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>ROUTE TITLE *</div>
               <input value={newPost.title} onChange={e=>setNewPost(p=>({...p,title:e.target.value}))} placeholder="e.g. Sunset PCH Run" style={{...INP,marginBottom:10}}/>
 
               {/* Type */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>ROUTE TYPE</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>ROUTE TYPE</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
-                {["scenic","hike","commute","road trip","bike","chill"].map(t=><button key={t} onClick={()=>setNewPost(p=>({...p,type:t}))} style={TAG(newPost.type===t)}>{t}</button>)}
+                {["scenic","hike","commute","home","road trip","bike","chill"].map(t=><button key={t} onClick={()=>setNewPost(p=>({...p,type:t}))} style={TAG(newPost.type===t)}>{t}</button>)}
               </div>
 
               {/* Distance */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>DISTANCE</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>DISTANCE</div>
               <input value={newPost.distance} onChange={e=>setNewPost(p=>({...p,distance:e.target.value}))} placeholder="e.g. 42 miles" style={{...INP,marginBottom:10}}/>
 
               {/* Stops */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>KEY STOPS</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>KEY STOPS</div>
               {newPost.stops.map((stop,i)=>(
                 <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
-                  <div style={{width:18,height:18,borderRadius:"50%",background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,color:OR,flexShrink:0}}>{i+1}</div>
+                  <div style={{width:18,height:18,borderRadius:"50%",background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:OR,flexShrink:0}}>{i+1}</div>
                   <input value={stop} onChange={e=>setNewPost(p=>({...p,stops:p.stops.map((s,j)=>j===i?e.target.value:s)}))} placeholder={"Stop "+(i+1)+" (e.g. Malibu Beach)"} style={{...INP,flex:1}}/>
-                  {newPost.stops.length>1 && <button onClick={()=>setNewPost(p=>({...p,stops:p.stops.filter((_,j)=>j!==i)}))} style={{padding:"5px 8px",borderRadius:8,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:10}}>✕</button>}
+                  {newPost.stops.length>1 && <button onClick={()=>setNewPost(p=>({...p,stops:p.stops.filter((_,j)=>j!==i)}))} style={{padding:"5px 8px",borderRadius:8,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:12}}>✕</button>}
                 </div>
               ))}
               {newPost.stops.length<6 && (
-                <button onClick={()=>setNewPost(p=>({...p,stops:[...p.stops,""]}))} style={{width:"100%",padding:"7px",borderRadius:9,border:"1.5px dashed #ddd",background:"#f8f8f8",color:"#111",fontSize:11,cursor:"pointer",marginBottom:10,fontFamily:F}}>+ Add Stop</button>
+                <button onClick={()=>setNewPost(p=>({...p,stops:[...p.stops,""]}))} style={{width:"100%",padding:"7px",borderRadius:9,border:"1.5px dashed #ddd",background:"#f8f8f8",color:"#111",fontSize:13,cursor:"pointer",marginBottom:10,fontFamily:F}}>+ Add Stop</button>
               )}
 
               {/* Story */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>YOUR STORY</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>YOUR STORY</div>
               <textarea value={newPost.body} onChange={e=>setNewPost(p=>({...p,body:e.target.value}))} placeholder="What made this route special? Describe the drive…" rows={3} style={{...INP,resize:"none",marginBottom:10}}/>
 
               {/* Highlight */}
-              <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>BEST HIGHLIGHT</div>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:5}}>BEST HIGHLIGHT</div>
               <input value={newPost.highlights} onChange={e=>setNewPost(p=>({...p,highlights:e.target.value}))} placeholder="e.g. The ocean view at mile 12 was unreal" style={{...INP,marginBottom:16}}/>
 
               {/* Submit */}
-              <button onClick={submitPost} style={{width:"100%",padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📤 Post Route</button>
+              <button onClick={submitPost} style={{width:"100%",padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>{editingPostId?"✓ Save Changes":"📤 Post Route"}</button>
             </div>
           </div>
         </div>
@@ -4357,10 +5018,7 @@ export default function SonoLane() {
         <div style={{padding:"10px 14px 8px",background:"#fff",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="event" color={DPAD_COLORS.event} size={16}/> Events</div>
-              <div style={{fontSize:9,color:"#111"}}>
-                {filtered.length} showing{appRadius ? " · within "+appRadius+" mi" : ""}
-              </div>
+              <div style={{fontSize:17,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="event" color={DPAD_COLORS.event} size={16}/> Events</div>
             </div>
             {/* Routes/Events toggle — now lives up here since the main nav moved to the bottom */}
             <div style={{display:"flex",gap:4,background:"#f3f3f3",borderRadius:40,padding:4,flexShrink:0}}>
@@ -4373,26 +5031,24 @@ export default function SonoLane() {
             </div>
           </div>
           <div style={{display:"flex",gap:6,marginBottom:8}}>
-            <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("myevents"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Events</VN>
-            <VN action={()=>setShowEvent(true)} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
+            <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("myevents"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Events</VN>
+            <VN action={()=>{resetEventForm();setShowEvent(true);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
           </div>
           {/* Search */}
-          <input value={evSearch} onChange={e=>setEvSearch(e.target.value)} placeholder="Search events…" style={{...INP,marginBottom:6,fontSize:12,padding:"8px 12px"}}/>
+          <input value={evSearch} onChange={e=>setEvSearch(e.target.value)} placeholder="Search events…" style={{...INP,marginBottom:6,fontSize:14,padding:"8px 12px"}}/>
           {/* Category filter */}
           <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:6}}>
             {["All","Following",...Object.keys(EV_ICONS)].map(t=>(
-              <button key={t} onClick={()=>toggleEvFilter(t)} style={{...TAG(evFilters.includes(t)),whiteSpace:"nowrap",flexShrink:0,fontSize:10,padding:"4px 10px",background:evFilters.includes(t)?(EV_COLORS[t]||OR):"#f3f3f3"}}>{t==="All"?"All":t==="Following"?"👥 Following":EV_ICONS[t]+" "+t}</button>
+              <button key={t} onClick={()=>toggleEvFilter(t)} style={{...TAG(evFilters.includes(t)),whiteSpace:"nowrap",flexShrink:0,fontSize:12,padding:"4px 10px",background:evFilters.includes(t)?(EV_COLORS[t]||OR):"#f3f3f3"}}>{t==="All"?"All":t==="Following"?"👥 Following":EV_ICONS[t]+" "+t}</button>
             ))}
           </div>
           {/* Radius indicator — set in Profile Settings */}
           {appRadius&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
-            <span style={{fontSize:9,color:"#111"}}>📍</span>
-            <span style={{fontSize:9,color:"#111"}}>{appRadius} mi radius</span>
-            <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("settings"),100);}} style={{fontSize:9,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
+            <span style={{fontSize:11,color:"#111"}}>📍</span>
+            <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
+            <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
           </div>}
-
-
-
+        </div>
 
         {/* Feed */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 12px 7px"}}>
@@ -4406,20 +5062,20 @@ export default function SonoLane() {
           {filtered.length===0 && events.length>0 && evFilters.length===1 && evFilters[0]==="Following" && (
             <div style={{textAlign:"center",padding:"40px 20px",color:"#111"}}>
               <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="people" size={34} color="#ddd"/></div>
-              <div style={{fontSize:12,color:"#111"}}>No events from people you follow yet.</div>
+              <div style={{fontSize:14,color:"#111"}}>No events from people you follow yet.</div>
             </div>
           )}
           {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && appRadius && !evSearch && (
             <div style={{textAlign:"center",padding:"40px 20px",color:"#111"}}>
               <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><DPadIcon id="event" color="#ddd" size={34}/></div>
-              <div style={{fontSize:12,color:"#111",marginBottom:4}}>No events within {appRadius} mi.</div>
-              <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:10,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
+              <div style={{fontSize:14,color:"#111",marginBottom:4}}>No events within {appRadius} mi.</div>
+              <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
             </div>
           )}
           {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && !(appRadius && !evSearch) && (
             <div style={{textAlign:"center",padding:"40px 20px",color:"#111"}}>
-              <div style={{fontSize:32,marginBottom:8}}>🔍</div>
-              <div style={{fontSize:12,color:"#111"}}>No events match your search.</div>
+              <div style={{fontSize:34,marginBottom:8}}>🔍</div>
+              <div style={{fontSize:14,color:"#111"}}>No events match your search.</div>
             </div>
           )}
           {filtered.map((ev,idx) => {
@@ -4430,33 +5086,40 @@ export default function SonoLane() {
                 <button onClick={()=>setFlyerEvent(ev)} style={{width:"100%",border:"none",padding:0,cursor:"pointer",display:"block",background:"none"}}>
                   <div style={{height:180,position:"relative",background:ev.photos?.length?"#111":"linear-gradient(145deg,"+accent+"cc,"+accent+"55)"}}>
                     {ev.photos?.length>0 && <img src={ev.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
-                    {!ev.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>{ev.icon}</div>}
+                    {!ev.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:58}}>{ev.icon}</div>}
                     {/* Type badge */}
-                    <div style={{position:"absolute",top:12,left:12,background:accent,borderRadius:20,padding:"4px 12px",fontSize:9,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:0.3}}>{ev.type}</div>
+                    <div style={{position:"absolute",top:12,left:12,background:accent,borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:0.3}}>{ev.type}</div>
                     {/* Live dot */}
                     <div style={{position:"absolute",top:12,right:12,display:"flex",alignItems:"center",gap:4,background:"rgba(0,0,0,0.5)",borderRadius:20,padding:"3px 8px"}}>
                       <span style={{width:5,height:5,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 5px #ef4444",display:"block"}}/>
-                      <span style={{fontSize:8,color:"#fff",fontWeight:700}}>LIVE</span>
+                      <span style={{fontSize:10,color:"#fff",fontWeight:700}}>LIVE</span>
                     </div>
                   </div>
                 </button>
                 {/* Post body */}
                 <div style={{padding:"12px 14px 14px"}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:ev.address?5:8}}>
-                    <div style={{fontSize:16,fontWeight:900,color:"#111",lineHeight:1.2,flex:1}}>{ev.title}</div>
-                    {ev.authorId!=="me" && <span style={{fontSize:9,color:"#111",flexShrink:0,paddingTop:3}}>📍 {milesAwayFor(ev.id)} mi</span>}
+                    <div style={{fontSize:18,fontWeight:900,color:"#111",lineHeight:1.2,flex:1}}>{ev.title}</div>
+                    {ev.authorId!=="me" && <span style={{fontSize:11,color:"#111",flexShrink:0,paddingTop:3}}>📍 {milesAwayFor(ev.id)} mi</span>}
+                    {ev.authorId==="me" && (
+                      <button onClick={()=>openEditEvent(ev)} title="Edit event" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+                    )}
                   </div>
+                  {ev.date && <div style={{fontSize:12,color:"#111",fontWeight:600,marginBottom:5}}>📅 {new Date(ev.date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>}
                   {ev.address && (
                     <button onClick={()=>openMaps(ev.address)} style={{display:"flex",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:8,fontFamily:F}}>
-                      <span style={{fontSize:10,color:"#22c55e",fontWeight:600}}>📍 {ev.address}</span>
-                      <span style={{fontSize:9,color:"#22c55e"}}>›</span>
+                      <span style={{fontSize:12,color:"#22c55e",fontWeight:600}}>📍 {ev.address}</span>
+                      <span style={{fontSize:11,color:"#22c55e"}}>›</span>
                     </button>
                   )}
-                  {ev.desc && <div style={{fontSize:12,color:"#111",lineHeight:1.65,marginBottom:10}}>{ev.desc}</div>}
+                  {ev.desc && <div style={{fontSize:14,color:"#111",lineHeight:1.65,marginBottom:10}}>{ev.desc}</div>}
                   {/* Actions */}
-                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <button onClick={()=>setFlyerEvent(ev)} style={{flex:1,padding:"9px",borderRadius:9,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>⚡ View Event</button>
-                    {ev.address && <button onClick={()=>openMaps(ev.address)} style={{flex:1,padding:"9px",borderRadius:9,background:"#4285F4",color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>🚗 Directions</button>}
+                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <button onClick={()=>setFlyerEvent(ev)} style={{flex:1,padding:"9px",borderRadius:9,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>⚡ View Event</button>
+                    {ev.address && <button onClick={()=>openMaps(ev.address)} style={{flex:1,padding:"9px",borderRadius:9,background:"#4285F4",color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>🚗 Directions</button>}
+                    {isFutureEvent(ev.date) && (
+                      <button onClick={()=>toggleRsvp(ev.id)} style={{flex:1,padding:"9px",borderRadius:9,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,border:"none",background:rsvpedEvents[ev.id]?"#22c55e":"#f3f3f3",color:rsvpedEvents[ev.id]?"#fff":"#111"}}>{rsvpedEvents[ev.id]?"✓ Going":"✋ RSVP"} · {(ev.rsvps||0)+(rsvpedEvents[ev.id]?1:0)}</button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -4470,29 +5133,38 @@ export default function SonoLane() {
             <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"92vh",background:"#fff",borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
               <div style={{height:210,position:"relative",overflow:"hidden",flexShrink:0,background:flyerEvent.photos?.length?"#111":"linear-gradient(160deg,"+(EV_COLORS[flyerEvent.type]||OR)+","+(EV_COLORS[flyerEvent.type]||OR)+"55,#111)"}}>
                 {flyerEvent.photos?.length>0 && <img src={flyerEvent.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
-                {!flyerEvent.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:64}}>{flyerEvent.icon}</div>}
+                {!flyerEvent.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:66}}>{flyerEvent.icon}</div>}
                 <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.5)"}}/>
-                <button onClick={()=>setFlyerEvent(null)} style={{position:"absolute",top:14,right:14,width:30,height:30,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:15,cursor:"pointer"}}>×</button>
-                <div style={{position:"absolute",bottom:14,left:14,background:EV_COLORS[flyerEvent.type]||OR,borderRadius:20,padding:"4px 12px",fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase"}}>{flyerEvent.type}</div>
+                <button onClick={()=>setFlyerEvent(null)} style={{position:"absolute",top:14,right:14,width:30,height:30,borderRadius:"50%",background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:17,cursor:"pointer"}}>×</button>
+                <div style={{position:"absolute",bottom:14,left:14,background:EV_COLORS[flyerEvent.type]||OR,borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:800,color:"#fff",textTransform:"uppercase"}}>{flyerEvent.type}</div>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"18px 18px 7px"}}>
-                <div style={{fontSize:22,fontWeight:900,color:"#111",marginBottom:10,lineHeight:1.2}}>{flyerEvent.title}</div>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:4}}>
+                  <div style={{fontSize:24,fontWeight:900,color:"#111",lineHeight:1.2,flex:1}}>{flyerEvent.title}</div>
+                  {flyerEvent.authorId==="me" && (
+                    <button onClick={()=>openEditEvent(flyerEvent)} title="Edit event" style={{width:32,height:32,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+                  )}
+                </div>
+                {flyerEvent.date && <div style={{fontSize:13,color:"#111",fontWeight:600,marginBottom:10}}>📅 {new Date(flyerEvent.date+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"})}</div>}
                 {flyerEvent.address && (
                   <button onClick={()=>openMaps(flyerEvent.address)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:13,background:"#f0fdf4",border:"1.5px solid #22c55e33",cursor:"pointer",fontFamily:F,marginBottom:14,textAlign:"left"}}>
-                    <div style={{width:38,height:38,borderRadius:10,background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🗺️</div>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:"#22c55e",marginBottom:1}}>Get Directions</div><div style={{fontSize:10,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flyerEvent.address}</div></div>
-                    <div style={{fontSize:18,color:"#22c55e"}}>›</div>
+                    <div style={{width:38,height:38,borderRadius:10,background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🗺️</div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:"#22c55e",marginBottom:1}}>Get Directions</div><div style={{fontSize:12,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flyerEvent.address}</div></div>
+                    <div style={{fontSize:20,color:"#22c55e"}}>›</div>
                   </button>
                 )}
-                {flyerEvent.desc && <div style={{fontSize:13,color:"#111",lineHeight:1.7,marginBottom:16}}>{flyerEvent.desc}</div>}
+                {flyerEvent.desc && <div style={{fontSize:15,color:"#111",lineHeight:1.7,marginBottom:16}}>{flyerEvent.desc}</div>}
                 {flyerEvent.photos?.length>1 && (
                   <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto"}}>
                     {flyerEvent.photos.map((p,i)=><img key={i} src={p.url} alt="" style={{width:70,height:70,borderRadius:10,objectFit:"cover",flexShrink:0}}/>)}
                   </div>
                 )}
-                <div style={{display:"flex",gap:8}}>
-                  {flyerEvent.address && <button onClick={()=>openMaps(flyerEvent.address)} style={{flex:2,padding:"13px",borderRadius:12,background:"#4285F4",color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>🚗 Start Route</button>}
-                  <button onClick={()=>setFlyerEvent(null)} style={{flex:1,padding:"13px",borderRadius:12,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Close</button>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {flyerEvent.address && <button onClick={()=>openMaps(flyerEvent.address)} style={{flex:2,padding:"13px",borderRadius:12,background:"#4285F4",color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>🚗 Start Route</button>}
+                  {isFutureEvent(flyerEvent.date) && (
+                    <button onClick={()=>toggleRsvp(flyerEvent.id)} style={{flex:1,padding:"13px",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:rsvpedEvents[flyerEvent.id]?"#22c55e":"#f3f3f3",color:rsvpedEvents[flyerEvent.id]?"#fff":"#111"}}>{rsvpedEvents[flyerEvent.id]?"✓ Going":"✋ RSVP"} · {(flyerEvent.rsvps||0)+(rsvpedEvents[flyerEvent.id]?1:0)}</button>
+                  )}
+                  <button onClick={()=>setFlyerEvent(null)} style={{flex:1,padding:"13px",borderRadius:12,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>Close</button>
                 </div>
               </div>
             </div>
@@ -4501,50 +5173,41 @@ export default function SonoLane() {
 
         {/* Create event sheet */}
         {showEvent && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEvent(false)}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeEventSheet}>
             <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#111"}}>⚡ Create Event</div>
-                <button onClick={()=>setShowEvent(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{editingEventId?"Edit Event":"⚡ Create Event"}</div>
+                <button onClick={closeEventSheet} style={{width:26,height:26,borderRadius:13,border:"none",background:"#f2f2f2",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:12}}>
                   {eventPhotos.map((p,i)=>(
                     <div key={i} style={{flex:1,height:80,borderRadius:10,overflow:"hidden",position:"relative"}}>
                       <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      <button onClick={()=>setEventPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:9,cursor:"pointer"}}>×</button>
+                      <button onClick={()=>setEventPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:11,cursor:"pointer"}}>×</button>
                     </div>
                   ))}
-                  {eventPhotos.length<3 && <button onClick={()=>eventPhotoRef.current?.click()} style={{flex:1,height:80,borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:24,color:"#111",cursor:"pointer"}}>+</button>}
+                  {eventPhotos.length<3 && <button onClick={()=>eventPhotoRef.current?.click()} style={{flex:1,height:80,borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",fontSize:26,color:"#111",cursor:"pointer"}}>+</button>}
                   {Array.from({length:Math.max(0,2-eventPhotos.length)}).map((_,i)=><div key={i} style={{flex:1,height:80,borderRadius:10,background:"#f5f5f5"}}/>)}
                   <input ref={eventPhotoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>Array.from(e.target.files||[]).slice(0,3-eventPhotos.length).forEach(f=>{const r=new FileReader();r.onload=ev=>setEventPhotos(p=>[...p,{url:ev.target.result}]);r.readAsDataURL(f);})}/>
                 </div>
                 <input value={newEvent.title} onChange={e=>setNewEvent(p=>({...p,title:e.target.value}))} placeholder="Event name *" style={{...INP,marginBottom:8}}/>
                 <input value={newEvent.address} onChange={e=>setNewEvent(p=>({...p,address:e.target.value}))} placeholder="Address or venue" style={{...INP,marginBottom:8}}/>
+                <input type="date" value={newEvent.date} onChange={e=>setNewEvent(p=>({...p,date:e.target.value}))} style={{...INP,marginBottom:8,color:newEvent.date?"#111":"#999"}}/>
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                   {Object.keys(EV_ICONS).map(t=><button key={t} onClick={()=>setNewEvent(p=>({...p,type:t}))} style={{...TAG(newEvent.type===t),background:newEvent.type===t?(EV_COLORS[t]||OR):"#f3f3f3"}}>{EV_ICONS[t]} {t}</button>)}
                 </div>
                 <textarea value={newEvent.desc} onChange={e=>setNewEvent(p=>({...p,desc:e.target.value}))} placeholder="Description…" rows={3} style={{...INP,resize:"none",marginBottom:16}}/>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{
-                    if(!newEvent.title.trim())return;
-                    const ev={id:Date.now(),...newEvent,icon:EV_ICONS[newEvent.type]||"📍",photos:eventPhotos,authorId:"me",authorName:userName||"You"};
-                    setEvents(p=>[ev,...p]);
-                    setNotifications(n=>[{id:Date.now(),icon:"⚡",text:"Your event \""+newEvent.title+"\" is now live in the community feed!",ts:"now",read:false},...n]);
-                    setNewEvent({title:"",type:"car meet",desc:"",address:""});
-                    setEventPhotos([]);
-                    setShowEvent(false);
-                    setFlyerEvent(ev);
-                  }} style={{flex:1,padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📍 Post Event</button>
-                  <button onClick={()=>setShowEvent(false)} style={{padding:"13px 16px",borderRadius:11,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                  <button onClick={submitEvent} style={{flex:1,padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>{editingEventId?"✓ Save Changes":"📍 Post Event"}</button>
+                  <button onClick={closeEventSheet} style={{padding:"13px 16px",borderRadius:11,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
-    </div>
     );
   });
 
@@ -4668,8 +5331,9 @@ export default function SonoLane() {
     const sendChanMsg = (text, isVoice=false, voiceSecs=0) => {
       if(!text.trim() && !isVoice) return;
       if(curCityLane && curCityLane.id!==currentFreewayId) return; // must be on this freeway to talk
+      const tempId = Date.now();
       const msg = {
-        id:Date.now(), text:text.trim(), mine:true,
+        id:tempId, text:text.trim(), mine:true,
         user:userName||"You",
         initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
         color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
@@ -4689,7 +5353,18 @@ export default function SonoLane() {
         // send it for real so the other person actually receives it, and
         // drop a notification in their feed.
         if (isSupabaseConfigured && curFriend && !isVoice) {
-          sendMessageSupabase(curFriend.id, text);
+          const friendId = curFriend.id;
+          sendMessageSupabase(friendId, text).then(realId => {
+            // Swap the optimistic tempId for the DB's real row id so the
+            // next poll (which dedupes by id) recognizes this message as
+            // already-shown instead of appending it a second time.
+            if (!realId) return;
+            setFriendMsgs(m => {
+              const list = m[friendId];
+              if (!list) return m;
+              return { ...m, [friendId]: list.map(x => x.id===tempId ? {...x, id:realId} : x) };
+            });
+          });
           sendNotificationSupabase(curFriend.id, "💬", (userName||"Someone")+" sent you a message.");
         }
       }
@@ -4812,23 +5487,23 @@ export default function SonoLane() {
         padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
         background:activeChan===id?"#42464d":"transparent",marginBottom:1,
       }}>
-        <span style={{fontSize:11,color:color||"#8e9297",flexShrink:0}}>{icon}</span>
-        <span style={{flex:1,fontSize:12,fontWeight:activeChan===id?600:400,color:activeChan===id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
-        {badge>0 && <div style={{minWidth:16,height:16,borderRadius:8,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",padding:"0 3px"}}>{badge}</div>}
-        {sub && !badge && <span style={{fontSize:8,color:"#5b5e66"}}>{sub}</span>}
+        <span style={{fontSize:13,color:color||"#8e9297",flexShrink:0}}>{icon}</span>
+        <span style={{flex:1,fontSize:14,fontWeight:activeChan===id?600:400,color:activeChan===id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
+        {badge>0 && <div style={{minWidth:16,height:16,borderRadius:8,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",padding:"0 3px"}}>{badge}</div>}
+        {sub && !badge && <span style={{fontSize:10,color:"#5b5e66"}}>{sub}</span>}
       </button>
     );
 
     return (
-      <div style={{flex:1,display:"flex",flexDirection:"row",overflow:"hidden",background:"#36393f"}}>
+      <div style={{flex:1,display:"flex",flexDirection:"row",overflow:"hidden",background:"#36393f",position:"relative"}}>
 
         {/* ── Sidebar ── */}
         <div style={{width:sidebarOpen?196:0,background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",transition:"width 0.2s ease"}}>
           {/* App name */}
           <div style={{padding:"11px 12px 9px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:900,color:"#fff",letterSpacing:-0.5,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="chat" color={DPAD_COLORS.chat} size={14}/> Lanes</div>
-              <div style={{fontSize:8,color:"#72767d",marginTop:1}}>Chat · Notes · Calls</div>
+              <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:-0.5,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="chat" color={DPAD_COLORS.chat} size={14}/> Lanes</div>
+              <div style={{fontSize:10,color:"#72767d",marginTop:1}}>Chat · Notes · Calls</div>
             </div>
             <div style={{width:8,height:8,borderRadius:"50%",background:"#23a55a",flexShrink:0}}/>
           </div>
@@ -4837,7 +5512,7 @@ export default function SonoLane() {
 
             {/* Personal section */}
             <div style={{padding:"8px 6px 3px"}}>
-              <span style={{fontSize:8,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Personal</span>
+              <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Personal</span>
             </div>
             <SideBtn id="notifications" icon="🔔" label="notifications" badge={lanesNotifications?unreadNotifs:0}/>
             <SideBtn id="notes" icon="#" label="notes" sub="you"/>
@@ -4848,28 +5523,28 @@ export default function SonoLane() {
                 anybody can create one and anybody nearby can see or join it.
                 Filtered to the discovery radius, like the freeway CB channels. */}
             <div style={{padding:"10px 6px 3px"}}>
-              <span style={{fontSize:8,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
-              <div style={{fontSize:8,color:"#5b5e66",marginTop:1}}>{appRadius ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
+              <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
+              <div style={{fontSize:10,color:"#5b5e66",marginTop:1}}>{appRadius ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
             </div>
-            {publicLanes.length===0 && <div style={{fontSize:9,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
+            {publicLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
             {publicLanes.map(lane=>(
               <button key={lane.id} onClick={()=>setActiveChan(lane.id)} style={{
                 width:"100%",display:"flex",alignItems:"center",gap:6,
                 padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
                 background:activeChan===lane.id?"#42464d":"transparent",marginBottom:1,
               }}>
-                <span style={{fontSize:9}}>🌐</span>
-                <span style={{flex:1,fontSize:11,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
-                {!lane.host && <span style={{fontSize:7,color:"#5b5e66"}}>you</span>}
+                <span style={{fontSize:11}}>🌐</span>
+                <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                {!lane.host && <span style={{fontSize:9,color:"#5b5e66"}}>you</span>}
               </button>
             ))}
 
             {/* My Lanes */}
             <div style={{padding:"10px 6px 3px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span style={{fontSize:8,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>My Lanes</span>
-              <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#4f545c",border:"none",cursor:"pointer",color:"#8e9297",fontSize:11,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
+              <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>My Lanes</span>
+              <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#4f545c",border:"none",cursor:"pointer",color:"#8e9297",fontSize:13,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
             </div>
-            {sidebarCustomLanes.length===0 && <div style={{fontSize:9,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
+            {sidebarCustomLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
             {sortPinned(sidebarCustomLanes).map(lane=>(
               <div key={lane.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
                 <button onClick={()=>setActiveChan(lane.id)} style={{
@@ -4877,18 +5552,18 @@ export default function SonoLane() {
                   padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
                   background:activeChan===lane.id?"#42464d":"transparent",
                 }}>
-                  <span style={{fontSize:10,color:lane.color||"#8e9297"}}>#</span>
-                  <span style={{flex:1,fontSize:11,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
-                  <span style={{fontSize:8,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
+                  <span style={{fontSize:12,color:lane.color||"#8e9297"}}>#</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                  <span style={{fontSize:10,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
                 </button>
-                <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:9,color:pinnedChans.includes(lane.id)?OR:"#4f545c",padding:0}}>📌</button>
+                <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(lane.id)?OR:"#4f545c",padding:0}}>📌</button>
               </div>
             ))}
 
             {/* Direct Messages */}
             {friends.length>0&&<>
               <div style={{padding:"10px 6px 3px"}}>
-                <span style={{fontSize:8,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Direct Messages</span>
+                <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Direct Messages</span>
               </div>
               {sortPinned(friends).map(fr=>(
                 <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
@@ -4901,9 +5576,9 @@ export default function SonoLane() {
                       <FriendAvatar fr={fr} size={22} fontSize={8}/>
                       <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #2f3136"}}/>
                     </div>
-                    <span style={{flex:1,fontSize:11,fontWeight:activeChan===fr.id?600:400,color:activeChan===fr.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</span>
+                    <span style={{flex:1,fontSize:13,fontWeight:activeChan===fr.id?600:400,color:activeChan===fr.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</span>
                   </button>
-                  <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:9,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
+                  <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
                 </div>
               ))}
             </>}
@@ -4919,10 +5594,10 @@ export default function SonoLane() {
               <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #292b2f"}}/>
             </div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:10,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName||"You"}</div>
-              {showOnlineStatus && <div style={{fontSize:7,color:"#72767d"}}>● Online</div>}
+              <div style={{fontSize:12,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName||"You"}</div>
+              {showOnlineStatus && <div style={{fontSize:9,color:"#72767d"}}>● Online</div>}
             </div>
-            <button onClick={()=>setShowLanesSettings(true)} title="Lanes settings" style={{width:20,height:20,borderRadius:4,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#8e9297"}}>⚙️</button>
+            <button onClick={()=>setShowLanesSettings(true)} title="Lanes settings" style={{width:20,height:20,borderRadius:4,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#8e9297"}}>⚙️</button>
           </div>
         </div>
 
@@ -4932,14 +5607,14 @@ export default function SonoLane() {
             <div style={{background:"#2f3136",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#4f545c",borderRadius:2,margin:"12px auto 0",flexShrink:0}}/>
               <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>⚙️ Lanes Settings</div>
-                <button onClick={()=>setShowLanesSettings(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#40444b",color:"#dcddde",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+                <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>⚙️ Lanes Settings</div>
+                <button onClick={()=>setShowLanesSettings(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#40444b",color:"#dcddde",fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px",background:"#36393f"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#2f3136",marginBottom:10}}>
                   <div style={{flex:1,paddingRight:10}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Show online status</div>
-                    <div style={{fontSize:10,color:"#8e9297",marginTop:2}}>Let others see the "● Online" indicator next to your name.</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>Show online status</div>
+                    <div style={{fontSize:12,color:"#8e9297",marginTop:2}}>Let others see the "● Online" indicator next to your name.</div>
                   </div>
                   <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#4f545c",position:"relative",flexShrink:0,padding:0}}>
                     <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
@@ -4947,16 +5622,16 @@ export default function SonoLane() {
                 </div>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#2f3136",marginBottom:10}}>
                   <div style={{flex:1,paddingRight:10}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Lanes notifications</div>
-                    <div style={{fontSize:10,color:"#8e9297",marginTop:2}}>Get badge alerts for new messages and activity in Lanes.</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>Lanes notifications</div>
+                    <div style={{fontSize:12,color:"#8e9297",marginTop:2}}>Get badge alerts for new messages and activity in Lanes.</div>
                   </div>
                   <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#4f545c",position:"relative",flexShrink:0,padding:0}}>
                     <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
                   </button>
                 </div>
                 <div style={{padding:"11px 12px",borderRadius:12,background:"#2f3136"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#fff",marginBottom:2}}>📌 Pinning chats</div>
-                  <div style={{fontSize:10,color:"#8e9297"}}>Tap the pin icon next to any lane or direct message in the sidebar list to keep it at the top.</div>
+                  <div style={{fontSize:14,fontWeight:700,color:"#fff",marginBottom:2}}>📌 Pinning chats</div>
+                  <div style={{fontSize:12,color:"#8e9297"}}>Tap the pin icon next to any lane or direct message in the sidebar list to keep it at the top.</div>
                 </div>
               </div>
             </div>
@@ -4968,29 +5643,24 @@ export default function SonoLane() {
 
           {/* Header */}
           <div style={{padding:"9px 14px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:8,background:"#36393f"}}>
-            {/* Collapse the lane/DM list sidebar so the chat itself gets the
-                full screen width — tap again to bring it back. */}
-            <button onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?"Hide lane list":"Show lane list"} style={{width:26,height:26,borderRadius:6,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#8e9297",flexShrink:0,padding:0}}>
-              {sidebarOpen?"◀":"☰"}
-            </button>
             {curCityLane ? (
               <>
-                <span style={{fontSize:14}}>📡</span>
+                <span style={{fontSize:16}}>📡</span>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{curCityLane.name}</div>
-                  <div style={{fontSize:9,color:"#72767d"}}>{curCityLane.desc} · Freeway Lane</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{curCityLane.name}</div>
+                  <div style={{fontSize:11,color:"#72767d"}}>{curCityLane.desc} · Freeway Lane</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:3,background:curCityLane.id===currentFreewayId?"#23a55a22":"#66666622",borderRadius:20,padding:"3px 8px",flexShrink:0}}>
                   <div style={{width:5,height:5,borderRadius:"50%",background:curCityLane.id===currentFreewayId?"#23a55a":"#666"}}/>
-                  <span style={{fontSize:8,color:curCityLane.id===currentFreewayId?"#23a55a":"#8e9297",fontWeight:700}}>{curCityLane.id===currentFreewayId?"On this freeway":"View only"}</span>
+                  <span style={{fontSize:10,color:curCityLane.id===currentFreewayId?"#23a55a":"#8e9297",fontWeight:700}}>{curCityLane.id===currentFreewayId?"On this freeway":"View only"}</span>
                 </div>
               </>
             ) : curCustomLane ? (
               <>
-                <span style={{fontSize:12,color:"#8e9297"}}>#</span>
+                <span style={{fontSize:14,color:"#8e9297"}}>#</span>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>#{curCustomLane.name}</div>
-                  <div style={{fontSize:9,color:"#72767d"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>#{curCustomLane.name}</div>
+                  <div style={{fontSize:11,color:"#72767d"}}>
                     {curCustomLane.garageId ? "🚗 Shared Garage Chat"
                       : curCustomLane.host ? "🌐 Public Lane · Hosted by "+curCustomLane.host
                       : curCustomLane.visibility==="public" ? "🌐 Public Lane · Anyone can join"
@@ -4999,21 +5669,21 @@ export default function SonoLane() {
                 </div>
               </>
             ) : activeChan==="notes" ? (
-              <><span style={{color:"#8e9297",fontSize:13}}>#</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>notes</div><div style={{fontSize:9,color:"#72767d"}}>Your personal notes</div></div></>
+              <><span style={{color:"#8e9297",fontSize:15}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>notes</div><div style={{fontSize:11,color:"#72767d"}}>Your personal notes</div></div></>
             ) : activeChan==="notifications" ? (
-              <><span style={{fontSize:14}}>🔔</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>notifications</div><div style={{fontSize:9,color:"#72767d"}}>SonoLane activity</div></div></>
+              <><span style={{fontSize:16}}>🔔</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>notifications</div><div style={{fontSize:11,color:"#72767d"}}>SonoLane activity</div></div></>
             ) : activeChan==="sono" ? (
-              <><span style={{fontSize:14}}>#</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Sono AI · {pal.name}</div><div style={{fontSize:9,color:pal.color}}>{pal.desc}</div></div>
+              <><span style={{fontSize:16}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Sono AI · {pal.name}</div><div style={{fontSize:11,color:pal.color}}>{pal.desc}</div></div>
               <div style={{display:"flex",gap:4}}>{AI_PALS.map(p=><button key={p.id} onClick={()=>setAiPalId(p.id)} title={p.name} style={{width:20,height:20,borderRadius:"50%",border:"none",cursor:"pointer",background:aiPalId===p.id?p.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}><CompassStar size={aiPalId===p.id?14:11} color={p.color}/></button>)}</div></>
             ) : curFriend ? (
               <><FriendAvatar fr={curFriend} size={26} fontSize={10}/>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{curFriend.name}</div><div style={{fontSize:9,color:"#23a55a"}}>● Online</div></div></>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{curFriend.name}</div><div style={{fontSize:11,color:"#23a55a"}}>● Online</div></div></>
             ) : null}
             {/* Voice chat indicator in header */}
             {voiceChatActive===activeChan && (
               <div style={{display:"flex",alignItems:"center",gap:4,background:"#23a55a22",borderRadius:20,padding:"3px 8px",flexShrink:0}}>
                 <div style={{width:5,height:5,borderRadius:"50%",background:"#23a55a",animation:"pulse 1s infinite"}}/>
-                <span style={{fontSize:8,color:"#23a55a",fontWeight:700}}>{(voiceChatMembers[activeChan]||[]).length || 1} in voice</span>
+                <span style={{fontSize:10,color:"#23a55a",fontWeight:700}}>{(voiceChatMembers[activeChan]||[]).length || 1} in voice</span>
               </div>
             )}
           </div>
@@ -5024,7 +5694,7 @@ export default function SonoLane() {
             {/* NOTIFICATIONS */}
             {activeChan==="notifications"&&(
               notifications.length===0
-                ? (<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:36,marginBottom:8}}>🔔</div><div style={{fontSize:12}}>No notifications</div></div>)
+                ? (<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:38,marginBottom:8}}>🔔</div><div style={{fontSize:14}}>No notifications</div></div>)
                 : notifications.map(n=>(
                   <div key={n.id} onClick={()=>{
                     setNotifications(ns=>ns.map(x=>x.id===n.id?{...x,read:true}:x));
@@ -5036,8 +5706,8 @@ export default function SonoLane() {
                     }
                   }}
                     style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:n.read?"transparent":"#5865f222",border:n.read?"none":"1px solid #5865f222",cursor:"pointer"}}>
-                    <div style={{fontSize:18,flexShrink:0}}>{n.icon}</div>
-                    <div style={{flex:1}}><div style={{fontSize:12,color:n.read?"#72767d":"#dcddde",lineHeight:1.5}}>{n.text}</div><div style={{fontSize:9,color:"#72767d",marginTop:2}}>{n.ts}</div></div>
+                    <div style={{fontSize:20,flexShrink:0}}>{n.icon}</div>
+                    <div style={{flex:1}}><div style={{fontSize:14,color:n.read?"#72767d":"#dcddde",lineHeight:1.5}}>{n.text}</div><div style={{fontSize:11,color:"#72767d",marginTop:2}}>{n.ts}</div></div>
                     {!n.read&&<div style={{width:6,height:6,borderRadius:"50%",background:"#5865f2",marginTop:4}}/>}
                   </div>
                 ))
@@ -5045,13 +5715,13 @@ export default function SonoLane() {
 
             {/* NOTES */}
             {activeChan==="notes"&&(<>
-              {tLines.length===0&&<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:36,marginBottom:8}}>📝</div><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:4}}>Your notes lane</div><div style={{fontSize:11,color:"#4f545c",lineHeight:1.6}}>Just for you. Jot, voice-transcribe, think out loud.</div></div>}
+              {tLines.length===0&&<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:38,marginBottom:8}}>📝</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:4}}>Your notes lane</div><div style={{fontSize:13,color:"#4f545c",lineHeight:1.6}}>Just for you. Jot, voice-transcribe, think out loud.</div></div>}
               {tLines.map((l,i)=>(
                 <div key={i} style={{display:"flex",gap:9,marginBottom:3,padding:"1px 0"}}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,"+OR+",#fb923c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#fff",flexShrink:0}}>
+                  <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,"+OR+",#fb923c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>
                     {userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?"}
                   </div>
-                  <div style={{flex:1}}><div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1}}><span style={{fontSize:12,fontWeight:700,color:"#fff"}}>{userName||"You"}</span><span style={{fontSize:9,color:"#72767d"}}>Today</span></div><div style={{fontSize:13,color:"#dcddde",lineHeight:1.5}}>{l}</div></div>
+                  <div style={{flex:1}}><div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1}}><span style={{fontSize:14,fontWeight:700,color:"#fff"}}>{userName||"You"}</span><span style={{fontSize:11,color:"#72767d"}}>Today</span></div><div style={{fontSize:15,color:"#dcddde",lineHeight:1.5}}>{l}</div></div>
                 </div>
               ))}
             </>)}
@@ -5060,37 +5730,37 @@ export default function SonoLane() {
             {activeChan==="sono"&&(<>
               {aiChat.map((c,i)=>(
                 <div key={i} style={{display:"flex",gap:9,marginBottom:3,flexDirection:c.role==="user"?"row-reverse":"row"}}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:c.role==="user"?"linear-gradient(135deg,"+OR+",#fb923c)":pal.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:c.role==="user"?10:13,fontWeight:800,color:"#fff",flexShrink:0}}>{c.role==="user"?(userName?userName[0].toUpperCase():"?"):<CompassStar size={16} color="#fff"/>}</div>
+                  <div style={{width:30,height:30,borderRadius:"50%",background:c.role==="user"?"linear-gradient(135deg,"+OR+",#fb923c)":pal.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:c.role==="user"?12:15,fontWeight:800,color:"#fff",flexShrink:0}}>{c.role==="user"?(userName?userName[0].toUpperCase():"?"):<CompassStar size={16} color="#fff"/>}</div>
                   <div style={{flex:1,maxWidth:"80%"}}>
-                    <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1,flexDirection:c.role==="user"?"row-reverse":"row"}}><span style={{fontSize:12,fontWeight:700,color:c.role==="user"?"#fff":pal.color}}>{c.role==="user"?(userName||"You"):pal.name}</span><span style={{fontSize:9,color:"#72767d"}}>Today</span></div>
-                    <div style={{fontSize:13,color:"#dcddde",lineHeight:1.5,background:c.role==="user"?"#4f545c22":"transparent",borderRadius:4,padding:c.role==="user"?"4px 8px":"0"}}>{c.text}</div>
+                    <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1,flexDirection:c.role==="user"?"row-reverse":"row"}}><span style={{fontSize:14,fontWeight:700,color:c.role==="user"?"#fff":pal.color}}>{c.role==="user"?(userName||"You"):pal.name}</span><span style={{fontSize:11,color:"#72767d"}}>Today</span></div>
+                    <div style={{fontSize:15,color:"#dcddde",lineHeight:1.5,background:c.role==="user"?"#4f545c22":"transparent",borderRadius:4,padding:c.role==="user"?"4px 8px":"0"}}>{c.text}</div>
                   </div>
                 </div>
               ))}
-              {aiThinking&&<div style={{display:"flex",gap:9,padding:"1px 0"}}><div style={{width:30,height:30,borderRadius:"50%",background:pal.color,display:"flex",alignItems:"center",justifyContent:"center"}}><CompassStar size={16} color="#fff"/></div><div style={{paddingTop:8,color:"#72767d",fontSize:12,fontStyle:"italic"}}>{pal.name} is typing…</div></div>}
+              {aiThinking&&<div style={{display:"flex",gap:9,padding:"1px 0"}}><div style={{width:30,height:30,borderRadius:"50%",background:pal.color,display:"flex",alignItems:"center",justifyContent:"center"}}><CompassStar size={16} color="#fff"/></div><div style={{paddingTop:8,color:"#72767d",fontSize:14,fontStyle:"italic"}}>{pal.name} is typing…</div></div>}
             </>)}
 
             {/* CB LANE OR FRIEND DM */}
             {(curCityLane||curCustomLane||curFriend)&&(<>
               {allMsgs.length===0&&(
                 <div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}>
-                  {curCityLane&&<><div style={{fontSize:28,marginBottom:6}}>📡</div><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:11,color:"#4f545c",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
-                  {curCustomLane&&<><div style={{fontSize:28,marginBottom:6}}>{curCustomLane.garageId?"🚗":"🛣️"}</div><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>#{curLane.name}</div><div style={{fontSize:11,color:"#4f545c"}}>{curCustomLane.garageId ? "Your Shared Garage's group chat." : curCustomLane.host ? "A public lane hosted by "+curCustomLane.host+"." : curCustomLane.visibility==="public" ? "Your public lane — anyone can join." : "Your friends-only lane."} Hold mic to voice message.</div></>}
-                  {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:13,fontWeight:700,color:"#72767d",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
+                  {curCityLane&&<><div style={{fontSize:30,marginBottom:6}}>📡</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:13,color:"#4f545c",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
+                  {curCustomLane&&<><div style={{fontSize:30,marginBottom:6}}>{curCustomLane.garageId?"🚗":"🛣️"}</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>#{curLane.name}</div><div style={{fontSize:13,color:"#4f545c"}}>{curCustomLane.garageId ? "Your Shared Garage's group chat." : curCustomLane.host ? "A public lane hosted by "+curCustomLane.host+"." : curCustomLane.visibility==="public" ? "Your public lane — anyone can join." : "Your friends-only lane."} Hold mic to voice message.</div></>}
+                  {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
                 </div>
               )}
               {allMsgs.map(msg=>(
                 <div key={msg.id} style={{display:"flex",gap:9,marginBottom:6,padding:"1px 0",flexDirection:msg.mine?"row-reverse":"row"}}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:msg.mine?"linear-gradient(135deg,"+OR+",#fb923c)":msg.color||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#fff",flexShrink:0}}>{msg.initials||"?"}</div>
+                  <div style={{width:30,height:30,borderRadius:"50%",background:msg.mine?"linear-gradient(135deg,"+OR+",#fb923c)":msg.color||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>{msg.initials||"?"}</div>
                   <div style={{flex:1,maxWidth:"78%"}}>
                     <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:2,flexDirection:msg.mine?"row-reverse":"row"}}>
-                      <span style={{fontSize:11,fontWeight:700,color:msg.mine?"#fff":msg.color||"#dcddde"}}>{msg.user||"Rider"}</span>
-                      <span style={{fontSize:9,color:"#72767d"}}>{msg.ts}</span>
+                      <span style={{fontSize:13,fontWeight:700,color:msg.mine?"#fff":msg.color||"#dcddde"}}>{msg.user||"Rider"}</span>
+                      <span style={{fontSize:11,color:"#72767d"}}>{msg.ts}</span>
                     </div>
                     {msg.isVoice ? (
                       <div style={{display:"flex",flexDirection:"column",alignItems:msg.mine?"flex-end":"flex-start",gap:3}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,background:msg.mine?"#f97316":"#40444b",borderRadius:20,padding:"7px 12px",width:"fit-content"}}>
-                          <button onClick={()=>toggleVoicePlayback(msg)} disabled={!msg.audioUrl} style={{width:24,height:24,borderRadius:"50%",background:msg.mine?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)",border:"none",padding:0,color:"#fff",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:msg.audioUrl?"pointer":"default"}}>{playingVoiceId===msg.id?"❚❚":"▶"}</button>
+                          <button onClick={()=>toggleVoicePlayback(msg)} disabled={!msg.audioUrl} style={{width:24,height:24,borderRadius:"50%",background:msg.mine?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)",border:"none",padding:0,color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:msg.audioUrl?"pointer":"default"}}>{playingVoiceId===msg.id?"❚❚":"▶"}</button>
                           <div style={{flex:1}}>
                             <div style={{display:"flex",gap:2,alignItems:"center",height:16}}>
                               {Array.from({length:16}).map((_,wi)=>(
@@ -5098,20 +5768,20 @@ export default function SonoLane() {
                               ))}
                             </div>
                           </div>
-                          <span style={{fontSize:9,color:msg.mine?"rgba(255,255,255,0.7)":"#72767d",fontWeight:600,flexShrink:0}}>{"0:"+(String(msg.voiceSeconds||3).padStart(2,"0"))}</span>
+                          <span style={{fontSize:11,color:msg.mine?"rgba(255,255,255,0.7)":"#72767d",fontWeight:600,flexShrink:0}}>{"0:"+(String(msg.voiceSeconds||3).padStart(2,"0"))}</span>
                         </div>
                         {msg.transcript && (
                           <button onClick={()=>toggleTranscript(msg.id)} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:3,fontFamily:F}}>
-                            <span style={{fontSize:9,color:"#72767d"}}>📝</span>
-                            <span style={{fontSize:9,color:"#72767d",fontWeight:600}}>{openTranscripts[msg.id]?"Hide transcript":"Show transcript"}</span>
+                            <span style={{fontSize:11,color:"#72767d"}}>📝</span>
+                            <span style={{fontSize:11,color:"#72767d",fontWeight:600}}>{openTranscripts[msg.id]?"Hide transcript":"Show transcript"}</span>
                           </button>
                         )}
                         {msg.transcript && openTranscripts[msg.id] && (
-                          <div style={{fontSize:11,color:"#b9bbbe",lineHeight:1.4,background:"#2f3136",border:"1px solid #202225",borderRadius:8,padding:"6px 10px",maxWidth:220}}>"{msg.transcript}"</div>
+                          <div style={{fontSize:13,color:"#b9bbbe",lineHeight:1.4,background:"#2f3136",border:"1px solid #202225",borderRadius:8,padding:"6px 10px",maxWidth:220}}>"{msg.transcript}"</div>
                         )}
                       </div>
                     ) : (
-                      <div style={{fontSize:13,color:"#dcddde",lineHeight:1.5,background:msg.mine?"#5865f233":"transparent",borderRadius:4,padding:msg.mine?"5px 9px":"0"}}>{msg.text}</div>
+                      <div style={{fontSize:15,color:"#dcddde",lineHeight:1.5,background:msg.mine?"#5865f233":"transparent",borderRadius:4,padding:msg.mine?"5px 9px":"0"}}>{msg.text}</div>
                     )}
                   </div>
                 </div>
@@ -5127,24 +5797,24 @@ export default function SonoLane() {
               {voiceChatActive===activeChan && (
                 <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:6,borderRadius:8,background:"#23a55a22",border:"1px solid #23a55a44"}}>
                   <div style={{width:7,height:7,borderRadius:"50%",background:"#23a55a",animation:"pulse 1s infinite",flexShrink:0}}/>
-                  <span style={{flex:1,fontSize:10,fontWeight:700,color:"#23a55a"}}>Voice chat active · {(voiceChatMembers[activeChan]||[userName||"You"]).join(", ")}</span>
+                  <span style={{flex:1,fontSize:12,fontWeight:700,color:"#23a55a"}}>Voice chat active · {(voiceChatMembers[activeChan]||[userName||"You"]).join(", ")}</span>
                   <button
                     onMouseDown={()=>{setVcRecording(true);setVcTimer(0);vcTimerRef.current=setInterval(()=>setVcTimer(t=>t+1),1000);}}
                     onMouseUp={()=>{clearInterval(vcTimerRef.current);setVcRecording(false);setVcTimer(0);const msg={id:Date.now(),text:"",mine:true,user:userName||"You",initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",color:OR,ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),isVoice:true,voiceSeconds:vcTimer||1,transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)]};setLaneMsgs(m=>({...m,[activeChan]:[...(m[activeChan]||[]),msg]}));setFriendMsgs(m=>({...m,[activeChan]:[...(m[activeChan]||[]),msg]}));}}
                     onTouchStart={e=>{e.preventDefault();setVcRecording(true);setVcTimer(0);vcTimerRef.current=setInterval(()=>setVcTimer(t=>t+1),1000);}}
                     onTouchEnd={e=>{e.preventDefault();clearInterval(vcTimerRef.current);setVcRecording(false);setVcTimer(0);const msg={id:Date.now(),text:"",mine:true,user:userName||"You",initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",color:OR,ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),isVoice:true,voiceSeconds:vcTimer||1,transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)]};setLaneMsgs(m=>({...m,[activeChan]:[...(m[activeChan]||[]),msg]}));setFriendMsgs(m=>({...m,[activeChan]:[...(m[activeChan]||[]),msg]}));}}
-                    style={{padding:"4px 10px",borderRadius:20,fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:vcRecording?"#ed4245":"#23a55a",color:"#fff",flexShrink:0}}>
+                    style={{padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:vcRecording?"#ed4245":"#23a55a",color:"#fff",flexShrink:0}}>
                     {vcRecording?"🔴 "+vcTimer+"s":"🎙 Talk"}
                   </button>
-                  <button onClick={()=>{setVoiceChatActive(null);setVcRecording(false);clearInterval(vcTimerRef.current);}} style={{padding:"4px 8px",borderRadius:20,fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"#ed424522",color:"#ed4245",fontFamily:F}}>Leave</button>
+                  <button onClick={()=>{setVoiceChatActive(null);setVcRecording(false);clearInterval(vcTimerRef.current);}} style={{padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,cursor:"pointer",border:"none",background:"#ed424522",color:"#ed4245",fontFamily:F}}>Leave</button>
                 </div>
               )}
 
               {/* Locked notice — city lane, but location doesn't match this freeway yet */}
               {laneLocked && (
                 <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:6,borderRadius:8,background:"#66666622",border:"1px solid #66666644"}}>
-                  <span style={{fontSize:13}}>🔒</span>
-                  <span style={{flex:1,fontSize:10,color:"#8e9297"}}>Get on {curCityLane.name} to talk here — you can still read what's posted.</span>
+                  <span style={{fontSize:15}}>🔒</span>
+                  <span style={{flex:1,fontSize:12,color:"#8e9297"}}>Get on {curCityLane.name} to talk here — you can still read what's posted.</span>
                 </div>
               )}
 
@@ -5152,7 +5822,7 @@ export default function SonoLane() {
                   circle, with a keyboard icon in the corner to switch to typing. */}
               {isLaneChat && chatInputMode==="voice" ? (
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative",padding:"4px 0 2px",opacity:laneLocked?0.6:1}}>
-                  <button onClick={()=>setChatInputMode("text")} title="Type a message instead" style={{position:"absolute",left:4,bottom:0,width:34,height:34,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,color:"#72767d"}}>⌨️</button>
+                  <button onClick={()=>setChatInputMode("text")} title="Type a message instead" style={{position:"absolute",left:4,bottom:0,width:34,height:34,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,color:"#72767d"}}>⌨️</button>
                   <button disabled={laneLocked} onClick={()=>{
                     if(laneLocked) return;
                     if(voiceChatActive===activeChan){setVoiceChatActive(null);clearInterval(vcTimerRef.current);}
@@ -5161,14 +5831,14 @@ export default function SonoLane() {
                       const SAMPLE=["SoCalDrifter","NightOwl","TruckDog"];
                       setVoiceChatMembers(m=>({...m,[activeChan]:[userName||"You",...SAMPLE.slice(0,Math.floor(Math.random()*3))]}));
                     }
-                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{position:"absolute",right:4,bottom:0,width:34,height:34,borderRadius:8,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:voiceChatActive===activeChan?"#23a55a":"#72767d"}}>🔊</button>
+                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{position:"absolute",right:4,bottom:0,width:34,height:34,borderRadius:8,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:voiceChatActive===activeChan?"#23a55a":"#72767d"}}>🔊</button>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
                     {laneRecPhase==="paused" && laneRecPreviewUrl && (
                       <audio controls src={laneRecPreviewUrl} style={{height:26,width:190,marginBottom:2}}/>
                     )}
                     <div style={{display:"flex",alignItems:"center",gap:14}}>
                       {laneRecPhase!=="idle" && (
-                        <button onClick={cancelLaneVoiceMsg} title="Cancel" style={{width:32,height:32,borderRadius:"50%",background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#8e9297",flexShrink:0}}>✕</button>
+                        <button onClick={cancelLaneVoiceMsg} title="Cancel" style={{width:32,height:32,borderRadius:"50%",background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#8e9297",flexShrink:0}}>✕</button>
                       )}
                       <button
                         disabled={laneLocked}
@@ -5180,55 +5850,67 @@ export default function SonoLane() {
                         }}
                         title={laneRecPhase==="idle"?"Tap to record":laneRecPhase==="recording"?"Tap to pause":"Tap to resume"}
                         style={{width:64,height:64,borderRadius:"50%",background:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#5865f2",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:laneRecPhase==="recording"?"0 0 0 8px #ed424522":"0 2px 10px rgba(0,0,0,0.35)",transition:"box-shadow .15s",flexShrink:0}}>
-                        <span style={{fontSize:22,color:"#fff"}}>{laneRecPhase==="recording"?"❚❚":laneRecPhase==="paused"?"🎙":"🎙"}</span>
+                        <span style={{fontSize:24,color:"#fff"}}>{laneRecPhase==="recording"?"❚❚":laneRecPhase==="paused"?"🎙":"🎙"}</span>
                       </button>
                       {laneRecPhase!=="idle" && (
-                        <button onClick={sendLaneVoiceMsg} title="Send" style={{width:32,height:32,borderRadius:"50%",background:"#23a55a",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>➤</button>
+                        <button onClick={sendLaneVoiceMsg} title="Send" style={{width:32,height:32,borderRadius:"50%",background:"#23a55a",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#fff",flexShrink:0}}>➤</button>
                       )}
                     </div>
-                    <span style={{fontSize:9,fontWeight:700,color:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#72767d"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#72767d"}}>
                       {laneLocked ? "Get on "+curCityLane.name+" to talk" : laneRecPhase==="recording" ? "Recording… "+laneRecSeconds+"s — tap to pause" : laneRecPhase==="paused" ? "Paused "+laneRecSeconds+"s — tap to resume, or send" : "Tap to record a voice message"}
                     </span>
                   </div>
                 </div>
               ) : (
-              <div style={{display:"flex",alignItems:"center",gap:6,background:"#40444b",borderRadius:8,padding:"4px 6px 4px 12px",opacity:laneLocked?0.6:1}}>
-                {/* Back to walkie-talkie mode (lane chats only) */}
-                {isLaneChat && (
-                  <button onClick={()=>setChatInputMode("voice")} title="Switch to hold-to-talk" style={{width:26,height:26,borderRadius:6,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#72767d",flexShrink:0}}>🎙</button>
-                )}
-                {/* Voice chat join button */}
-                <button disabled={laneLocked} onClick={()=>{
-                  if(laneLocked) return;
-                  if(voiceChatActive===activeChan){setVoiceChatActive(null);clearInterval(vcTimerRef.current);}
-                  else{
-                    setVoiceChatActive(activeChan);
-                    const SAMPLE=["SoCalDrifter","NightOwl","TruckDog"];
-                    setVoiceChatMembers(m=>({...m,[activeChan]:[userName||"You",...SAMPLE.slice(0,Math.floor(Math.random()*3))]}));
-                  }
-                }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{width:26,height:26,borderRadius:6,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:voiceChatActive===activeChan?"#23a55a":"#72767d",flexShrink:0}}>🔊</button>
-                <input value={chanInput} onChange={e=>setChanInput(e.target.value)} disabled={laneLocked}
-                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();
+              <div style={{display:"flex",alignItems:"center",gap:6,opacity:laneLocked?0.6:1}}>
+                {/* Chat menu / lane-list toggle — was a floating overlay, now
+                    sits to the left of the text bar so it's always in the
+                    same reachable spot, whether the sidebar is open or the
+                    chat is full screen. */}
+                <button onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?"Hide lane list":"Show lane list"} style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>
+                  {sidebarOpen?"◀":"☰"}
+                </button>
+
+                {/* Text bar */}
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:6,background:"#40444b",borderRadius:8,padding:"4px 6px 4px 12px",minWidth:0}}>
+                  {/* Voice chat join button */}
+                  <button disabled={laneLocked} onClick={()=>{
+                    if(laneLocked) return;
+                    if(voiceChatActive===activeChan){setVoiceChatActive(null);clearInterval(vcTimerRef.current);}
+                    else{
+                      setVoiceChatActive(activeChan);
+                      const SAMPLE=["SoCalDrifter","NightOwl","TruckDog"];
+                      setVoiceChatMembers(m=>({...m,[activeChan]:[userName||"You",...SAMPLE.slice(0,Math.floor(Math.random()*3))]}));
+                    }
+                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{width:26,height:26,borderRadius:6,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:voiceChatActive===activeChan?"#23a55a":"#72767d",flexShrink:0}}>🔊</button>
+                  <input value={chanInput} onChange={e=>setChanInput(e.target.value)} disabled={laneLocked}
+                    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();
+                      if(activeChan==="sono"){
+                        if(!chanInput.trim())return;
+                        const q=chanInput.trim();
+                        setAiChat(c=>[...c,{role:"user",text:q}]);
+                        setChanInput(""); setAiThinking(true);
+                        callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant. Be concise.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
+                      } else { sendChanMsg(chanInput); }
+                    }}}
+                    placeholder={laneLocked?"Get on "+curCityLane.name+" to talk…":curCityLane?"Message "+curCityLane.name+"…":curCustomLane?"Message #"+curCustomLane.name+"…":activeChan==="notes"?"Jot a note…":activeChan==="sono"?"Ask "+pal.name+"…":curFriend?"Message "+curFriend.name+"…":""}
+                    style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:"#dcddde",fontSize:15,fontFamily:F}}/>
+                  <button disabled={laneLocked} onClick={()=>{
+                    if(laneLocked) return;
                     if(activeChan==="sono"){
                       if(!chanInput.trim())return;
                       const q=chanInput.trim();
                       setAiChat(c=>[...c,{role:"user",text:q}]);
                       setChanInput(""); setAiThinking(true);
-                      callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant. Be concise.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
+                      callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
                     } else { sendChanMsg(chanInput); }
-                  }}}
-                  placeholder={laneLocked?"Get on "+curCityLane.name+" to talk…":curCityLane?"Message "+curCityLane.name+"…":curCustomLane?"Message #"+curCustomLane.name+"…":activeChan==="notes"?"Jot a note…":activeChan==="sono"?"Ask "+pal.name+"…":curFriend?"Message "+curFriend.name+"…":""}
-                  style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#dcddde",fontSize:13,fontFamily:F}}/>
-                <button disabled={laneLocked} onClick={()=>{
-                  if(laneLocked) return;
-                  if(activeChan==="sono"){
-                    if(!chanInput.trim())return;
-                    const q=chanInput.trim();
-                    setAiChat(c=>[...c,{role:"user",text:q}]);
-                    setChanInput(""); setAiThinking(true);
-                    callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
-                  } else { sendChanMsg(chanInput); }
-                }} style={{width:28,height:28,borderRadius:6,background:chanInput.trim()?"#5865f2":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:chanInput.trim()?"#fff":"#72767d"}}>↑</button>
+                  }} style={{width:14,height:14,borderRadius:6,background:chanInput.trim()?"#5865f2":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:chanInput.trim()?"#fff":"#72767d",flexShrink:0}}>↑</button>
+                </div>
+
+                {/* Voice message button — hold-to-talk voice notes, lane chats only */}
+                {isLaneChat && (
+                  <button onClick={()=>setChatInputMode("voice")} title="Switch to hold-to-talk" style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>🎙</button>
+                )}
               </div>
               )}
             </div>
@@ -5240,20 +5922,20 @@ export default function SonoLane() {
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:800,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowCreateLane(false)}>
             <div style={{background:"#2f3136",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
               <div style={{width:30,height:3,background:"#40444b",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:4}}>Create a Lane</div>
-              <div style={{fontSize:10,color:"#72767d",marginBottom:14}}>Lanes are your own private or shared CB channels.</div>
-              <div style={{fontSize:9,color:"#8e9297",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>LANE NAME</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#fff",marginBottom:4}}>Create a Lane</div>
+              <div style={{fontSize:12,color:"#72767d",marginBottom:14}}>Lanes are your own private or shared CB channels.</div>
+              <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>LANE NAME</div>
               <input value={newLaneName} onChange={e=>setNewLaneName(e.target.value)} placeholder="e.g. Car Meet Crew, Night Rides…" style={{...INP,background:"#40444b",border:"1px solid #202225",color:"#dcddde",marginBottom:16}}/>
-              <div style={{fontSize:9,color:"#8e9297",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>WHO CAN JOIN</div>
+              <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>WHO CAN JOIN</div>
               <div style={{display:"flex",gap:8,marginBottom:6}}>
-                <button onClick={()=>setNewLaneVisibility("friends")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="friends"?"1.5px solid #5865f2":"1px solid #202225",background:newLaneVisibility==="friends"?"#5865f222":"#40444b",color:newLaneVisibility==="friends"?"#fff":"#8e9297",fontSize:11,fontWeight:700,textAlign:"left"}}>
-                  👥 Friends<div style={{fontSize:8,fontWeight:400,color:"#8e9297",marginTop:2}}>Only your friends</div>
+                <button onClick={()=>setNewLaneVisibility("friends")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="friends"?"1.5px solid #5865f2":"1px solid #202225",background:newLaneVisibility==="friends"?"#5865f222":"#40444b",color:newLaneVisibility==="friends"?"#fff":"#8e9297",fontSize:13,fontWeight:700,textAlign:"left"}}>
+                  👥 Friends<div style={{fontSize:10,fontWeight:400,color:"#8e9297",marginTop:2}}>Only your friends</div>
                 </button>
-                <button onClick={()=>setNewLaneVisibility("public")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="public"?"1.5px solid "+OR:"1px solid #202225",background:newLaneVisibility==="public"?OR+"22":"#40444b",color:newLaneVisibility==="public"?"#fff":"#8e9297",fontSize:11,fontWeight:700,textAlign:"left"}}>
-                  🌐 Public<div style={{fontSize:8,fontWeight:400,color:"#8e9297",marginTop:2}}>Anyone nearby can join</div>
+                <button onClick={()=>setNewLaneVisibility("public")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="public"?"1.5px solid "+OR:"1px solid #202225",background:newLaneVisibility==="public"?OR+"22":"#40444b",color:newLaneVisibility==="public"?"#fff":"#8e9297",fontSize:13,fontWeight:700,textAlign:"left"}}>
+                  🌐 Public<div style={{fontSize:10,fontWeight:400,color:"#8e9297",marginTop:2}}>Anyone nearby can join</div>
                 </button>
               </div>
-              <div style={{fontSize:9,color:"#5b5e66",marginBottom:16}}>{newLaneVisibility==="public" ? "Shows in Public Lanes for anyone within your discovery radius." : "Stays in My Lanes, visible only to your friends."}</div>
+              <div style={{fontSize:11,color:"#5b5e66",marginBottom:16}}>{newLaneVisibility==="public" ? "Shows in Public Lanes for anyone within your discovery radius." : "Stays in My Lanes, visible only to your friends."}</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>{
                   if(!newLaneName.trim())return;
@@ -5262,7 +5944,7 @@ export default function SonoLane() {
                   setCustomLanes(l=>[...l,lane]);
                   setActiveChan(lane.id);
                   setNewLaneName("");setNewLaneVisibility("friends");setShowCreateLane(false);
-                }} style={{flex:1,padding:"12px",borderRadius:10,background:"#5865f2",color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create Lane</button>
+                }} style={{flex:1,padding:"12px",borderRadius:10,background:"#5865f2",color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create Lane</button>
                 <button onClick={()=>setShowCreateLane(false)} style={{padding:"12px 16px",borderRadius:10,background:"#40444b",border:"none",color:"#8e9297",cursor:"pointer",fontFamily:F}}>Cancel</button>
               </div>
             </div>
@@ -5277,147 +5959,450 @@ export default function SonoLane() {
      about it is shown on this page. Recorded footage surfaces in the
      profile's Dashcam section, and speed/duration/lights surface in
      Drive History once a drive ends. ── */
-  const DrivePanel = useStablePanel(() => (
-    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
-      <div style={{flex:1,position:"relative",overflow:"hidden",minHeight:0,background:"#e5e3df"}}>
-        <iframe
-          title="Live Map"
-          style={{width:"100%",height:"100%",border:"none",display:"block",pointerEvents:mapInteractive?"auto":"none"}}
-          src="https://maps.google.com/maps?q=current+location&z=15&output=embed"
-          loading="lazy"
-        />
-        {/* Home — exits Drive mode back to the swipe carousel. go() stops &
-            saves any in-progress dashcam recording on the way out. */}
-        <button onClick={()=>go("profile")} style={{position:"absolute",top:10,right:10,width:32,height:32,borderRadius:"50%",background:"rgba(0,0,0,0.6)",border:"none",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,zIndex:2}}>
-          ←
-        </button>
-        {/* Tap-to-interact overlay — tap toggles into the map so the user can pan/zoom it. */}
-        {!mapInteractive && (
-          <div
-            onClick={()=>setMapInteractive(true)}
-            style={{position:"absolute",inset:0,background:"transparent",cursor:"pointer"}}
-          />
-        )}
-        {mapInteractive && (
-          <button onClick={()=>setMapInteractive(false)} style={{position:"absolute",top:10,left:10,padding:"6px 12px",borderRadius:20,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,zIndex:2}}>
-            ✓ Done
-          </button>
-        )}
-        {!dashcamConsent && !mapInteractive && (
-          <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("dashcam"),100);}} style={{position:"absolute",top:10,left:10,padding:"7px 12px",borderRadius:20,background:"rgba(0,0,0,0.65)",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F,zIndex:2,display:"flex",alignItems:"center",gap:6}}>
-            📹 Enable dashcam
-          </button>
-        )}
-        <button onClick={()=>window.open("https://maps.google.com","_blank")} style={{position:"absolute",bottom:12,right:12,padding:"9px 16px",borderRadius:20,background:"#4285F4",color:"#fff",border:"none",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F,boxShadow:"0 2px 10px rgba(0,0,0,0.25)",display:"flex",alignItems:"center",gap:6,zIndex:2}}>
-          🗺️ Open in Maps
-        </button>
-      </div>
+  // 5 apps in Drive mode's bottom apps bar — tapping one swaps only the main
+  // ~2/3-width app area (driveApp), leaving the widgets column untouched.
+  // Maps is the default app and also sits in this bar, per the CarPlay-style
+  // reference layout: a wide main app + a stack of glanceable widgets beside it.
+  const DRIVE_APPS = [
+    {id:"map",     icon:"🗺️", label:"Maps"},
+    {id:"radio",   icon:"📻", label:"SonoLane Radio"},
+    {id:"cbradio", icon:"📡", label:"CB Radio"},
+    {id:"agent",   icon:"⭐", label:"Sono"},
+  ];
+  const DrivePanel = useStablePanel(() => {
+    const isPortrait = driveOrientation==="portrait";
+    // Which CB freeway lane is open in Drive mode's inline CB Radio app —
+    // separate from MusicModal's own activeCbLane so browsing a lane here
+    // doesn't disturb the CB Radio sheet's state (and vice versa).
+    const [driveCbLane, setDriveCbLane] = useState(null);
+    // Drive Mode Settings sheet (opened via the ⚙️ at the end of the apps
+    // bar) — a toggle up top switches between Startup Sound, Widgets, and
+    // Voice Control instead of stacking all three. These all used to live
+    // on the Profile Edit page; now they live only here, inside Drive mode.
+    const [driveSettingsTab, setDriveSettingsTab] = useState("sound");
 
-      {/* Widgets + radio — paired with the map, only shown while driving */}
-      <div style={{flexShrink:0,background:"#fff",borderTop:"1px solid #ebebeb",boxShadow:"0 -1px 8px rgba(0,0,0,0.05)",zIndex:100}}>
-        {voiceOn && (
-          <div style={{padding:"3px 12px",background:"#fff9f5",borderBottom:"1px solid #fde8d8",display:"flex",alignItems:"center",gap:6}}>
-            <span style={{width:5,height:5,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0,display:"block"}}/>
-            <span style={{fontSize:8,color:OR,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{voiceText || (showAgent ? "Agent open — speak your question" : "Listening… say \"Sono\" for agent")}</span>
-          </div>
-        )}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 190px 1fr",alignItems:"stretch",padding:"6px 8px 8px",gap:6,minHeight:88}}>
-          <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",overflow:"visible",display:"flex",alignItems:"stretch",position:"relative"}}>
-            {voiceOn&&<div style={{position:"absolute",top:-5,left:-5,zIndex:30,width:17,height:17,borderRadius:"50%",background:"#111",color:"#fff",fontSize:6.5,fontWeight:900,lineHeight:"17px",textAlign:"center",pointerEvents:"none",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>6</div>}
-            <div style={{width:"100%",height:"100%",borderRadius:12,overflow:"hidden",display:"flex",alignItems:"stretch"}}>{renderWidget(leftWidget,"left")}</div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            {/* Car avatar / AI agent trigger */}
-            {carName && (
-              <div style={{position:"relative",flexShrink:0}}>
-              {voiceOn&&<div style={{position:"absolute",top:-5,left:-5,zIndex:30,width:17,height:17,borderRadius:"50%",background:"#111",color:"#fff",fontSize:6.5,fontWeight:900,lineHeight:"17px",textAlign:"center",pointerEvents:"none",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>9</div>}
-              <button onClick={()=>setShowAgent(a=>!a)} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:3}}>
-                <div style={{width:24,height:24,borderRadius:7,overflow:"hidden",border:"2px solid "+(showAgent?pal.color:OR),display:"flex",alignItems:"center",justifyContent:"center",background:"#f8f8f8"}}>
-                  {carAvatarMode==="photo" && carAvatarPhoto
-                    ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                    : <CarSVG color={carColor} mods={carMods} size={26} styleId={carBodyStyle}/>}
+    const mainAppBox = (
+          <div style={{flex:1,position:"relative",overflow:"hidden",minHeight:0,background:driveApp==="map"?"#e5e3df":"#111"}}>
+
+            {driveApp==="map" && (<>
+              <iframe
+                title="Live Map"
+                style={{width:"100%",height:"100%",border:"none",display:"block",pointerEvents:mapInteractive?"auto":"none"}}
+                src={driveDirections ? buildEmbedDirectionsSrc(driveDirections) : "https://maps.google.com/maps?q=current+location&z=15&output=embed"}
+                loading="lazy"
+                allow="geolocation"
+              />
+              {/* Route banner — only shown while a "Get Directions" route is
+                  loaded; lets you see the stops at a glance or drop back to
+                  the plain live map. */}
+              {driveDirections && !mapInteractive && (
+                <div style={{position:"absolute",top:10,left:10,right:52,zIndex:2,background:"rgba(0,0,0,0.7)",borderRadius:12,padding:"8px 10px",display:"flex",alignItems:"flex-start",gap:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🗺️ {driveDirections.title}</div>
+                    {driveDirections.stops?.length>0 && (
+                      <div style={{fontSize:10,color:"#ccc",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{driveDirections.stops.map(s=>"📍 "+s).join("  ")}</div>
+                    )}
+                  </div>
+                  <button onClick={()=>setDriveDirections(null)} title="Exit directions" style={{width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",fontSize:12,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
                 </div>
-              </button>
-              </div>
-            )}
-            {/* Classic Chevy-style car radio — always opens straight to My Music */}
-            <div style={{flex:1,margin:"0 4px",position:"relative"}}>
-            {voiceOn&&<div style={{position:"absolute",top:-6,left:0,zIndex:30,width:17,height:17,borderRadius:"50%",background:"#111",color:"#fff",fontSize:6.5,fontWeight:900,lineHeight:"17px",textAlign:"center",pointerEvents:"none",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>8</div>}
-            <button onClick={()=>{setMusicTab("music");memStore.setItem("sl_radioTab","music");setShowMusic(true);}} style={{
-              width:"100%",cursor:"pointer",fontFamily:F,border:"none",padding:0,
-              background:"transparent",display:"flex",alignItems:"center",
-            }}>
-              <div style={{
-                width:"100%",
-                background:"#111",
-                borderRadius:8,
-                border:"1px solid #2a2a2a",
-                boxShadow:"0 2px 8px rgba(0,0,0,0.5)",
-                overflow:"hidden",
-                position:"relative",
-                padding:"5px 8px 4px",
-              }}>
-                {isBroad&&<span style={{position:"absolute",top:3,right:3,width:5,height:5,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 4px #ef4444",animation:"pulse 1s infinite"}}/>}
-                {/* Flat car-stereo icon: play button · equalizer · slot */}
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{flexShrink:0}}>
-                    <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="1.8"/>
-                    <path d="M10 8.3L16.5 12L10 15.7V8.3Z" fill="#fff"/>
-                  </svg>
-                  <div style={{display:"flex",alignItems:"flex-end",gap:2,height:12,flex:1,justifyContent:"center"}}>
-                    {[5,9,12,7,10].map((h,i)=>(
-                      <div key={i} style={{width:2,height:h,borderRadius:1,background:"#fff",flexShrink:0}}/>
+              )}
+              {/* Tap-to-interact overlay — tap toggles into the map so the user can pan/zoom it. */}
+              {!mapInteractive && (
+                <div onClick={()=>setMapInteractive(true)} style={{position:"absolute",inset:0,background:"transparent",cursor:"pointer"}}/>
+              )}
+              {mapInteractive && (
+                <button onClick={()=>setMapInteractive(false)} style={{position:"absolute",top:10,left:10,padding:"6px 12px",borderRadius:20,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,zIndex:2}}>
+                  ✓ Done
+                </button>
+              )}
+              {!dashcamConsent && !mapInteractive && (
+                <button onClick={()=>setShowDashcamSetup(true)} style={{position:"absolute",bottom:12,left:12,padding:"7px 12px",borderRadius:20,background:"rgba(0,0,0,0.65)",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,zIndex:2,display:"flex",alignItems:"center",gap:6}}>
+                  📹 Enable dashcam
+                </button>
+              )}
+              {driveDirections ? (
+                <button onClick={()=>startTurnByTurn(driveDirections)} style={{position:"absolute",bottom:12,right:12,padding:"9px 16px",borderRadius:20,background:"#4285F4",color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,boxShadow:"0 2px 10px rgba(0,0,0,0.25)",display:"flex",alignItems:"center",gap:6,zIndex:2}}>
+                  🧭 Start Navigation
+                </button>
+              ) : (
+                <button onClick={()=>window.open("https://maps.google.com","_blank")} style={{position:"absolute",bottom:12,right:12,padding:"9px 16px",borderRadius:20,background:"#4285F4",color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,boxShadow:"0 2px 10px rgba(0,0,0,0.25)",display:"flex",alignItems:"center",gap:6,zIndex:2}}>
+                  🗺️ Open in Maps
+                </button>
+              )}
+            </>)}
+
+            {driveApp==="radio" && (
+              <div style={{position:"absolute",inset:0,overflowY:"auto",padding:"14px 16px 20px"}}>
+                <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MY BROADCAST</div>
+                {isBroad ? (
+                  <div style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:14,padding:"12px",display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0}}/>
+                    <div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:11,color:"#8e9297"}}>Broadcasting live now</div></div>
+                    <button onClick={()=>setIsBroad(false)} style={{padding:"5px 12px",borderRadius:20,background:"#2a2a2a",border:"none",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
+                  </div>
+                ) : radioHosts.length>0 ? (
+                  <div style={{marginBottom:16}}>
+                    {radioHosts.map((h,i)=>(
+                      <div key={i} style={{background:"#1a1a1a",borderRadius:12,padding:"11px",marginBottom:7,display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:38,height:38,borderRadius:10,background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>📻</div>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.name}</div><div style={{fontSize:11,color:"#8e9297"}}>{h.genre} · @{h.handle}</div></div>
+                        <button onClick={()=>{setBroadName(h.name);setIsBroad(true);}} style={{padding:"5px 10px",borderRadius:20,background:"#ef4444",color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0}}>Go Live</button>
+                      </div>
                     ))}
                   </div>
-                  <div style={{width:2.5,height:12,borderRadius:1.5,background:"#fff",flexShrink:0}}/>
+                ) : !showReg ? (
+                  <button onClick={()=>setShowReg(true)} style={{width:"100%",padding:"12px",borderRadius:14,background:"transparent",border:"1.5px dashed #ef444466",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:16}}>📻 Register as Radio Host</button>
+                ) : null}
+
+                {showReg && (
+                  <div style={{background:"#1a1a1a",borderRadius:14,padding:"14px",marginBottom:16}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:10}}>Host Registration</div>
+                    <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+                      {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
+                        <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#222",color:hostForm.genre===g?"#fff":"#8e9297",border:"none",fontFamily:F}}>{g}</button>
+                      ))}
+                    </div>
+                    <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"9px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
+                      <button onClick={()=>setShowReg(false)} style={{padding:"9px 14px",borderRadius:10,background:"#222",border:"1px solid #333",color:"#8e9297",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
+                  {appRadius ? "STATIONS · "+appRadius+" MI" : "ALL STATIONS"}
                 </div>
-                {/* Station name */}
-                <div style={{fontSize:6,color:"#889",fontWeight:600,textAlign:"center",marginTop:2,letterSpacing:0.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {isBroad?broadName:spotifyLinked?"Spotify":appleOn?"Apple Music":"SonoLane Radio"}
+                {radioHosts.length===0 ? (
+                  <div style={{textAlign:"center",padding:"30px 10px",color:"#555"}}>
+                    <div style={{fontSize:32,marginBottom:8}}>📻</div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#8e9297",marginBottom:4}}>No stations nearby yet</div>
+                    <div style={{fontSize:12,color:"#555"}}>Be the first to register a station above.</div>
+                  </div>
+                ) : radioHosts.map((h,i)=>(
+                  <div key={i} style={{background:"#1a1a1a",borderRadius:12,padding:"11px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:40,height:40,borderRadius:10,background:OR+"22",border:"1.5px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📻</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.name}</div>
+                      <div style={{fontSize:11,color:"#8e9297"}}>{h.genre} · @{h.handle}</div>
+                    </div>
+                    <button onClick={()=>toggleSavedStation(h.name)} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#555",fontSize:16,cursor:"pointer",padding:2,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
+                    {isBroad&&broadName===h.name
+                      ? (<div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"3px 8px",flexShrink:0}}><div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/><span style={{fontSize:10,color:"#ef4444",fontWeight:700}}>LIVE</span></div>)
+                      : (<button style={{padding:"5px 10px",borderRadius:20,background:"#2a2a2a",color:"#8e9297",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0}}>▶ Listen</button>)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {driveApp==="cbradio" && (() => {
+              const visibleLanes = appRadius ? CB_CITY_LANES.filter(l=>!l.city||l.city==="San Diego") : CB_CITY_LANES;
+              if(!driveCbLane){
+                return (
+                  <div style={{position:"absolute",inset:0,overflowY:"auto",padding:"14px 16px 20px"}}>
+                    <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
+                      {appRadius ? "NEARBY FREEWAY LANES · "+appRadius+" MI" : "ALL FREEWAY LANES"}
+                    </div>
+                    <div style={{fontSize:12,color:currentFreewayId?"#23a55a":"#8e9297",marginBottom:10,lineHeight:1.5}}>
+                      {currentFreewayId
+                        ? "📍 You're on "+(CB_CITY_LANES.find(l=>l.id===currentFreewayId)?.name||"a freeway lane")+" — you can talk here."
+                        : "🔒 You can view any lane here, but can only talk once your location matches that freeway."}
+                    </div>
+                    {visibleLanes.map(lane=>{
+                      const updates=laneTrafficUpdates[lane.id]||[];
+                      const last=updates[0];
+                      const here = lane.id===currentFreewayId;
+                      return (
+                        <button key={lane.id} onClick={()=>setDriveCbLane(lane.id)} style={{
+                          width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px",
+                          marginBottom:7,borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,
+                          background:"#1a1a1a",textAlign:"left",
+                        }}>
+                          <div style={{width:40,height:40,borderRadius:10,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📡</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                              <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>{lane.name}</span>
+                              <div style={{width:5,height:5,borderRadius:"50%",background:here?"#23a55a":"#555"}}/>
+                            </div>
+                            <div style={{fontSize:11,color:"#8e9297",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last ? last.icon+" \""+last.text+"\"" : lane.desc}</div>
+                          </div>
+                          <div style={{fontSize:17,color:"#555"}}>›</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              const laneObj = CB_CITY_LANES.find(l=>l.id===driveCbLane);
+              const riders = 2 + ((laneObj?.id.split("").reduce((s,c)=>s+c.charCodeAt(0),0))%4);
+              const updates = laneTrafficUpdates[driveCbLane]||[];
+              const onThisLane = driveCbLane===currentFreewayId;
+              return (
+                <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+                  <div style={{padding:"9px 14px",borderBottom:"1px solid #222",flexShrink:0,display:"flex",alignItems:"center",gap:8}}>
+                    <button onClick={()=>setDriveCbLane(null)} style={{fontSize:18,background:"none",border:"none",color:"#8e9297",cursor:"pointer"}}>←</button>
+                    <div style={{width:7,height:7,borderRadius:"50%",background:laneObj?.color||OR}}/>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{laneObj?.name}</div></div>
+                    <div style={{display:"flex",alignItems:"center",gap:3,background:onThisLane?"#23a55a22":"#66666622",borderRadius:20,padding:"2px 7px",flexShrink:0}}>
+                      <div style={{width:5,height:5,borderRadius:"50%",background:onThisLane?"#23a55a":"#666"}}/>
+                      <span style={{fontSize:9,color:onThisLane?"#23a55a":"#8e9297",fontWeight:700}}>{onThisLane?"LIVE":"BROWSING"}</span>
+                    </div>
+                  </div>
+                  {onThisLane ? (
+                    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"16px 20px"}}>
+                      <div style={{position:"relative",width:88,height:88,marginBottom:14}}>
+                        <div style={{position:"absolute",inset:0,borderRadius:"50%",background:(laneObj?.color||OR)+"22",animation:"pulse 1.6s infinite"}}/>
+                        <div style={{position:"absolute",inset:10,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>📡</div>
+                      </div>
+                      <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:4,textAlign:"center"}}>Connected — ready to talk</div>
+                      <div style={{fontSize:11,color:"#555",fontWeight:700}}>🎧 {riders} riders connected</div>
+                    </div>
+                  ) : (
+                    <div style={{flex:1,overflowY:"auto",padding:"10px 12px"}}>
+                      {updates.length===0 ? (
+                        <div style={{textAlign:"center",color:"#555",paddingTop:20}}>
+                          <div style={{fontSize:22,marginBottom:6}}>📡</div>
+                          <div style={{fontSize:12}}>No recent updates on this lane.</div>
+                        </div>
+                      ) : updates.map(u=>(
+                        <div key={u.id} style={{display:"flex",gap:8,padding:"9px 10px",marginBottom:6,borderRadius:10,background:"#1a1a1a"}}>
+                          <div style={{fontSize:16,flexShrink:0}}>{u.icon}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12,color:"#ddd",lineHeight:1.4,marginBottom:2}}>{u.text}</div>
+                            <div style={{fontSize:10,color:"#555"}}><span style={{color:u.color,fontWeight:700}}>{u.handle}</span> · {timeAgo(u.ts)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {onThisLane && (
+                    <div style={{padding:"6px 12px 10px",flexShrink:0}}>
+                      <button
+                        onMouseDown={()=>{setCbRecording(true);setCbTimer(0);cbTimerRef.current=setInterval(()=>setCbTimer(t=>t+1),1000);}}
+                        onMouseUp={()=>{clearInterval(cbTimerRef.current);setCbRecording(false);setCbTimer(0);broadcastOnLane(driveCbLane);}}
+                        onTouchStart={e=>{e.preventDefault();setCbRecording(true);setCbTimer(0);cbTimerRef.current=setInterval(()=>setCbTimer(t=>t+1),1000);}}
+                        onTouchEnd={e=>{e.preventDefault();clearInterval(cbTimerRef.current);setCbRecording(false);setCbTimer(0);broadcastOnLane(driveCbLane);}}
+                        style={{width:"100%",padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,background:cbRecording?"#ed4245":"#23a55a",color:"#fff",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                        {cbRecording ? (<><span style={{width:6,height:6,borderRadius:"50%",background:"#fff",animation:"pulse 0.5s infinite",display:"block"}}/>{"Broadcasting… "+cbTimer+"s"}</>) : (<><span>📡</span>{"Hold to Talk"}</>)}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {driveApp==="agent" && (
+              <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",borderBottom:"1px solid #222",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                  <CompassStar size={18} color={pal.color}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{pal.name}</div>
+                    <div style={{fontSize:11,color:"#8e9297"}}>{pal.desc}</div>
+                  </div>
+                </div>
+                <div style={{flex:1,overflowY:"auto",padding:"10px 14px"}}>
+                  {roadMsgs.slice(-6).map((m,i)=><div key={i} style={{fontSize:13,color:"#dcddde",padding:"5px 0",lineHeight:1.5}}>{pal.emoji} {m}</div>)}
+                </div>
+                <div style={{padding:"8px 10px",display:"flex",gap:6,flexShrink:0,borderTop:"1px solid #222"}}>
+                  <input value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendChat();}} placeholder={"Ask "+pal.name+"…"} style={{...INP,flex:1,background:"#1a1a1a",border:"1px solid #2a2a2a",color:"#fff"}}/>
+                  <button onClick={sendChat} style={{padding:"7px 14px",borderRadius:8,background:pal.color,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer"}}>↑</button>
                 </div>
               </div>
+            )}
+
+            {/* Persistent overlay controls, on top of whichever app is showing */}
+            <button onClick={()=>go("profile")} style={{position:"absolute",top:10,right:10,width:32,height:32,borderRadius:"50%",background:"#1a1a1a",border:"none",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,zIndex:3,boxShadow:"0 2px 6px rgba(0,0,0,0.4)"}}>
+              ←
             </button>
-            </div>
-            {/* REC badge */}
-            {dashOn && <div style={{display:"flex",alignItems:"center",gap:2,background:"#ef444411",borderRadius:20,padding:"2px 5px",flexShrink:0}}>
-              <span style={{width:4,height:4,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",display:"block"}}/>
-              <span style={{color:"#ef4444",fontSize:7,fontWeight:800}}>REC</span>
-            </div>}
-            {/* Sound-wave mic button — fixed #10 */}
-            <div style={{position:"relative",flexShrink:0}}>
-            {voiceOn&&<div style={{position:"absolute",top:-5,right:-5,zIndex:30,width:17,height:17,borderRadius:"50%",background:"#111",color:"#fff",fontSize:6.5,fontWeight:900,lineHeight:"17px",textAlign:"center",pointerEvents:"none",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>10</div>}
-            <button onClick={toggleVoice} style={{width:28,height:28,borderRadius:"50%",background:voiceOn?OR:"#f5f5f5",border:voiceOn?"none":"1px solid #e0e0e0",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:voiceOn?"0 0 8px "+OR+"77":"none"}}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                {voiceOn ? (<>
-                  <rect x="1" y="5" width="2" height="4" rx="1" fill="#fff"/>
-                  <rect x="4" y="3" width="2" height="8" rx="1" fill="#fff"/>
-                  <rect x="7" y="1" width="2" height="12" rx="1" fill="#fff"/>
-                  <rect x="10" y="3" width="2" height="8" rx="1" fill="#fff"/>
-                  <rect x="13" y="5" width="2" height="4" rx="1" fill="#fff"/>
-                </>) : (<>
-                  <rect x="1" y="6" width="2" height="2" rx="1" fill="#888"/>
-                  <rect x="4" y="4" width="2" height="6" rx="1" fill="#888"/>
-                  <rect x="7" y="2" width="2" height="10" rx="1" fill="#888"/>
-                  <rect x="10" y="4" width="2" height="6" rx="1" fill="#888"/>
-                  <rect x="13" y="6" width="2" height="2" rx="1" fill="#888"/>
-                </>)}
-              </svg>
+            {dashOn && (
+              <div style={{position:"absolute",top:10,left:10,display:"flex",alignItems:"center",gap:4,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"4px 9px",zIndex:3}}>
+                <span style={{width:5,height:5,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",display:"block"}}/>
+                <span style={{color:"#fff",fontSize:11,fontWeight:800}}>REC</span>
+              </div>
+            )}
+          </div>
+    );
+
+    /* Apps bar — 5 apps, switches only the main app area above, plus a small
+       "⚙️" button at the end to jump straight to the widget-slot picker
+       without leaving Drive mode. Horizontal strip (landscape, sits under
+       the main area) or a narrow vertical strip (portrait, along the side). */
+    const appsBarHorizontal = (
+      <div style={{flexShrink:0,display:"flex",background:"#111",borderTop:"1px solid #222"}}>
+        {DRIVE_APPS.map(a=>{
+          const active = driveApp===a.id;
+          return (
+            <button key={a.id} onClick={()=>setDriveApp(a.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",border:"none",cursor:"pointer",fontFamily:F,background:active?OR+"22":"transparent"}}>
+              <span style={{fontSize:19}}>{a.icon}</span>
+              <span style={{fontSize:10,fontWeight:active?800:600,color:active?OR:"#8e9297"}}>{a.label}</span>
             </button>
-            </div>
-          </div>
-          <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",overflow:"visible",display:"flex",alignItems:"stretch",position:"relative"}}>
-            {voiceOn&&<div style={{position:"absolute",top:-5,right:-5,zIndex:30,width:17,height:17,borderRadius:"50%",background:"#111",color:"#fff",fontSize:6.5,fontWeight:900,lineHeight:"17px",textAlign:"center",pointerEvents:"none",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>7</div>}
-            <div style={{width:"100%",height:"100%",borderRadius:12,overflow:"hidden",display:"flex",alignItems:"stretch"}}>{renderWidget(rightWidget,"right")}</div>
-          </div>
-        </div>
+          );
+        })}
+        <button onClick={()=>setShowWidgetSettings(true)} title="Drive Mode Settings" style={{flexShrink:0,width:40,display:"flex",alignItems:"center",justifyContent:"center",border:"none",borderLeft:"1px solid #222",cursor:"pointer",background:"transparent",fontSize:15}}>⚙️</button>
       </div>
-    </div>
-  ));
+    );
+    const appsBarVertical = (
+      <div style={{flexShrink:0,width:56,display:"flex",flexDirection:"column",background:"#111",borderRight:"1px solid #222"}}>
+        {DRIVE_APPS.map(a=>{
+          const active = driveApp===a.id;
+          return (
+            <button key={a.id} onClick={()=>setDriveApp(a.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"8px 2px",border:"none",cursor:"pointer",fontFamily:F,background:active?OR+"22":"transparent"}}>
+              <span style={{fontSize:19}}>{a.icon}</span>
+              <span style={{fontSize:9,fontWeight:active?800:600,color:active?OR:"#8e9297",textAlign:"center"}}>{a.label}</span>
+            </button>
+          );
+        })}
+        <button onClick={()=>setShowWidgetSettings(true)} title="Drive Mode Settings" style={{flexShrink:0,height:36,display:"flex",alignItems:"center",justifyContent:"center",border:"none",borderTop:"1px solid #222",cursor:"pointer",background:"transparent",fontSize:14}}>⚙️</button>
+      </div>
+    );
+
+    /* Widgets — up to 3 slots, stacked (landscape, side column) or
+       side-by-side (portrait, bottom bar). A slot marked "only show when
+       turned on" simply isn't rendered until it's active — the remaining
+       slot(s) are equal flex children of the same row/column, so 2 widgets
+       split the space 50/50 and 1 widget fills it completely, automatically. */
+    const widgetIsActive = id => {
+      if(id==="dashcam") return dashOn;
+      if(id==="spotify") return spotifyPlaying;
+      if(id==="cbradio") return isBroad || !!currentFreewayId;
+      if(id==="none") return false; // Empty is never "active" — with the
+      // toggle on, an Empty slot just stays hidden permanently, letting the
+      // other widget(s) split the bottom bar between them (or fill it, if
+      // it's the only one left).
+      return true; // no real on/off state for weather/points/friends/topfriends/routes/music
+    };
+    const slotShow = (w, onlyOn) => !onlyOn || widgetIsActive(w);
+    const slot1Show = slotShow(widget1, widget1OnlyOn);
+    const slot2Show = slotShow(widget2, widget2OnlyOn);
+    const slot3Show = slotShow(widget3, widget3OnlyOn);
+    const slotBox = (w, side) => (
+      <div style={{flex:1,background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",overflow:"hidden",display:"flex",alignItems:"stretch",minHeight:0}}>{renderWidget(w,side)}</div>
+    );
+    const widgetsColVertical = (
+      <div style={{flex:1,display:"flex",flexDirection:"column",gap:6,padding:6,background:"#fff",overflow:"hidden",minHeight:0}}>
+        {slot1Show && slotBox(widget1,"1")}
+        {slot2Show && slotBox(widget2,"2")}
+        {slot3Show && slotBox(widget3,"3")}
+      </div>
+    );
+    const widgetsRowHorizontal = (
+      <div style={{flexShrink:0,height:110,display:"flex",flexDirection:"row",gap:6,padding:6,background:"#fff",overflow:"hidden"}}>
+        {slot1Show && slotBox(widget1,"1")}
+        {slot2Show && slotBox(widget2,"2")}
+        {slot3Show && slotBox(widget3,"3")}
+      </div>
+    );
+
+    return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
+        {voiceOn && (
+          <div style={{flexShrink:0,padding:"3px 12px",background:"#fff9f5",borderBottom:"1px solid #fde8d8",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{width:5,height:5,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0,display:"block"}}/>
+            <span style={{fontSize:10,color:OR,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{voiceText || (showAgent ? "Agent open — speak your question" : "Listening… say \"Sono\" for agent")}</span>
+          </div>
+        )}
+        {isPortrait ? (
+          <>
+            <div style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
+              {appsBarVertical}
+              <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
+                {mainAppBox}
+              </div>
+            </div>
+            {widgetsRowHorizontal}
+          </>
+        ) : (
+          <div style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
+            <div style={{flex:2,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,borderRight:"1px solid #ebebeb"}}>
+              {mainAppBox}
+              {appsBarHorizontal}
+            </div>
+            {widgetsColVertical}
+          </div>
+        )}
+
+        {/* Drive Mode Settings — the small ⚙️ at the end of the apps bar
+            opens this sheet. Startup Sound, Widgets, and Voice Control all
+            live here now instead of on the Profile Edit page, so every
+            Drive-mode setting can be reached without leaving Drive mode. */}
+        {showWidgetSettings && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:590,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowWidgetSettings(false)}>
+            <div style={{background:"#1a1a1a",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:30,height:3,background:"#333",borderRadius:2,margin:"0 auto 14px"}}/>
+              <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:12}}>Drive Mode Settings</div>
+
+              <div style={{display:"flex",gap:4,background:"#242424",borderRadius:40,padding:4,marginBottom:14}}>
+                <button onClick={()=>setDriveSettingsTab("sound")} style={{flex:1,padding:"7px 6px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:700,background:driveSettingsTab==="sound"?OR:"transparent",color:driveSettingsTab==="sound"?"#fff":"#8e9297"}}>Startup Sound</button>
+                <button onClick={()=>setDriveSettingsTab("widgets")} style={{flex:1,padding:"7px 6px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:700,background:driveSettingsTab==="widgets"?OR:"transparent",color:driveSettingsTab==="widgets"?"#fff":"#8e9297"}}>Widgets</button>
+                <button onClick={()=>setDriveSettingsTab("voice")} style={{flex:1,padding:"7px 6px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:700,background:driveSettingsTab==="voice"?OR:"transparent",color:driveSettingsTab==="voice"?"#fff":"#8e9297"}}>Voice Control</button>
+              </div>
+
+              {driveSettingsTab==="sound" && (<>
+                <div style={{fontSize:12,color:"#8e9297",marginBottom:10,lineHeight:1.5}}>Plays every time you tap Start to begin a drive.</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
+                  {Object.entries(STARTUP_SOUNDS).map(([key,cfg])=>(
+                    <button key={key} onClick={()=>{setStartupSound(key);memStore.setItem("sl_startupSound",key);playStartupSound(key);}} style={{
+                      display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
+                      cursor:"pointer",fontFamily:F,textAlign:"left",
+                      border:"1.5px solid "+(startupSound===key?OR:"#333"),
+                      background:startupSound===key?OR+"22":"#242424",
+                    }}>
+                      <div style={{width:30,height:30,borderRadius:"50%",background:startupSound===key?OR+"33":"#1a1a1a",border:"1.5px solid "+(startupSound===key?OR+"66":"#333"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
+                        {key==="none"?"🔇":key==="engine"?"🏎":key==="digital"?"🔔":key==="warm"?"🎶":"🎵"}
+                      </div>
+                      <div style={{flex:1,fontSize:14,fontWeight:700,color:startupSound===key?OR:"#fff"}}>{cfg.label}</div>
+                      {startupSound===key && <div style={{width:18,height:18,borderRadius:"50%",background:OR,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>✓</div>}
+                    </button>
+                  ))}
+                </div>
+                <div style={{fontSize:11,color:"#8e9297",textAlign:"center"}}>Tap a sound to preview it</div>
+              </>)}
+
+              {driveSettingsTab==="widgets" && (<>
+                {[["1","Top",widget1,widget1OnlyOn],["2","Mid",widget2,widget2OnlyOn],["3","Bottom",widget3,widget3OnlyOn]].map(([slot,label,w,onlyOn])=>(
+                  <button key={slot} onClick={()=>{setShowWidgetSettings(false);setWidgetEditFrom("drive");setWidgetEdit(slot);}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px",borderRadius:12,background:"#242424",border:"none",cursor:"pointer",fontFamily:F,marginBottom:8,textAlign:"left"}}>
+                    <div style={{fontSize:20}}>{w==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={18}/>:w==="weather"?"☀️":w==="music"?"🎵":w==="spotify"?"🎧":w==="cbradio"?"📡":w==="points"?"⭐":w==="friends"?"👥":w==="topfriends"?"👥":w==="dashcam"?"📹":"＋"}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:11,color:"#8e9297",fontWeight:700}}>{label.toUpperCase()}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textTransform:"capitalize"}}>{w}{onlyOn?" · only when on":""}</div>
+                    </div>
+                    <span style={{color:"#8e9297",fontSize:18}}>›</span>
+                  </button>
+                ))}
+              </>)}
+
+              {driveSettingsTab==="voice" && (<>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 2px"}}>
+                  <div style={{flex:1,paddingRight:10}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Say "Sono" to Wake</div>
+                    <div style={{fontSize:12,color:"#8e9297",marginTop:2,lineHeight:1.5}}>Keep voice control on every time you open Drive mode, so you can talk to your Co-Pilot hands-free without tapping the mic first. This setting saves.</div>
+                  </div>
+                  <button onClick={()=>setDriveSayWakeEnabled(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:driveSayWakeEnabled?OR:"#333",position:"relative",flexShrink:0,padding:0}}>
+                    <div style={{position:"absolute",top:2,left:driveSayWakeEnabled?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+                  </button>
+                </div>
+              </>)}
+
+              <button onClick={()=>setShowWidgetSettings(false)} style={{width:"100%",padding:"10px",marginTop:14,borderRadius:9,background:"none",border:"1px solid #333",color:"#8e9297",cursor:"pointer",fontSize:13,fontFamily:F}}>Close</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  });
 
 
   /* ── MODALS ── */
   const MusicModal = useStablePanel(() => {
-    if (!showMusic) return null;
+    // Hooks always run first, unconditionally — this used to "if (!showMusic)
+    // return null" BEFORE the useState/useEffect calls below, which breaks
+    // React's Rules of Hooks (a different number of hooks run depending on
+    // showMusic). Since this component never actually unmounts (it's always
+    // in the tree; see useStablePanel above), that mismatch made React
+    // silently drop this component's hook state and remount it fresh every
+    // single time it opened — including mid-session tab/drag state. All
+    // hooks now run every render; only the returned JSX is conditional.
     const [activeCbLane, setActiveCbLane] = useState(null);
     const [dragY, setDragY] = useState(0);
     const [dragging, setDragging] = useState(false);
@@ -5441,24 +6426,13 @@ export default function SonoLane() {
     // Auto-join: opening CB Radio drops you straight into whichever freeway
     // lane your location currently matches, if any.
     useEffect(() => {
-      if(musicTab==="lanes" && !activeCbLane && currentFreewayId) setActiveCbLane(currentFreewayId);
-    }, [musicTab, currentFreewayId]);
+      if(showMusic && musicTab==="lanes" && !activeCbLane && currentFreewayId) setActiveCbLane(currentFreewayId);
+    }, [showMusic, musicTab, currentFreewayId]);
+    if (!showMusic) return null;
     const onCurrentLane = !!activeCbLane && activeCbLane===currentFreewayId;
-    // Broadcasting on a lane is voice-only (no text) — a finished broadcast
-    // gets "transcribed & summarized" into a traffic report on that lane so
-    // it's visible to anyone browsing lanes later without joining the call,
-    // and (most of the time) draws a simulated reply from another CB'er.
-    const pushReport = (laneId, handle, color) => {
-      const rep = TRAFFIC_REPORTS[Math.floor(Math.random()*TRAFFIC_REPORTS.length)];
-      setLaneTrafficUpdates(m=>({...m,[laneId]:[{id:Date.now()+Math.random(),icon:rep.icon,text:rep.text,handle,color,ts:Date.now()},...(m[laneId]||[])]}));
-    };
-    const broadcastOnLane = (laneId) => {
-      pushReport(laneId, userName||"You", OR);
-      if(Math.random()<0.7){
-        const h = CB_HANDLES[Math.floor(Math.random()*CB_HANDLES.length)];
-        setTimeout(()=>pushReport(laneId, h.name, h.color), 1500+Math.random()*1500);
-      }
-    };
+    // Broadcasting on a lane (pushReport/broadcastOnLane) is shared at the
+    // top level now — Drive mode's inline CB Radio app uses the same two
+    // functions, so a broadcast reads the same everywhere.
     const switchTab = (id) => {
       setMusicTab(id);
       memStore.setItem("sl_radioTab", id);
@@ -5488,19 +6462,19 @@ export default function SonoLane() {
           <div style={{width:36,height:4,background:"#333",borderRadius:2,margin:"8px auto 6px"}}/>
           <div style={{padding:"4px 16px 10px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #1f1f1f"}}>
             <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{TABS.find(t=>t.id===musicTab)?.label}</div>
+              <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>{TABS.find(t=>t.id===musicTab)?.label}</div>
             </div>
-            <button onClick={closeSheet} style={{width:30,height:30,borderRadius:"50%",background:"#1a1a1a",border:"none",color:"#666",cursor:"pointer",fontSize:15}}>×</button>
+            <button onClick={closeSheet} style={{width:30,height:30,borderRadius:"50%",background:"#1a1a1a",border:"none",color:"#666",cursor:"pointer",fontSize:17}}>×</button>
           </div>
         </div>
 
         {/* ── CB RADIO — lane list ── */}
         {musicTab==="lanes" && !activeCbLane && (
           <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-            <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
+            <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
               {appRadius ? "NEARBY FREEWAY LANES · "+appRadius+" MI" : "ALL FREEWAY LANES"}
             </div>
-            <div style={{fontSize:10,color:currentFreewayId?"#23a55a":"#666",marginBottom:10,lineHeight:1.5}}>
+            <div style={{fontSize:12,color:currentFreewayId?"#23a55a":"#666",marginBottom:10,lineHeight:1.5}}>
               {currentFreewayId
                 ? "📍 You're on "+CB_CITY_LANES.find(l=>l.id===currentFreewayId)?.name+" — you can talk on that lane."
                 : "🔒 You can view any lane here, but can only talk once your location matches that freeway."}
@@ -5515,23 +6489,23 @@ export default function SonoLane() {
                   marginBottom:8,borderRadius:14,border:"none",cursor:"pointer",fontFamily:F,
                   background:"#181818",textAlign:"left",
                 }}>
-                  <div style={{width:48,height:48,borderRadius:12,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📡</div>
+                  <div style={{width:48,height:48,borderRadius:12,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📡</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-                      <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>{lane.name}</span>
+                      <span style={{fontSize:16,fontWeight:800,color:"#fff"}}>{lane.name}</span>
                       <div style={{width:5,height:5,borderRadius:"50%",background:here?"#23a55a":"#555"}}/>
-                      <span style={{fontSize:8,color:here?"#23a55a":"#666",fontWeight:700}}>{here?"YOU'RE HERE":"VIEW ONLY"}</span>
+                      <span style={{fontSize:10,color:here?"#23a55a":"#666",fontWeight:700}}>{here?"YOU'RE HERE":"VIEW ONLY"}</span>
                     </div>
-                    <div style={{fontSize:10,color:"#555"}}>{lane.desc}</div>
+                    <div style={{fontSize:12,color:"#555"}}>{lane.desc}</div>
                     {last
-                      ? <div style={{fontSize:9,color:"#888",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last.icon} "{last.text}" · {timeAgo(last.ts)}</div>
-                      : <div style={{fontSize:9,color:"#3a3a3a",marginTop:3,fontStyle:"italic"}}>No recent updates</div>}
+                      ? <div style={{fontSize:11,color:"#888",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last.icon} "{last.text}" · {timeAgo(last.ts)}</div>
+                      : <div style={{fontSize:11,color:"#3a3a3a",marginTop:3,fontStyle:"italic"}}>No recent updates</div>}
                   </div>
-                  <div style={{fontSize:18,color:"#333"}}>›</div>
+                  <div style={{fontSize:20,color:"#333"}}>›</div>
                 </button>
               );
             })}
-            {appRadius && <div style={{fontSize:9,color:"#444",textAlign:"center",paddingTop:4}}>Radius: {appRadius} mi · <button onClick={()=>{setShowMusic(false);go("profile");setTimeout(()=>setSubPanel("settings"),100);}} style={{background:"none",border:"none",color:OR,fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change</button></div>}
+            {appRadius && <div style={{fontSize:11,color:"#444",textAlign:"center",paddingTop:4}}>Radius: {appRadius} mi · <button onClick={()=>{setShowMusic(false);go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{background:"none",border:"none",color:OR,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change</button></div>}
           </div>
         )}
 
@@ -5546,12 +6520,12 @@ export default function SonoLane() {
           return (
           <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             <div style={{padding:"10px 16px",borderBottom:"1px solid #1f1f1f",flexShrink:0,display:"flex",alignItems:"center",gap:10}}>
-              <button onClick={()=>setActiveCbLane(null)} style={{fontSize:18,background:"none",border:"none",color:"#555",cursor:"pointer"}}>←</button>
+              <button onClick={()=>setActiveCbLane(null)} style={{fontSize:20,background:"none",border:"none",color:"#555",cursor:"pointer"}}>←</button>
               <div style={{width:8,height:8,borderRadius:"50%",background:laneObj?.color||OR}}/>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{laneObj?.name}</div><div style={{fontSize:9,color:"#555"}}>{laneObj?.desc}</div></div>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#fff"}}>{laneObj?.name}</div><div style={{fontSize:11,color:"#555"}}>{laneObj?.desc}</div></div>
               <div style={{display:"flex",alignItems:"center",gap:3,background:onCurrentLane?"#23a55a22":"#66666622",borderRadius:20,padding:"3px 8px"}}>
                 <div style={{width:5,height:5,borderRadius:"50%",background:onCurrentLane?"#23a55a":"#666",...(onCurrentLane?{animation:"pulse 1s infinite"}:{})}}/>
-                <span style={{fontSize:8,color:onCurrentLane?"#23a55a":"#888",fontWeight:700}}>{onCurrentLane?"LIVE":"BROWSING"}</span>
+                <span style={{fontSize:10,color:onCurrentLane?"#23a55a":"#888",fontWeight:700}}>{onCurrentLane?"LIVE":"BROWSING"}</span>
               </div>
             </div>
 
@@ -5560,31 +6534,31 @@ export default function SonoLane() {
               <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 24px"}}>
                 <div style={{position:"relative",width:120,height:120,marginBottom:18}}>
                   <div style={{position:"absolute",inset:0,borderRadius:"50%",background:(laneObj?.color||OR)+"22",animation:"pulse 1.6s infinite"}}/>
-                  <div style={{position:"absolute",inset:14,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40}}>📡</div>
+                  <div style={{position:"absolute",inset:14,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:42}}>📡</div>
                 </div>
-                <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:4}}>Connected — ready to talk</div>
-                <div style={{fontSize:11,color:"#666",textAlign:"center",lineHeight:1.6,marginBottom:6}}>You're live on {laneObj?.name}. Hold the button below to broadcast.</div>
-                <div style={{fontSize:10,color:"#444",fontWeight:700}}>🎧 {riders} riders connected</div>
+                <div style={{fontSize:17,fontWeight:800,color:"#fff",marginBottom:4}}>Connected — ready to talk</div>
+                <div style={{fontSize:13,color:"#666",textAlign:"center",lineHeight:1.6,marginBottom:6}}>You're live on {laneObj?.name}. Hold the button below to broadcast.</div>
+                <div style={{fontSize:12,color:"#444",fontWeight:700}}>🎧 {riders} riders connected</div>
               </div>
             ) : (
               /* ── Browsing (not on this freeway) — read-only transcribed/summarized
                    traffic reports, so conditions can be checked before driving ── */
               <div style={{flex:1,overflowY:"auto",padding:"12px 14px"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",marginBottom:12,borderRadius:10,background:"#181818"}}>
-                  <span style={{fontSize:15}}>🔒</span>
-                  <span style={{fontSize:10,color:"#888",lineHeight:1.5}}>Get on {laneObj?.name} to join the live call. Meanwhile, here's what's been reported recently.</span>
+                  <span style={{fontSize:17}}>🔒</span>
+                  <span style={{fontSize:12,color:"#888",lineHeight:1.5}}>Get on {laneObj?.name} to join the live call. Meanwhile, here's what's been reported recently.</span>
                 </div>
                 {updates.length===0 ? (
                   <div style={{textAlign:"center",color:"#444",paddingTop:30}}>
-                    <div style={{fontSize:24,marginBottom:6}}>📡</div>
-                    <div style={{fontSize:11}}>No recent updates on this lane.</div>
+                    <div style={{fontSize:26,marginBottom:6}}>📡</div>
+                    <div style={{fontSize:13}}>No recent updates on this lane.</div>
                   </div>
                 ) : updates.map(u=>(
                   <div key={u.id} style={{display:"flex",gap:10,padding:"11px 12px",marginBottom:8,borderRadius:12,background:"#181818"}}>
-                    <div style={{fontSize:18,flexShrink:0}}>{u.icon}</div>
+                    <div style={{fontSize:20,flexShrink:0}}>{u.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,color:"#ddd",lineHeight:1.5,marginBottom:3}}>{u.text}</div>
-                      <div style={{fontSize:9,color:"#555"}}><span style={{color:u.color,fontWeight:700}}>{u.handle}</span> · {timeAgo(u.ts)}</div>
+                      <div style={{fontSize:14,color:"#ddd",lineHeight:1.5,marginBottom:3}}>{u.text}</div>
+                      <div style={{fontSize:11,color:"#555"}}><span style={{color:u.color,fontWeight:700}}>{u.handle}</span> · {timeAgo(u.ts)}</div>
                     </div>
                   </div>
                 ))}
@@ -5598,7 +6572,7 @@ export default function SonoLane() {
                   onMouseUp={()=>{clearInterval(cbTimerRef.current);setCbRecording(false);setCbTimer(0);broadcastOnLane(activeCbLane);}}
                   onTouchStart={e=>{e.preventDefault();setCbRecording(true);setCbTimer(0);cbTimerRef.current=setInterval(()=>setCbTimer(t=>t+1),1000);}}
                   onTouchEnd={e=>{e.preventDefault();clearInterval(cbTimerRef.current);setCbRecording(false);setCbTimer(0);broadcastOnLane(activeCbLane);}}
-                  style={{width:"100%",padding:"14px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,background:cbRecording?"#ed4245":"#23a55a",color:"#fff",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  style={{width:"100%",padding:"14px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,background:cbRecording?"#ed4245":"#23a55a",color:"#fff",fontSize:15,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                   {cbRecording ? (<><span style={{width:7,height:7,borderRadius:"50%",background:"#fff",animation:"pulse 0.5s infinite",display:"block"}}/>{"Broadcasting… "+cbTimer+"s"}</>) : (<><span>{"📡"}</span>{"Hold to Talk"}</>)}
                 </button>
               </div>
@@ -5610,12 +6584,40 @@ export default function SonoLane() {
         {/* ── MY MUSIC — full view ── */}
         {musicTab==="music" && (
           <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-            <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>STREAMING SERVICES</div>
+            {/* Now Playing — a real Spotify connection needs Spotify's own
+                developer OAuth key, which we don't have, so once you connect
+                below this drives an actually-ticking player (real elapsed
+                time, auto-advancing tracks) instead of a static mockup. */}
+            {spotifyLinked && (
+              <div style={{background:"linear-gradient(160deg,"+SPOTIFY_TRACKS[spotifyTrackIdx].color+",#111)",borderRadius:16,padding:"16px",marginBottom:16}}>
+                <div style={{fontSize:10,color:"#fff",opacity:0.8,fontWeight:700,letterSpacing:1.2,marginBottom:10}}>🎧 NOW PLAYING</div>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+                  <div style={{width:52,height:52,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🎵</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:16,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{SPOTIFY_TRACKS[spotifyTrackIdx].title}</div>
+                    <div style={{fontSize:13,color:"#fff",opacity:0.85,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{SPOTIFY_TRACKS[spotifyTrackIdx].artist}</div>
+                  </div>
+                </div>
+                <div style={{width:"100%",height:4,borderRadius:2,background:"rgba(255,255,255,0.25)",overflow:"hidden",marginBottom:6}}>
+                  <div style={{height:"100%",background:"#fff",width:(spotifyElapsed/SPOTIFY_TRACKS[spotifyTrackIdx].dur*100)+"%"}}/>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#fff",opacity:0.75,marginBottom:12}}>
+                  <span>{Math.floor(spotifyElapsed/60)}:{String(spotifyElapsed%60).padStart(2,"0")}</span>
+                  <span>{Math.floor(SPOTIFY_TRACKS[spotifyTrackIdx].dur/60)}:{String(SPOTIFY_TRACKS[spotifyTrackIdx].dur%60).padStart(2,"0")}</span>
+                </div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:22}}>
+                  <button onClick={()=>{setSpotifyTrackIdx(i=>(i-1+SPOTIFY_TRACKS.length)%SPOTIFY_TRACKS.length);setSpotifyElapsed(0);}} style={{background:"none",border:"none",color:"#fff",fontSize:20,cursor:"pointer"}}>⏮</button>
+                  <button onClick={()=>setSpotifyPlaying(p=>!p)} style={{width:44,height:44,borderRadius:"50%",background:"#fff",border:"none",color:"#111",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{spotifyPlaying?"⏸":"▶️"}</button>
+                  <button onClick={()=>{setSpotifyTrackIdx(i=>(i+1)%SPOTIFY_TRACKS.length);setSpotifyElapsed(0);}} style={{background:"none",border:"none",color:"#fff",fontSize:20,cursor:"pointer"}}>⏭</button>
+                </div>
+              </div>
+            )}
+            <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>STREAMING SERVICES</div>
             {[{name:"Spotify",color:"#1DB954",icon:"🎧",linked:spotifyLinked,set:setSpotifyLinked},{name:"Apple Music",color:"#fc3c44",icon:"🎶",linked:appleOn,set:setAppleOn}].map(svc=>(
               <div key={svc.name} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:44,height:44,borderRadius:11,background:svc.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{svc.icon}</div>
-                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{svc.name}</div><div style={{fontSize:10,color:svc.linked?svc.color:"#555"}}>{svc.linked?"Connected":"Not connected"}</div></div>
-                <button onClick={()=>svc.set(l=>!l)} style={{padding:"7px 14px",borderRadius:20,fontSize:11,fontWeight:700,background:svc.linked?"#2a2a2a":svc.color,color:svc.linked?"#ef4444":"#fff",border:"none",cursor:"pointer",fontFamily:F}}>{svc.linked?"Unlink":"Connect"}</button>
+                <div style={{width:44,height:44,borderRadius:11,background:svc.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{svc.icon}</div>
+                <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{svc.name}</div><div style={{fontSize:12,color:svc.linked?svc.color:"#555"}}>{svc.linked?"Connected":"Not connected"}</div></div>
+                <button onClick={()=>svc.set(l=>!l)} style={{padding:"7px 14px",borderRadius:20,fontSize:13,fontWeight:700,background:svc.linked?"#2a2a2a":svc.color,color:svc.linked?"#ef4444":"#fff",border:"none",cursor:"pointer",fontFamily:F}}>{svc.linked?"Unlink":"Connect"}</button>
               </div>
             ))}
           </div>
@@ -5624,66 +6626,66 @@ export default function SonoLane() {
         {/* ── NEARBY STATIONS — full view (also hosts My Broadcast / registration) ── */}
         {musicTab==="nearby" && (
           <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-            <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MY BROADCAST</div>
+            <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MY BROADCAST</div>
             {isBroad ? (
               <div style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:14,padding:"14px",display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
                 <div style={{width:12,height:12,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0}}/>
-                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:10,color:"#666"}}>Broadcasting live now</div></div>
-                <button onClick={()=>setIsBroad(false)} style={{padding:"6px 14px",borderRadius:20,background:"#2a2a2a",border:"none",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
+                <div style={{flex:1}}><div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:12,color:"#666"}}>Broadcasting live now</div></div>
+                <button onClick={()=>setIsBroad(false)} style={{padding:"6px 14px",borderRadius:20,background:"#2a2a2a",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
               </div>
             ) : radioHosts.length>0 ? (
               <div style={{marginBottom:18}}>
                 {radioHosts.map((h,i)=>(
                   <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{width:44,height:44,borderRadius:11,background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📻</div>
-                    <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{h.name}</div><div style={{fontSize:10,color:"#555"}}>{h.genre} · @{h.handle}</div></div>
-                    <button onClick={()=>{setBroadName(h.name);setIsBroad(true);}} style={{padding:"6px 12px",borderRadius:20,background:"#ef4444",color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>Go Live</button>
+                    <div style={{width:44,height:44,borderRadius:11,background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
+                    <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{h.name}</div><div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div></div>
+                    <button onClick={()=>{setBroadName(h.name);setIsBroad(true);}} style={{padding:"6px 12px",borderRadius:20,background:"#ef4444",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Go Live</button>
                   </div>
                 ))}
               </div>
             ) : !showReg ? (
-              <button onClick={()=>setShowReg(true)} style={{width:"100%",padding:"14px",borderRadius:14,background:"transparent",border:"1.5px dashed #ef444466",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:18}}>📻 Register as Radio Host</button>
+              <button onClick={()=>setShowReg(true)} style={{width:"100%",padding:"14px",borderRadius:14,background:"transparent",border:"1.5px dashed #ef444466",color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:18}}>📻 Register as Radio Host</button>
             ) : null}
 
             {showReg && (
               <div style={{background:"#181818",borderRadius:14,padding:"16px",marginBottom:18}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:12}}>Host Registration</div>
+                <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:12}}>Host Registration</div>
                 <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                   {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
-                    <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#222",color:hostForm.genre===g?"#fff":"#666",border:"none",fontFamily:F}}>{g}</button>
+                    <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#222",color:hostForm.genre===g?"#fff":"#666",border:"none",fontFamily:F}}>{g}</button>
                   ))}
                 </div>
                 <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
                 <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",resize:"none",marginBottom:12}}/>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
+                  <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
                   <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#222",border:"1px solid #333",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
                 </div>
               </div>
             )}
 
-            <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
+            <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
               {appRadius ? "RADIO HOSTS · "+appRadius+" MI" : "ALL RADIO HOSTS"}
             </div>
             {radioHosts.length===0 ? (
               <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
-                <div style={{fontSize:36,marginBottom:10}}>📻</div>
-                <div style={{fontSize:13,fontWeight:700,color:"#666",marginBottom:6}}>No stations nearby yet</div>
-                <div style={{fontSize:11,color:"#444",marginBottom:14}}>Be the first to register a station above.</div>
+                <div style={{fontSize:38,marginBottom:10}}>📻</div>
+                <div style={{fontSize:15,fontWeight:700,color:"#666",marginBottom:6}}>No stations nearby yet</div>
+                <div style={{fontSize:13,color:"#444",marginBottom:14}}>Be the first to register a station above.</div>
               </div>
             ) : radioHosts.map((h,i)=>(
               <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:48,height:48,borderRadius:12,background:OR+"22",border:"1.5px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
+                <div style={{width:48,height:48,borderRadius:12,background:OR+"22",border:"1.5px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📻</div>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{h.name}</div>
-                  <div style={{fontSize:10,color:"#555"}}>{h.genre} · @{h.handle}</div>
-                  {h.bio && <div style={{fontSize:10,color:"#444",marginTop:3}}>{h.bio}</div>}
+                  <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{h.name}</div>
+                  <div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div>
+                  {h.bio && <div style={{fontSize:12,color:"#444",marginTop:3}}>{h.bio}</div>}
                 </div>
-                <button onClick={()=>toggleSavedStation(h.name)} title={savedStations.includes(h.name)?"Remove from saved stations":"Save station"} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#555",fontSize:16,cursor:"pointer",padding:4,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
+                <button onClick={()=>toggleSavedStation(h.name)} title={savedStations.includes(h.name)?"Remove from saved stations":"Save station"} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#555",fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
                 {isBroad&&broadName===h.name
-                  ? (<div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/><span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>LIVE</span></div>)
-                  : (<button style={{padding:"6px 12px",borderRadius:20,background:"#2a2a2a",color:"#888",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Listen</button>)}
+                  ? (<div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/><span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span></div>)
+                  : (<button style={{padding:"6px 12px",borderRadius:20,background:"#2a2a2a",color:"#888",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Listen</button>)}
               </div>
             ))}
           </div>
@@ -5697,8 +6699,8 @@ export default function SonoLane() {
                 flex:1,padding:"10px 4px 8px",border:"none",cursor:"pointer",fontFamily:F,
                 background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:3,
               }}>
-                <span style={{fontSize:19,opacity:musicTab===t.id?1:0.4}}>{t.icon}</span>
-                <span style={{fontSize:9,fontWeight:musicTab===t.id?800:500,color:musicTab===t.id?OR:"#555"}}>{t.label}</span>
+                <span style={{fontSize:21,opacity:musicTab===t.id?1:0.4}}>{t.icon}</span>
+                <span style={{fontSize:11,fontWeight:musicTab===t.id?800:500,color:musicTab===t.id?OR:"#555"}}>{t.label}</span>
                 {musicTab===t.id && <div style={{width:16,height:2,borderRadius:1,background:OR,marginTop:1}}/>}
               </button>
             ))}
@@ -5710,24 +6712,52 @@ export default function SonoLane() {
   });
   const WidgetPicker = useStablePanel(() => {
     if (!widgetEdit) return null;
+    const curOnlyOn = widgetEdit==="1"?widget1OnlyOn:widgetEdit==="2"?widget2OnlyOn:widget3OnlyOn;
+    const setCurOnlyOn = widgetEdit==="1"?setWidget1OnlyOn:widgetEdit==="2"?setWidget2OnlyOn:setWidget3OnlyOn;
+    const curWidget = widgetEdit==="1"?widget1:widgetEdit==="2"?widget2:widget3;
+    // Back returns to the small ⚙️ widgets list if that's where this was
+    // opened from (Drive mode); otherwise it just closes, same as Done.
+    const closePicker = () => {
+      setWidgetEdit(null);
+      if(widgetEditFrom==="drive") setShowWidgetSettings(true);
+      setWidgetEditFrom(null);
+    };
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:600,display:"flex",alignItems:"flex-end"}} onClick={()=>setWidgetEdit(null)}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:600,display:"flex",alignItems:"flex-end"}} onClick={closePicker}>
         <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
           <div style={{width:30,height:3,background:"#e8e8e8",borderRadius:2,margin:"0 auto 14px"}}/>
-          <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:12}}>{widgetEdit==="left"?"Left":"Right"} Widget</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <button onClick={closePicker} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer",padding:0}}>←</button>
+            <div style={{fontSize:15,fontWeight:800,color:"#111",flex:1}}>{widgetEdit==="1"?"Top":widgetEdit==="2"?"Mid":"Bottom"} Widget</div>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-            {[["weather","☀️","Weather"],["music","🎵","Now Playing"],["cbradio","📡","CB Radio"],["points","⭐","Star Points"],["friends","👥","Friends"],["routes","🗺️","My Routes"],["dashcam","📹","Dashcam"],["none","＋","Empty"]].map(([id,ic,label])=>{
-              const cur=widgetEdit==="left"?leftWidget:rightWidget;
+            {[["weather","☀️","Weather"],["music","🎵","My Music"],["spotify","🎧","Spotify"],["cbradio","📡","CB Radio"],["points","⭐","Star Points"],["friends","👥","Friends"],["topfriends","👥","Top 3 Friends"],["routes","🗺️","My Routes"],["dashcam","📹","Dashcam"],["none","＋","Empty"]].map(([id,ic,label])=>{
+              const cur=widgetEdit==="1"?widget1:widgetEdit==="2"?widget2:widget3;
               return (
-                <button key={id} onClick={()=>{if(widgetEdit==="left")setLeftWidget(id);else setRightWidget(id);setWidgetEdit(null);}}
+                <button key={id} onClick={()=>{if(widgetEdit==="1")setWidget1(id);else if(widgetEdit==="2")setWidget2(id);else setWidget3(id);}}
                   style={{padding:"14px 10px",borderRadius:12,border:"2px solid "+(cur===id?OR:"#ebebeb"),background:cur===id?OR+"08":"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-                  <div style={{marginBottom:4}}>{id==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={22}/>:<span style={{fontSize:22}}>{ic}</span>}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:cur===id?OR:"#111"}}>{label}</div>
+                  <div style={{marginBottom:4}}>{id==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={22}/>:<span style={{fontSize:24}}>{ic}</span>}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:cur===id?OR:"#111"}}>{label}</div>
                 </button>
               );
             })}
           </div>
-          <button onClick={()=>setWidgetEdit(null)} style={{width:"100%",padding:"10px",marginTop:12,borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:11,fontFamily:F}}>Cancel</button>
+          {/* For every widget except Empty, this hides the slot until it's
+              actually active (dashcam recording, Spotify playing, etc.). For
+              Empty specifically there's no "active" state, so the toggle
+              simply hides it outright — either way the other widget(s)
+              stretch to fill the freed space since each is just an equal
+              flex slot in the same row/column. */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 2px 2px",marginTop:10,borderTop:"1px solid #ebebeb"}}>
+            <div style={{flex:1,paddingRight:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{curWidget==="none"?"Hide this slot":"Only show when turned on"}</div>
+              <div style={{fontSize:11,color:"#111",marginTop:2,lineHeight:1.5}}>{curWidget==="none"?"Remove this empty slot from the bar so the other widget(s) split the space between them.":"Hide this slot until it's active — the other widgets stretch to fill the space."}</div>
+            </div>
+            <button onClick={()=>setCurOnlyOn(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:curOnlyOn?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+              <div style={{position:"absolute",top:2,left:curOnlyOn?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+            </button>
+          </div>
+          <button onClick={closePicker} style={{width:"100%",padding:"10px",marginTop:12,borderRadius:9,background:OR,border:"none",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:F}}>Done</button>
         </div>
       </div>
     );
@@ -5753,18 +6783,18 @@ export default function SonoLane() {
   const TopNav = () => {
     const onLanes = panel==="create";
     return (
-    <div style={{flexShrink:0,display:"flex",gap:4,padding:"6px 8px",paddingBottom:"calc(6px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+    <div style={{flexShrink:0,display:"flex",gap:4,padding:"3px 8px",paddingBottom:"calc(2px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
       {TOPNAV_ITEMS.map(it=>{
         const active = panel===it.id;
         const color = DPAD_COLORS[it.iconId];
         return (
           <button key={it.id} onClick={()=>go(it.id)} style={{
             flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-            padding:"7px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,
+            padding:"5px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,
             background:active?color+"14":"transparent",
           }}>
             {it.id==="profile" ? <CompassStar size={17} color={color}/> : <DPadIcon id={it.iconId} color={color} size={17}/>}
-            <span style={{fontSize:11,fontWeight:active?800:600,color:active?color:(onLanes?"#8e9297":"#888")}}>{it.label}</span>
+            <span style={{fontSize:13,fontWeight:active?800:600,color:active?color:(onLanes?"#8e9297":"#888")}}>{it.label}</span>
           </button>
         );
       })}
@@ -5778,7 +6808,7 @@ export default function SonoLane() {
   if (isSupabaseConfigured && !authChecked) {
     return (
       <div style={{width:"100%",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
-        <div style={{fontSize:36}}>🚗</div>
+        <img src={STAR_LOGO} alt="" style={{width:44,height:44,borderRadius:10}}/>
       </div>
     );
   }
@@ -5819,22 +6849,57 @@ export default function SonoLane() {
 
       {panel!=="drive" && <TopNav/>}
 
-      {showAgent && (
-        <div style={{position:"fixed",bottom:panel==="drive"?132:16,left:8,right:8,zIndex:400,background:"#fff",borderRadius:14,border:"1.5px solid "+pal.color+"44",boxShadow:"0 4px 24px "+pal.color+"22"}}>
-          <div style={{padding:"10px 12px",borderBottom:"1px solid "+pal.color+"22",display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:16}}>{pal.emoji}</span>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{pal.name}</div>
-              <div style={{fontSize:9,color:"#111"}}>{pal.desc}</div>
+      {/* Voice control is purely settings-driven now — no on-screen mic
+          button anywhere, in or out of Drive mode. Drive mode's own "Say
+          Sono to Wake" toggle (Drive mode Settings) governs it in Drive
+          mode; the Profile > AI toggle governs it everywhere else. This
+          banner is just a passive "it's listening" indicator, matching the
+          one built into Drive mode's own dashboard. */}
+      {panel!=="drive" && voiceOn && (
+        <div style={{position:"fixed",left:0,right:0,bottom:"calc(58px + env(safe-area-inset-bottom, 0px))",zIndex:150,padding:"3px 12px",background:"#fff9f5",borderTop:"1px solid #fde8d8",display:"flex",alignItems:"center",gap:6}}>
+          <span style={{width:5,height:5,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0,display:"block"}}/>
+          <span style={{fontSize:10,color:OR,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{voiceText || "Listening… say \"Sono\" for the AI, or a number to tap a button"}</span>
+        </div>
+      )}
+
+      {/* AI Co-Pilot voice call — a full-screen takeover so it works the same
+          from wherever it was started (My Profile's Top 3 row). */}
+      {aiCallOpen && (
+        <div style={{position:"fixed",inset:0,background:"linear-gradient(160deg,"+pal.color+",#111)",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",padding:"48px 24px",boxSizing:"border-box",paddingTop:"calc(48px + env(safe-area-inset-top, 0px))",paddingBottom:"calc(32px + env(safe-area-inset-bottom, 0px))"}}>
+          <div style={{textAlign:"center",marginTop:20}}>
+            <div style={{width:96,height:96,borderRadius:"50%",background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",boxShadow:aiCallSpeaking?"0 0 0 10px rgba(255,255,255,0.15)":aiCallListening?"0 0 0 6px rgba(255,255,255,0.1)":"none",transition:"box-shadow 0.3s ease"}}>
+              <CompassStar size={48} color="#fff"/>
             </div>
-            <button onClick={()=>setShowAgent(false)} style={{fontSize:16,background:"none",border:"none",color:"#111",cursor:"pointer"}}>×</button>
+            <div style={{fontSize:22,fontWeight:800,color:"#fff"}}>{pal.name}</div>
+            <div style={{fontSize:14,color:"rgba(255,255,255,0.75)",marginTop:6}}>
+              {!(window.SpeechRecognition||window.webkitSpeechRecognition)
+                ? "Voice input isn't supported in this browser"
+                : aiCallSpeaking ? "Speaking…" : aiCallListening ? "Listening…" : "…"}
+            </div>
+          </div>
+          <div style={{width:"100%",maxHeight:"35%",overflowY:"auto",textAlign:"center"}}>
+            {aiCallInterim && <div style={{fontSize:15,color:"rgba(255,255,255,0.85)",fontStyle:"italic",lineHeight:1.5}}>{aiCallInterim}</div>}
+          </div>
+          <button onClick={endAiCall} style={{width:64,height:64,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:26,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(239,68,68,0.5)"}}>✕</button>
+        </div>
+      )}
+
+      {showAgent && (
+        <div style={{position:"fixed",bottom:panel==="drive"?58:16,left:8,right:8,zIndex:400,background:"#fff",borderRadius:14,border:"1.5px solid "+pal.color+"44",boxShadow:"0 4px 24px "+pal.color+"22"}}>
+          <div style={{padding:"10px 12px",borderBottom:"1px solid "+pal.color+"22",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:18}}>{pal.emoji}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{pal.name}</div>
+              <div style={{fontSize:11,color:"#111"}}>{pal.desc}</div>
+            </div>
+            <button onClick={()=>setShowAgent(false)} style={{fontSize:18,background:"none",border:"none",color:"#111",cursor:"pointer"}}>×</button>
           </div>
           <div style={{padding:"8px 12px",maxHeight:80,overflowY:"auto"}}>
-            {roadMsgs.slice(-2).map((m,i)=><div key={i} style={{fontSize:10,color:"#111",padding:"3px 0",lineHeight:1.5}}>{pal.emoji} {m}</div>)}
+            {roadMsgs.slice(-2).map((m,i)=><div key={i} style={{fontSize:12,color:"#111",padding:"3px 0",lineHeight:1.5}}>{pal.emoji} {m}</div>)}
           </div>
           <div style={{padding:"8px 12px 10px",display:"flex",gap:5}}>
             <input value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){sendChat();setShowAgent(false);}}} placeholder={"Ask "+pal.name+"…"} style={{...INP,flex:1}} autoFocus/>
-            <button onClick={()=>{sendChat();setShowAgent(false);}} style={{padding:"7px 12px",borderRadius:8,background:pal.color,color:"#fff",border:"none",fontSize:11,fontWeight:800,cursor:"pointer"}}>↑</button>
+            <button onClick={()=>{sendChat();setShowAgent(false);}} style={{padding:"7px 12px",borderRadius:8,background:pal.color,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer"}}>↑</button>
           </div>
         </div>
       )}
@@ -5846,19 +6911,19 @@ export default function SonoLane() {
             <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
             {widgetAction==="weather" && <>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",gap:10}}>
-                <div style={{fontSize:28}}>{weather.icon}</div>
-                <div><div style={{fontSize:20,fontWeight:900,color:"#111"}}>{weather.temp}°F <span style={{fontSize:13,fontWeight:400,color:"#111"}}>{weather.cond}</span></div><div style={{fontSize:10,color:"#111"}}>Los Angeles, CA</div></div>
+                <div style={{fontSize:30}}>{weather.icon}</div>
+                <div><div style={{fontSize:22,fontWeight:900,color:"#111"}}>{weather.temp}°F <span style={{fontSize:15,fontWeight:400,color:"#111"}}>{weather.cond}</span></div><div style={{fontSize:12,color:"#111"}}>Los Angeles, CA</div></div>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px"}}>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>7-DAY FORECAST</div>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>7-DAY FORECAST</div>
                 {FORECAST.map((d,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <div style={{width:40,fontSize:11,fontWeight:700,color:"#111"}}>{d.day}</div>
-                    <div style={{fontSize:18,marginRight:10}}>{d.icon}</div>
+                    <div style={{width:40,fontSize:13,fontWeight:700,color:"#111"}}>{d.day}</div>
+                    <div style={{fontSize:20,marginRight:10}}>{d.icon}</div>
                     <div style={{flex:1,height:4,borderRadius:2,background:"#f0f0f0",overflow:"hidden"}}>
                       <div style={{height:"100%",borderRadius:2,background:"linear-gradient(90deg,#60a5fa,#f97316)",width:((d.hi-55)/(78-55)*100)+"%"}}/>
                     </div>
-                    <div style={{width:60,textAlign:"right",fontSize:11}}>
+                    <div style={{width:60,textAlign:"right",fontSize:13}}>
                       <span style={{fontWeight:700,color:"#111"}}>{d.hi}°</span>
                       <span style={{color:"#111",marginLeft:4}}>{d.lo}°</span>
                     </div>
@@ -5868,68 +6933,68 @@ export default function SonoLane() {
             </>}
             {widgetAction==="points" && <>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-                <div style={{fontSize:16,fontWeight:800,color:"#111"}}>⭐ Star Points</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#111"}}>⭐ Star Points</div>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px"}}>
                 <div style={{textAlign:"center",padding:"16px 0 20px"}}>
-                  <div style={{fontSize:52,fontWeight:900,color:"#f59e0b",lineHeight:1}}>{pts}</div>
-                  <div style={{fontSize:12,color:"#111",marginTop:4}}>Level {Math.floor(pts/200)} · {200-(pts%200)} pts to next level</div>
+                  <div style={{fontSize:54,fontWeight:900,color:"#f59e0b",lineHeight:1}}>{pts}</div>
+                  <div style={{fontSize:14,color:"#111",marginTop:4}}>Level {Math.floor(pts/200)} · {200-(pts%200)} pts to next level</div>
                   <div style={{height:6,borderRadius:3,background:"#f3f3f3",margin:"12px 0 0",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:"#f59e0b",width:((pts%200)/200*100)+"%"}}/></div>
                 </div>
-                <div style={{fontSize:9,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>HOW TO EARN</div>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>HOW TO EARN</div>
                 {[["🚗","Complete a drive","50 pts"],["📍","Log a route","25 pts"],["👥","Add a friend","10 pts"],["⚡","Create an event","30 pts"],["🎙","Use voice mode","5 pts"]].map(([ic,l,v])=>(
                   <div key={l} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <div style={{fontSize:18}}>{ic}</div>
-                    <div style={{flex:1,fontSize:11,color:"#111"}}>{l}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:"#f59e0b"}}>{v}</div>
+                    <div style={{fontSize:20}}>{ic}</div>
+                    <div style={{flex:1,fontSize:13,color:"#111"}}>{l}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{v}</div>
                   </div>
                 ))}
               </div>
             </>}
             {widgetAction==="friends" && <>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-                <div style={{fontSize:16,fontWeight:800,color:"#111"}}>👥 Friends</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#111"}}>👥 Friends</div>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px"}}>
                 {friends.length===0?(
                   <div style={{textAlign:"center",padding:"30px 0",color:"#111"}}>
-                    <div style={{fontSize:36,marginBottom:8}}>👥</div>
-                    <div style={{fontSize:12}}>No friends yet.</div>
-                    <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("friends"),100);}} style={{marginTop:12,padding:"8px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Add Friends</button>
+                    <div style={{fontSize:38,marginBottom:8}}>👥</div>
+                    <div style={{fontSize:14}}>No friends yet.</div>
+                    <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("friends"),100);}} style={{marginTop:12,padding:"8px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Add Friends</button>
                   </div>
                 ):friends.map(fr=>(
                   <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
                     <FriendAvatar fr={fr} size={36} fontSize={14}/>
-                    <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:"#111"}}>{fr.name}</div><div style={{fontSize:9,color:"#111"}}>@{fr.handle}</div></div>
+                    <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div><div style={{fontSize:11,color:"#111"}}>@{fr.handle}</div></div>
                   </div>
                 ))}
               </div>
             </>}
             {widgetAction==="routes" && <>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center"}}>
-                <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> My Routes</div>
-                <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"5px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ New</button>
+                <div style={{flex:1,fontSize:18,fontWeight:800,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> My Routes</div>
+                <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"5px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ New</button>
               </div>
               <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px"}}>
                 {routes.length===0?(
                   <div style={{textAlign:"center",padding:"30px 0",color:"#111"}}>
-                    <div style={{fontSize:36,marginBottom:8}}>🗺️</div>
-                    <div style={{fontSize:12,marginBottom:12}}>No routes saved yet.</div>
-                    <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"8px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save a Route</button>
+                    <div style={{fontSize:38,marginBottom:8}}>🗺️</div>
+                    <div style={{fontSize:14,marginBottom:12}}>No routes saved yet.</div>
+                    <button onClick={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{padding:"8px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save a Route</button>
                   </div>
                 ):routes.map(r=>(
                   <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #f5f5f5"}}>
                     <div style={{width:8,height:8,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#111"}}>{r.title}</div>
-                      <div style={{fontSize:9,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{r.title}</div>
+                      <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
                     </div>
-                    <button onClick={()=>openMaps(r.title)} style={{padding:"5px 10px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶</button>
+                    <button onClick={()=>{setWidgetAction(null);startRouteDirections(r);}} title="Get Directions" style={{padding:"5px 10px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭</button>
                   </div>
                 ))}
               </div>
             </>}
-            <button onClick={()=>setWidgetAction(null)} style={{margin:"0 14px 14px",padding:"10px",borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:11,fontFamily:F,flexShrink:0}}>Close</button>
+            <button onClick={()=>setWidgetAction(null)} style={{margin:"0 14px 14px",padding:"10px",borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:13,fontFamily:F,flexShrink:0}}>Close</button>
           </div>
         </div>
       )}
@@ -5945,17 +7010,17 @@ export default function SonoLane() {
             <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
             <div style={{padding:"4px 20px 24px",overflowY:"auto"}}>
               <div style={{textAlign:"center",marginBottom:14}}>
-                <div style={{fontSize:36,marginBottom:6}}>📹</div>
-                <div style={{fontSize:14,fontWeight:900,color:"#111",marginBottom:4}}>Set Up the Dashcam Widget</div>
-                <div style={{fontSize:11,color:"#111",lineHeight:1.6}}>One-time setup. Once enabled, this widget shows a live recording preview and starts recording automatically the moment you enter Drive mode.</div>
+                <div style={{fontSize:38,marginBottom:6}}>📹</div>
+                <div style={{fontSize:16,fontWeight:900,color:"#111",marginBottom:4}}>Set Up the Dashcam Widget</div>
+                <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>One-time setup. Once enabled, this widget shows a live recording preview and starts recording automatically the moment you enter Drive mode.</div>
               </div>
-              <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"14px",marginBottom:16,fontSize:11,color:"#111",lineHeight:1.7}}>
+              <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"14px",marginBottom:16,fontSize:13,color:"#111",lineHeight:1.7}}>
                 Camera and mic access is used only while SonoLane is open in the foreground. Footage stays on this device and is viewable anytime from Profile → Dashcam, where you can also revoke access.
               </div>
-              <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");setShowDashcamSetup(false);if(panel==="drive")go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
+              <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");setShowDashcamSetup(false);if(panel==="drive")go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
                 I Agree — Enable Dashcam
               </button>
-              <button onClick={()=>setShowDashcamSetup(false)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+              <button onClick={()=>setShowDashcamSetup(false)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>
                 Not Now
               </button>
             </div>
@@ -5981,16 +7046,16 @@ export default function SonoLane() {
               width:44,height:44,borderRadius:12,
               background:"linear-gradient(135deg,#e94560,#f5a623)",
               display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:22,flexShrink:0,
+              fontSize:24,flexShrink:0,
             }}>{newAchQueue[0].icon}</div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:9,color:"#e94560",fontWeight:800,letterSpacing:1.2,marginBottom:2}}>ACHIEVEMENT UNLOCKED</div>
-              <div style={{fontSize:13,fontWeight:900,color:"#fff",marginBottom:1}}>{newAchQueue[0].title}</div>
-              <div style={{fontSize:9,color:"#aaa",lineHeight:1.4}}>{newAchQueue[0].desc}</div>
+              <div style={{fontSize:11,color:"#e94560",fontWeight:800,letterSpacing:1.2,marginBottom:2}}>ACHIEVEMENT UNLOCKED</div>
+              <div style={{fontSize:15,fontWeight:900,color:"#fff",marginBottom:1}}>{newAchQueue[0].title}</div>
+              <div style={{fontSize:11,color:"#aaa",lineHeight:1.4}}>{newAchQueue[0].desc}</div>
             </div>
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,flexShrink:0}}>
-              <span style={{fontSize:13,fontWeight:900,color:"#f5a623"}}>+{newAchQueue[0].pts}</span>
-              <span style={{fontSize:7,color:"#555",fontWeight:600}}>pts</span>
+              <span style={{fontSize:15,fontWeight:900,color:"#f5a623"}}>+{newAchQueue[0].pts}</span>
+              <span style={{fontSize:9,color:"#555",fontWeight:600}}>pts</span>
             </div>
           </div>
         </div>
