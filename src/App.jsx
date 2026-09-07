@@ -388,6 +388,16 @@ const CAR_BODY_STYLES = [
 ];
 // Legacy flat label list kept for anything that still expects plain strings.
 const CAR_MODELS = CAR_BODY_STYLES.map(s=>s.label);
+// Friends don't carry their own saved car data (only you customize a car in
+// this demo) — this derives a stable, deterministic body style for a
+// friend's car-avatar preview from their id, paired with their existing
+// avatar color, so the same friend always shows the same "their car" look.
+const friendCarStyle = (fr) => {
+  const key = String(fr?.id ?? fr?.name ?? "friend");
+  let hash = 0;
+  for (let i=0;i<key.length;i++) hash = (hash*31 + key.charCodeAt(i)) >>> 0;
+  return CAR_BODY_STYLES[hash % CAR_BODY_STYLES.length].id;
+};
 
 // Manufacturer picker — shown as colored wordmark badges (not literal brand
 // marks) so the library covers a wide roster of real manufacturers without
@@ -1104,7 +1114,9 @@ export default function SonoLane() {
   const aiCallSpeakingRef = useRef(false);
   const aiCallRecogRef    = useRef(null);
   const setAiCallSpeaking = v => { aiCallSpeakingRef.current=v; setAiCallSpeakingState(v); };
-  const [subPanel,     setSubPanel]     = useState(null);
+  // Defaults to "garage" so Profile home always lands with the Garage
+  // section of the icon toggle row already expanded, instead of collapsed.
+  const [subPanel,     setSubPanel]     = useState("garage");
   // Car customization — persisted via usePersistedState so it survives
   // closing and reopening the app (a phone install, not just this tab),
   // instead of silently resetting to defaults every time.
@@ -1360,6 +1372,12 @@ export default function SonoLane() {
   // perk; Live Location Sharing below is the only Top 3 perk now.)
   const [pts,          setPts]          = useState(() => parseInt(memStore.getItem("sl_pts")||"0"));
   const [dashOn,       setDashOn]       = useState(false);
+  // camLive: the camera preview stream is open (Dashcam widget shows the
+  // live feed). Independent from dashOn (actually recording a clip) — the
+  // widget shows the camera the whole time you're in Drive mode once
+  // consented, but a clip is only ever saved while dashOn is also true
+  // (i.e. once you're actually moving over 5 mph).
+  const [camLive,      setCamLive]      = useState(false);
   const [dashcamConsent, setDashcamConsent] = useState(()=>memStore.getItem("sl_dashcamConsent")==="1"); // Dashcam ToS/Privacy accepted?
   const [showDashcamSetup, setShowDashcamSetup] = useState(false); // one-time inline setup prompt, opened from the Dashcam widget
   // Separate from consent — lets you keep the dashcam permission granted
@@ -1446,6 +1464,12 @@ export default function SonoLane() {
   const [feedSearch,   setFeedSearch]   = useState("");
   const [evSearch,     setEvSearch]     = useState(""); // Events search — lifted up so the shared TopBar can drive it
   const [laneUserSearch, setLaneUserSearch] = useState(""); // Lanes TopBar — look up users
+  // Where the car detail page was opened from — the hero avatar at the top
+  // of the profile, or a car tile inside My Garage — so its back button (now
+  // the shared TopBar's back button) can return you to wherever you actually
+  // came from instead of always one place. Lifted up so both ProfilePanel
+  // and TopBar can read/set it.
+  const [carDetailFrom, setCarDetailFrom] = useState("profile");
   const [events,       setEvents]       = usePersistedState("sl_events", []);
   // One-time seed: drop the 10 San Diego events into the feed the first time
   // this runs, same pattern as the route posts seed above. Never repeats.
@@ -1522,6 +1546,12 @@ export default function SonoLane() {
   const [tLines,       setTLines]       = useState([]);
   // Lanes chat
   const [activeChan,   setActiveChan]   = useState("notes");
+  // Lanes is now two separate full pages on top of the shared TopBar/TopNav
+  // shell — "list" (the sidebar's chat names, full screen) and "room" (the
+  // full-screen chat for whichever chan is active). Tapping any chat in the
+  // list switches to "room"; the shared TopBar becomes that page's back
+  // button (see BACK_PAGES-style handling in TopBar) to return to "list".
+  const [lanesView,    setLanesView]    = useState("list");
   const [laneMsgs,     setLaneMsgs]     = useState({}); // {laneId: [{id,text,user,initials,color,ts,isVoice,voiceSeconds}]}
   const [showCreateLane,setShowCreateLane]=useState(false);
   const [voiceChatActive, setVoiceChatActive] = useState(null); // chanId currently in voice
@@ -1725,6 +1755,17 @@ export default function SonoLane() {
   const fmt = s => Math.floor(s/60)+":"+(String(s%60).padStart(2,"0"));
   const scrollRef     = useRef(null);
   const swipeStartRef = useRef(null); // {x,y} — page-swipe gesture tracking (Lanes ↔ Home ↔ Discover)
+  const swipeActiveRef = useRef(false); // true once the current drag has been confirmed as a horizontal carousel swipe (vs. a vertical scroll, tap, or a back-page swipe which stays instant/unanimated)
+  // Live drag state for the sliding carousel animation — swipeDX is the raw
+  // finger offset in px (updated continuously while dragging so the page
+  // visually follows the finger 1:1), swipeDir says which neighbor tab is
+  // being revealed ("next" = the tab to the right, "prev" = to the left),
+  // and swipeSettling turns a CSS transition on only for the release
+  // animation (snap to the neighbor, or spring back) — never while the
+  // finger is actually down, so the drag itself never feels laggy.
+  const [swipeDX, setSwipeDX] = useState(0);
+  const [swipeDir, setSwipeDir] = useState(null);
+  const [swipeSettling, setSwipeSettling] = useState(false);
   const voiceActions  = useRef({});   // number -> fn
   const voiceCounter  = useRef(11);   // page-level counter, starts at 11
   const setScroll = el => {
@@ -1771,7 +1812,7 @@ export default function SonoLane() {
   // setDashcamConsent(true) doesn't take effect until the next render, so
   // the `dashcamConsent` closed over here would otherwise still read false
   // for the rest of this same click handler.
-  const go = (p, { forceDashcamConsent, directions } = {}) => {
+  const go = (p, { forceDashcamConsent, directions, lanesRoom } = {}) => {
     // Exiting Drive mode while the dashcam is recording stops & saves the
     // clip — recording runs continuously for the whole drive regardless of
     // momentary speed, and only ends when Drive mode itself ends.
@@ -1783,7 +1824,15 @@ export default function SonoLane() {
     // etc.) was open every time. Only reset it when actually switching to a
     // different panel, so the open section survives a re-tap.
     setPanel(p);
-    if(p!==panel) setSubPanel(null);
+    // Landing on Profile fresh (from another tab) always opens with Garage
+    // already expanded, instead of the collapsed home grid.
+    if(p!==panel) setSubPanel(p==="profile" ? "garage" : null);
+    // Landing on Lanes fresh (from another tab) always opens the chat list
+    // first, not whatever chat room happened to be open last time — direct
+    // "message so-and-so" entry points pass lanesRoom:true to jump straight
+    // into that chat's room instead.
+    if(lanesRoom) setLanesView("room");
+    else if(p!==panel && p==="create") setLanesView("list");
     setShowAgent(false); setMapInteractive(false);
     // Entering Drive mode always opens straight to Maps — carrying the
     // just-picked route's directions along if this call came from "Get
@@ -1796,21 +1845,74 @@ export default function SonoLane() {
     // starts the camera before you've actually started moving.
   };
 
+  // ── Back-button actions for every full-screen Profile sub-page, hoisted up
+  // here (instead of defined inline inside ProfilePanel) so the shared
+  // TopBar can call them directly — the TopBar takes over as that page's
+  // back button (and, where there is one, its main right-side action) while
+  // the page is open, instead of the page drawing its own separate header
+  // row underneath. Keeping one definition of each action shared between
+  // TopBar and the page body avoids the two drifting out of sync. ──
+  const back = () => { setSubPanel(null); setSelTrip(null); };
+  const cancelCreateRoute = () => {
+    setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
+    setEditingRouteId(null);
+    setSubPanel("routes");
+  };
+  const saveCreateRoute = () => {
+    if(!newRoute.title.trim()) return;
+    const C=[OR,"#22c55e","#6366f1","#a855f7"];
+    const cleanStops = newRoute.stops.map(s=>s.trim()).filter(Boolean);
+    if(editingRouteId){
+      setRoutes(rs=>rs.map(x=>x.id===editingRouteId?{...x,...newRoute,stops:cleanStops}:x));
+    } else {
+      setRoutes(rs=>{const nr=[{id:Date.now(),...newRoute,stops:cleanStops,color:C[rs.length%C.length]},...rs]; setTimeout(()=>checkAchievements({routes:nr}),200); return nr;});
+      if(newRoute.public){
+        setPosts(p=>[{
+          id: Date.now()+1, title: newRoute.title, type: newRoute.type, body: newRoute.bio,
+          distance: newRoute.distance, stops: cleanStops, highlights: "", photos: [],
+          fromSaved: true, savedRouteName: newRoute.title, likes: 0,
+          authorId: "me", authorName: userName||"You",
+        },...p]);
+        setNotifications(n=>[{id:Date.now()+2,icon:"🗺️",text:"Your route \""+newRoute.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
+      }
+    }
+    setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
+    setEditingRouteId(null);
+    setSubPanel("routes");
+  };
+  const cancelSharedGarage = () => { setSubPanel("garage"); setSelSharedGarage(null); };
+  const openSharedGarageChat = () => {
+    const g = sharedGarages.find(x=>x.id===selSharedGarage);
+    if(g){ setActiveChan(g.laneId); go("create", {lanesRoom:true}); }
+  };
+  const saveEditCar = () => { setCarSaved(true); setTimeout(()=>checkAchievements({carSaved:true}),200); setSubPanel("car"); };
+  const saveEditProfile = () => { setEditMode(false); saveProfileToSupabase(); back(); };
+
   // ── Swipe carousel — Lanes ↔ Home ↔ Discover (Drive mode is not part of it) ──
   // Order matches the TopNav's actual left-to-right tab layout (Lanes | Home
   // | Discover — see TOPNAV_ITEMS below), NOT the order pages were coded in.
   // Swipe direction is read against THIS order, so it has to match what's
   // literally on screen or "swipe left" and "swipe right" end up backwards.
   const CAROUSEL = ["create","profile","discover"];
+  // subPanel is dual-purpose on Profile — these 6 values are just which
+  // "My Stuff" icon-toggle section is expanded INLINE on the Profile home
+  // screen (which now defaults to "garage" open), not a full-screen
+  // sub-page. Only a subPanel value OUTSIDE this list (Edit Profile, Car
+  // Details, Create Route, …) is an actual full-screen page with its own
+  // back button — swipe-back below needs that distinction, or it would
+  // treat the Profile home screen itself as "on a sub-page" simply because
+  // Garage is expanded by default.
+  const PROFILE_INLINE_SECTIONS = ["garage","routes","myevents","history","radiostations","settings"];
   // Whenever the current screen already has its own ← back button (a Profile
   // sub-page like Edit Car/Settings/My Routes, or a route's full-screen
   // detail view), swipe-right should trigger THAT back action instead of the
   // carousel's "previous tab" — otherwise swiping right to go back a page
   // instead jumped all the way to the Lanes chat tab.
-  const backAvailable = (panel==="profile" && !!subPanel) || (panel==="discover" && !!viewRouteId);
+  const backAvailable = (panel==="profile" && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="discover" && !!viewRouteId) || (panel==="create" && lanesView==="room");
   const runBack = () => {
     if(panel==="discover" && viewRouteId){ setViewRouteId(null); return; }
     if(panel==="profile" && subPanel){ setSubPanel(null); setSelTrip(null); return; }
+    if(panel==="create" && lanesView==="room"){ setLanesView("list"); return; }
   };
   const onSwipeStart = e => {
     if(!CAROUSEL.includes(panel)) { swipeStartRef.current=null; return; }
@@ -1825,11 +1927,72 @@ export default function SonoLane() {
       el = el.parentElement;
     }
     swipeStartRef.current = {x:t.clientX, y:t.clientY};
+    swipeActiveRef.current = false;
+    setSwipeSettling(false);
+  };
+  // Live-tracks the finger/mouse while a gesture is in progress, so the
+  // current page and its neighbor visibly slide together in real time,
+  // proportional to how far the drag has gone — instead of only reacting
+  // once the finger lifts. Only kicks in for the plain tab carousel
+  // (Lanes ↔ Home ↔ Discover); a page with its own back button available
+  // (a Profile sub-page, a Discover route detail, the Lanes chat room)
+  // keeps the simpler instant swipe-to-go-back behavior from onSwipeEnd,
+  // since animating "back out of a sub-page" would mean live-rendering two
+  // states of the SAME panel at once rather than two different panels.
+  const onSwipeMove = e => {
+    const start = swipeStartRef.current;
+    if(!start || backAvailable) return;
+    const idx = CAROUSEL.indexOf(panel);
+    if(idx===-1) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dx = t.clientX - start.x, dy = t.clientY - start.y;
+    if(!swipeActiveRef.current){
+      // Not yet confirmed as a horizontal carousel drag — require a small
+      // deliberate horizontal movement (clearly more horizontal than
+      // vertical) before committing to it, so an ordinary vertical scroll
+      // never gets hijacked into a sideways page slide.
+      if(Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)*1.2) return;
+      if(dx < 0 && idx >= CAROUSEL.length-1) return; // no next tab to reveal
+      if(dx > 0 && idx <= 0) return;                 // no previous tab to reveal
+      swipeActiveRef.current = true;
+    }
+    const w = window.innerWidth || 390;
+    const clamped = Math.max(-w, Math.min(w, dx));
+    setSwipeDX(clamped);
+    setSwipeDir(clamped < 0 ? "next" : clamped > 0 ? "prev" : null);
   };
   const onSwipeEnd = e => {
     const start = swipeStartRef.current;
+    const wasActive = swipeActiveRef.current;
     swipeStartRef.current = null;
+    swipeActiveRef.current = false;
     if(!start) return;
+
+    if(wasActive){
+      // A live carousel drag was under way — commit to the neighbor once
+      // dragged far enough (over a third of the screen), otherwise spring
+      // back to the page we started on. Either way this is an ANIMATED
+      // settle (swipeSettling turns the CSS transition on), not an instant
+      // snap, so the motion started by the finger continues naturally.
+      const idx = CAROUSEL.indexOf(panel);
+      const w = window.innerWidth || 390;
+      const commit = Math.abs(swipeDX) > w*0.35;
+      setSwipeSettling(true);
+      if(commit && swipeDX<0 && idx<CAROUSEL.length-1){
+        setSwipeDX(-w);
+        setTimeout(()=>{ go(CAROUSEL[idx+1]); setSwipeDX(0); setSwipeDir(null); setSwipeSettling(false); }, 220);
+      } else if(commit && swipeDX>0 && idx>0){
+        setSwipeDX(w);
+        setTimeout(()=>{ go(CAROUSEL[idx-1]); setSwipeDX(0); setSwipeDir(null); setSwipeSettling(false); }, 220);
+      } else {
+        setSwipeDX(0);
+        setTimeout(()=>{ setSwipeDir(null); setSwipeSettling(false); }, 220);
+      }
+      return;
+    }
+
+    // Fallback — a short tap, or a swipe on a page with its own back button
+    // (see backAvailable) — same instant behavior as before, no live drag.
     const t = e.changedTouches ? e.changedTouches[0] : e;
     const dx = t.clientX - start.x, dy = t.clientY - start.y;
     if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)*1.4) return; // require a deliberate horizontal drag
@@ -1938,8 +2101,17 @@ export default function SonoLane() {
     if((!dashcamConsent && !forceConsent) || dashOn) return;
     playStartupSound(startupSound);
     try{
-      const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:true});
-      streamRef.current=st;
+      // Reuse the already-open preview stream (the widget shows live camera
+      // the whole time Drive mode is open) instead of re-requesting the
+      // camera — only fall back to a fresh getUserMedia if no preview
+      // stream happens to be live yet (e.g. speed crossed 5mph before the
+      // preview effect finished opening it).
+      let st = streamRef.current;
+      if(!st){
+        st=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:true});
+        streamRef.current=st;
+        setCamLive(true);
+      }
       if(videoRef.current){videoRef.current.srcObject=st;videoRef.current.muted=true;videoRef.current.playsInline=true;videoRef.current.play().catch(()=>{});}
       const mime = pickRecorderMime();
       const mr = mime ? new MediaRecorder(st, {mimeType:mime}) : new MediaRecorder(st);
@@ -1975,12 +2147,10 @@ export default function SonoLane() {
     recRef.current = null;
     tripRef.current = null;
 
-    // Stop camera stream
-    try {
-      streamRef.current?.getTracks().forEach(t => t.stop());
-    } catch {}
-    streamRef.current = null;
-    if(videoRef.current) videoRef.current.srcObject = null;
+    // Stop camera stream — recording has ended, and stopDrive is only ever
+    // called when actually leaving Drive mode (or turning auto-record /
+    // consent off), so the preview shouldn't stay open either.
+    teardownStream();
 
     // Stop MediaRecorder and save clip
     try {
@@ -2060,6 +2230,49 @@ export default function SonoLane() {
       hadNightDrive: nightDrive || hadNightDrive,
     }), 500);
   };
+
+  // Fully releases the camera/mic stream (used both when recording stops
+  // and when just closing the live preview) and clears the preview <video>.
+  const teardownStream = () => {
+    try { streamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+    streamRef.current = null;
+    setCamLive(false);
+    if(videoRef.current) videoRef.current.srcObject = null;
+  };
+
+  // Opens (or keeps open) the live camera preview shown by the Dashcam
+  // widget — independent of whether a clip is actually being recorded.
+  // Called as soon as Drive mode is opened (with consent already granted),
+  // so the widget always shows the live feed, not just while moving.
+  const openCamPreview = async () => {
+    if (!dashcamConsent || streamRef.current) return;
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:true});
+      streamRef.current = st;
+      setCamLive(true);
+    } catch {}
+  };
+  // Closes the preview stream — but only when nothing is actively
+  // recording, since a clip mid-recording must keep its stream alive even
+  // if, say, the widget itself becomes hidden.
+  const closeCamPreview = () => {
+    if (dashOn) return;
+    teardownStream();
+  };
+
+  // Keeps the Dashcam widget's live camera preview tied to Drive mode
+  // itself (once consented) rather than to whether a clip happens to be
+  // recording — opens the moment Drive mode is entered, closes the moment
+  // it's left (unless a clip is still recording, which stopDrive/go()
+  // already handle by calling stopDrive() first).
+  useEffect(() => {
+    if (panel === "drive" && dashcamConsent) {
+      openCamPreview();
+    } else {
+      closeCamPreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, dashcamConsent]);
 
   /* ── Background dashcam automation ──
      Only runs once dashcamConsent AND dashcamBgRecord are both true (consent
@@ -2274,11 +2487,12 @@ export default function SonoLane() {
     );
     if(id==="routes")  return <button onClick={openAction} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><DPadIcon id="road" color={DPAD_COLORS.road} size={20}/><div style={{fontSize:18,fontWeight:900,color:"#6366f1"}}>{routes.length}</div><div style={{fontSize:9,color:"#111"}}>routes</div></button>;
     if(id==="dashcam") return (
-      // Live recording preview only — no navigation. First tap without consent
-      // opens a one-time inline setup prompt; the full Dashcam settings page
-      // lives only in Profile. Once consented, this just shows the live feed.
-      <button onClick={()=>{ if(!dashcamConsent) setShowDashcamSetup(true); }} style={{...WW,background:dashOn?"#000":"none",border:"none",cursor:dashcamConsent?"default":"pointer",position:"relative",overflow:"hidden",padding:0}}>
-        {dashOn && streamRef.current ? (
+      // Shows the LIVE camera feed the whole time Drive mode is open, once
+      // consented — that's just the preview (camLive), separate from
+      // whether a clip is actually being saved (dashOn, driven by the 5mph
+      // auto-record effect). The red REC dot only appears while dashOn.
+      <button onClick={()=>{ if(!dashcamConsent) setShowDashcamSetup(true); }} style={{...WW,background:(camLive||dashOn)?"#000":"none",border:"none",cursor:dashcamConsent?"default":"pointer",position:"relative",overflow:"hidden",padding:0}}>
+        {camLive && streamRef.current ? (
           <video
             ref={el=>{ if(el && streamRef.current && el.srcObject!==streamRef.current){ el.srcObject=streamRef.current; el.muted=true; el.playsInline=true; el.play().catch(()=>{}); } }}
             autoPlay muted playsInline
@@ -2288,7 +2502,7 @@ export default function SonoLane() {
           <div style={{fontSize:22}}>📹</div>
         )}
         {dashOn && <span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",display:"block",zIndex:2}}/>}
-        {!dashOn && <div style={{fontSize:11,color:"#bbb"}}>{dashcamConsent?"Dashcam":"Tap to enable"}</div>}
+        {!camLive && <div style={{fontSize:11,color:"#bbb"}}>{dashcamConsent?"Dashcam":"Tap to enable"}</div>}
       </button>
     );
     return <div style={{...WW,color:"#111"}}><div style={{fontSize:20}}>＋</div><div style={{fontSize:9}}>empty</div></div>;
@@ -2423,7 +2637,8 @@ export default function SonoLane() {
 
   /* ── PROFILE PANEL ── */
   const ProfilePanel = useStablePanel(() => {
-    const back = () => { setSubPanel(null); setSelTrip(null); };
+    // `back` is now defined at the SonoLane() top level (near `go`) so the
+    // shared TopBar can call it too — see the back-button actions block.
 
     // Live drag value for the discovery-radius slider, committed to the real
     // appRadius state only on release — the whole panel remounts whenever any
@@ -2440,10 +2655,6 @@ export default function SonoLane() {
     const [objectivesDismissed, setObjectivesDismissed] = useState(()=>memStore.getItem("sl_objDismissed")==="1");
     const dismissObjectives = () => { setObjectivesDismissed(true); memStore.setItem("sl_objDismissed","1"); };
 
-    // Where the car detail page was opened from — the hero avatar at the top
-    // of the profile, or a car tile inside My Garage — so its back button can
-    // return you to wherever you actually came from instead of always one place.
-    const [carDetailFrom, setCarDetailFrom] = useState("profile");
     // Private car info now opens from a wallet button at the bottom of the
     // car page instead of always sitting inline on the page.
     const [showPrivateCard, setShowPrivateCard] = useState(false);
@@ -2467,6 +2678,20 @@ export default function SonoLane() {
     // by hand.
     const [friendSearch, setFriendSearch] = useState("");
     const [addFriendSearch, setAddFriendSearch] = useState("");
+    // Special Top 3 Friend page — a combined walkie-talkie + text chat box
+    // for whichever Top 3 friend you tapped (see subPanel==="top3friend").
+    const [top3ChatText, setTop3ChatText] = useState("");
+    const top3AudioRef = useRef(null);
+    const [top3PlayingId, setTop3PlayingId] = useState(null);
+    const toggleTop3Voice = (msg) => {
+      if (!msg.audioUrl) return;
+      const audio = top3AudioRef.current || (top3AudioRef.current = new Audio());
+      if (top3PlayingId === msg.id) { audio.pause(); setTop3PlayingId(null); return; }
+      audio.src = msg.audioUrl;
+      audio.onended = () => setTop3PlayingId(null);
+      audio.play().catch(()=>{});
+      setTop3PlayingId(msg.id);
+    };
     // Real-backend mode: results of searching actual signed-up users by
     // name (debounced), used instead of the local demo directory below.
     const [supaFriendResults, setSupaFriendResults] = useState([]);
@@ -2579,6 +2804,27 @@ export default function SonoLane() {
       if(walkieStream.current) walkieStream.current.getTracks().forEach(t=>t.stop());
       clearInterval(walkieTimer.current);
     }, []);
+    // Text side of the special Top 3 Friend page's chat box — appends into
+    // the same friendMsgs thread the walkie voice clips use, so both kinds
+    // of messages show up together in one combined thread.
+    const sendTop3Text = (target) => {
+      const text = top3ChatText.trim();
+      if(!text || !target) return;
+      const msg = {
+        id:Date.now(), text, mine:true,
+        user:userName||"You",
+        initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
+        color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+        isVoice:false, voiceSeconds:0,
+      };
+      setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),msg]}));
+      setTop3ChatText("");
+      setTimeout(()=>{
+        const replies = ["👍","On my way!","Haha same","Let's do it this weekend","Sounds good.","😂"];
+        const reply = {id:Date.now()+1, text:replies[Math.floor(Math.random()*replies.length)], mine:false, user:target.name, initials:target.initials, color:target.color, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), isVoice:false, voiceSeconds:0};
+        setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),reply]}));
+      }, 1400+Math.random()*1200);
+    };
     const WalkieTalkieSheet = () => !walkieTarget ? null : (
       <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
         <div style={{fontSize:12,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>WALKIE-TALKIE</div>
@@ -2635,7 +2881,7 @@ export default function SonoLane() {
               if(!already) setFriends(f=>[...f,quickUser]);
               setQuickUser(null);
               setActiveChan(quickUser.id);
-              go("create");
+              go("create", {lanesRoom:true});
             }} style={{width:"100%",padding:"12px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800}}>
               💬 Message
             </button>
@@ -2956,41 +3202,16 @@ export default function SonoLane() {
       const setStop = (i,val) => setNewRoute(r=>({...r,stops:r.stops.map((s,j)=>j===i?val:s)}));
       const addStop = () => setNewRoute(r=>({...r,stops:[...r.stops,""]}));
       const removeStop = i => setNewRoute(r=>({...r,stops:r.stops.filter((_,j)=>j!==i)}));
-      const saveRoute = () => {
-        if(!newRoute.title.trim()) return;
-        const C=[OR,"#22c55e","#6366f1","#a855f7"];
-        const cleanStops = newRoute.stops.map(s=>s.trim()).filter(Boolean);
-        if(editingRouteId){
-          setRoutes(rs=>rs.map(x=>x.id===editingRouteId?{...x,...newRoute,stops:cleanStops}:x));
-        } else {
-          setRoutes(rs=>{const nr=[{id:Date.now(),...newRoute,stops:cleanStops,color:C[rs.length%C.length]},...rs]; setTimeout(()=>checkAchievements({routes:nr}),200); return nr;});
-          // Public routes also post to the Route feed right away, same shape as
-          // sharing an existing saved route from the feed's own "+ Create" sheet.
-          if(newRoute.public){
-            setPosts(p=>[{
-              id: Date.now()+1, title: newRoute.title, type: newRoute.type, body: newRoute.bio,
-              distance: newRoute.distance, stops: cleanStops, highlights: "", photos: [],
-              fromSaved: true, savedRouteName: newRoute.title, likes: 0,
-              authorId: "me", authorName: userName||"You",
-            },...p]);
-            setNotifications(n=>[{id:Date.now()+2,icon:"🗺️",text:"Your route \""+newRoute.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
-          }
-        }
-        setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
-        setEditingRouteId(null);
-        setSubPanel("routes");
-      };
-      const cancelRoute = () => {
-        setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
-        setEditingRouteId(null);
-        setSubPanel("routes");
-      };
+      // Save/cancel now live at the SonoLane() top level as saveCreateRoute
+      // / cancelCreateRoute, so the shared TopBar's back/Save buttons can
+      // call the same logic this page used to run from its own header.
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={cancelRoute} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> {editingRouteId?"Edit Route":"Create Route"}</div>
-          <button onClick={saveRoute} style={{padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
+        {/* Own header removed — the shared TopBar shows back/Save while this
+            page is open (see <TopBar/>). */}
+        <div style={{padding:"10px 14px 0",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          <DPadIcon id="road" color={DPAD_COLORS.road} size={15}/>
+          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{editingRouteId?"Edit Route":"Create Route"}</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 32px"}}>
 
@@ -3027,7 +3248,7 @@ export default function SonoLane() {
             </button>
           </div>
 
-          <button onClick={saveRoute} style={{width:"100%",padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>{editingRouteId?"💾 Save Changes":"💾 Save Route"}</button>
+          <button onClick={saveCreateRoute} style={{width:"100%",padding:"13px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F}}>{editingRouteId?"💾 Save Changes":"💾 Save Route"}</button>
         </div>
       </div>
       );
@@ -3100,18 +3321,10 @@ export default function SonoLane() {
             </div>
           )}
 
-          <button onClick={()=>setShowCreateSharedGarage(true)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:14,border:"1.5px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,textAlign:"left",marginBottom:14}}>
-            <div style={{width:40,height:40,borderRadius:10,background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#ccc",flexShrink:0}}>＋</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
-              <div style={{fontSize:11,color:"#111",marginTop:1}}>Invite friends to add their own vehicle, chat, and call.</div>
-            </div>
-          </button>
-
           {sharedGarages.length>0 && (
             <>
-              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,margin:"22px 0 12px"}}>SHARED GARAGES</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,margin:"0 0 12px"}}>SHARED GARAGES</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
                 {sharedGarages.map(g=>(
                   <button key={g.id} onClick={()=>{setSelSharedGarage(g.id);setSubPanel("sharedgarage");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid #ebebeb",background:"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                     <div style={{width:44,height:44,borderRadius:12,background:g.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚗</div>
@@ -3125,6 +3338,14 @@ export default function SonoLane() {
               </div>
             </>
           )}
+
+          <button onClick={()=>setShowCreateSharedGarage(true)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:14,border:"1.5px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+            <div style={{width:40,height:40,borderRadius:10,background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#ccc",flexShrink:0}}>＋</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
+              <div style={{fontSize:11,color:"#111",marginTop:1}}>Invite friends to add their own vehicle, chat, and call.</div>
+            </div>
+          </button>
         </div>
 
         {showCreateSharedGarage && (
@@ -3194,11 +3415,9 @@ export default function SonoLane() {
       const invitableFriends = friends.filter(f=>!g.memberIds.includes(f.id));
       return (
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={()=>{setSubPanel("garage");setSelSharedGarage(null);}} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-            <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {g.name}</div>
-            <VN action={()=>{setActiveChan(g.laneId);go("create");}} style={{padding:"6px 12px",borderRadius:20,background:"#5865f2",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>💬 Group Chat</VN>
-          </div>
+          {/* Own header removed — the shared TopBar shows back/Group Chat
+              while this page is open (see <TopBar/>). */}
+          <div style={{padding:"10px 14px 0",flexShrink:0,fontSize:16,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {g.name}</div>
           <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 7px"}}>
             <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
 
@@ -3241,7 +3460,7 @@ export default function SonoLane() {
                   {v && <div style={{fontSize:12,color:"#111",marginBottom:10}}>{v.bio}</div>}
                   <div style={{display:"flex",gap:8}}>
                     <button onClick={()=>setCallingFriend({friend:fr,status:"ringing",secs:0})} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
-                    <button onClick={()=>{setActiveChan(fr.id);go("create");}} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
+                    <button onClick={()=>{setActiveChan(fr.id);go("create",{lanesRoom:true});}} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
                   </div>
                 </div>
               );
@@ -3484,13 +3703,11 @@ export default function SonoLane() {
       const editBannerBg = carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css;
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={()=>setSubPanel("car")} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>Edit Car</div>
-          <button onClick={()=>{setCarSaved(true);setTimeout(()=>checkAchievements({carSaved:true}),200);setSubPanel("car");}} style={{padding:"5px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
-        </div>
+        {/* Own header removed — the shared TopBar shows back/Save while this
+            page is open (see <TopBar/>). */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
 
+          <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Edit Car</div>
           {/* Avatar mode — custom SVG avatar or an uploaded photo of the real car */}
           <div style={SEC}>CAR AVATAR</div>
           <div style={{display:"flex",gap:8,marginBottom:12}}>
@@ -3837,16 +4054,44 @@ export default function SonoLane() {
                 return (
                   <div style={{marginBottom:14}}>
                     <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
-                    {dayTrips.map(trip=>(
-                      <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:"1px solid #ebebeb",background:"#fff",marginBottom:8,cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                        <div style={{fontSize:18}}>🛣️</div>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{trip.time} · {trip.startAddr}</div>
-                          <div style={{fontSize:11,color:"#111"}}>{trip.dist} mi · +{trip.pts} pts{dayClips.length>0?" · 📹":""}</div>
-                        </div>
-                        <div style={{fontSize:16,color:"#111"}}>›</div>
-                      </button>
-                    ))}
+                    {/* Each trip gets the same mini route-map card as the
+                        main list below — a picture of the road taken, not
+                        just a text row — so browsing by calendar date shows
+                        the same map + distance + footage history. */}
+                    {dayTrips.map(trip=>{
+                      const color=PATH_COLORS[trip.id%PATH_COLORS.length];
+                      const hasClip=clips.some(c=>c.date===trip.date);
+                      return (
+                        <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{
+                          width:"100%",background:"#fff",borderRadius:14,border:"1px solid #ebebeb",
+                          marginBottom:8,overflow:"hidden",cursor:"pointer",fontFamily:F,textAlign:"left",
+                          boxShadow:"0 2px 8px rgba(0,0,0,0.05)",padding:0,
+                        }}>
+                          <div style={{height:90,position:"relative",background:"#e5e3df",overflow:"hidden"}}>
+                            <iframe
+                              title={"calmap"+trip.id}
+                              style={{width:"100%",height:"180px",border:"none",display:"block",marginTop:"-45px",pointerEvents:"none"}}
+                              src={"https://maps.google.com/maps?q="+encodeURIComponent(trip.startAddr||"San Diego, CA")+"&z=12&output=embed"}
+                              loading="lazy"
+                            />
+                            <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 300 100" preserveAspectRatio="none">
+                              <polyline points="20,80 50,65 85,52 120,42 160,35 200,30 240,28 270,25" fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.9"/>
+                              <circle cx={20} cy={80} r={5} fill="#22c55e" stroke="#fff" strokeWidth="1.5"/>
+                              <circle cx={270} cy={25} r={5} fill="#ef4444" stroke="#fff" strokeWidth="1.5"/>
+                            </svg>
+                            {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#fff"}}>📹</div>}
+                          </div>
+                          <div style={{padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:7,height:26,borderRadius:4,background:color,flexShrink:0}}/>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{trip.time} · {trip.startAddr}</div>
+                              <div style={{fontSize:11,color:"#111"}}>{trip.dist} mi · +{trip.pts} pts{hasClip?" · 📹 footage":""}</div>
+                            </div>
+                            <div style={{fontSize:16,color:"#111"}}>›</div>
+                          </div>
+                        </button>
+                      );
+                    })}
                     {dayTrips.length===0 && dayClips.map(clip=>(
                       <div key={clip.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
                         <div style={{background:"#111",position:"relative",cursor:"pointer",height:80}} onClick={()=>setPlayingClip(p=>p===clip.id?null:clip.id)}>
@@ -3872,8 +4117,10 @@ export default function SonoLane() {
                 );
               })()}
 
-              {/* Dashcam enable prompt, or the background-record toggle once
-                  enabled — merged in from the old Dashcam tab */}
+              {/* Dashcam enable prompt — the actual "Record in Background"
+                  auto-record toggle now lives in Drive Mode Settings (the ⚙️
+                  inside Drive mode), not here, so it's reachable without
+                  leaving Drive mode. */}
               {!dashcamConsent ? (
                 <div style={{background:"#fff8f0",border:"1px solid #fde8d8",borderRadius:12,padding:"14px",marginBottom:16,textAlign:"center"}}>
                   <div style={{fontSize:28,marginBottom:6}}>📹</div>
@@ -3885,13 +4132,7 @@ export default function SonoLane() {
                 </div>
               ) : (
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",marginBottom:16}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Record in Background</div>
-                    <div style={{fontSize:11,color:"#111",marginTop:2}}>Auto-record once you hit 5 mph in Drive mode. Turn off to only record when you start a clip yourself.</div>
-                  </div>
-                  <button onClick={()=>{const next=!dashcamBgRecord;setDashcamBgRecord(next);if(!next&&dashOn)stopDrive();}} style={{width:44,height:26,borderRadius:13,border:"none",background:dashcamBgRecord?OR:"#ddd",position:"relative",cursor:"pointer",flexShrink:0,padding:0}}>
-                    <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:dashcamBgRecord?21:3,transition:"left 0.15s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
-                  </button>
+                  <div style={{fontSize:12,color:"#111",lineHeight:1.6}}>The camera preview and auto-record settings for Dashcam now live in <b>Drive Mode Settings</b> (tap ⚙️ inside Drive mode).</div>
                 </div>
               )}
 
@@ -3994,9 +4235,11 @@ export default function SonoLane() {
     /* following sub — people you follow */
     if(subPanel==="following") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><ProfileIcon id="people" size={14} color="#111"/> Following</div>
+        {/* Own header removed — the shared TopBar shows back + "Following"
+            while this page is open (see <TopBar/>). */}
+        <div style={{padding:"10px 14px 0",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          <ProfileIcon id="people" size={14} color="#111"/>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>Following</div>
           <div style={{fontSize:12,color:"#111"}}>{following.length}</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 24px"}}>
@@ -4100,9 +4343,11 @@ export default function SonoLane() {
     /* followers sub — people following you */
     if(subPanel==="followerslist") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><ProfileIcon id="people" size={14} color="#111"/> Followers</div>
+        {/* Own header removed — the shared TopBar shows back + "Followers"
+            while this page is open (see <TopBar/>). */}
+        <div style={{padding:"10px 14px 0",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          <ProfileIcon id="people" size={14} color="#111"/>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>Followers</div>
           <div style={{fontSize:12,color:"#111"}}>{followersList.length}</div>
         </div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 24px"}}>
@@ -4138,13 +4383,88 @@ export default function SonoLane() {
     );
 
     /* friends sub */
+    /* top3friend sub — special Top 3 Friend page: walkie-talkie mode with a
+       combined text/voice chat box, live location sharing, and a window
+       onto their car avatar. Opened by tapping a filled Top 3 slot. */
+    if(subPanel==="top3friend" && selFriend) {
+      const fr = selFriend;
+      const locOn = locationSharing.includes(fr.id);
+      const msgs = friendMsgs[fr.id] || [];
+      const firstName = fr.name.split(" ")[0];
+      return (
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#14161c"}}>
+          {/* Own header removed — the shared TopBar (dark, to match this
+              page) shows the back button while this page is open. Name and
+              avatar now live in the content below instead. */}
+          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 14px 10px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+              <FriendAvatar fr={fr} size={38} fontSize={14}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:16,fontWeight:800,color:"#fff",display:"flex",alignItems:"center",gap:6}}>{fr.name} <span style={{fontSize:10,fontWeight:800,color:OR}}>⭐ TOP 3</span></div>
+                <div style={{fontSize:12,color:"#8a8f98"}}>@{fr.handle}</div>
+              </div>
+            </div>
+            {/* Car avatar window */}
+            <div style={{background:"#1c1f27",borderRadius:16,border:"1px solid #262933",padding:"16px",marginBottom:14,display:"flex",flexDirection:"column",alignItems:"center"}}>
+              <div style={{fontSize:10,fontWeight:700,letterSpacing:1.2,color:"#8a8f98",alignSelf:"flex-start",marginBottom:8}}>🚗 {firstName.toUpperCase()}'S CAR</div>
+              <CarSVG color={fr.color} mods={{}} size={120} styleId={friendCarStyle(fr)}/>
+            </div>
+
+            {/* Share Live Location — the Top 3 Friend perk */}
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:14,background:"#1c1f27",border:"1px solid #262933",marginBottom:14}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>📍 Share Live Location</div>
+                <div style={{fontSize:11,color:"#8a8f98",marginTop:2}}>{locOn?"On — stays on until you turn it off.":"Off"}</div>
+              </div>
+              <button onClick={()=>{
+                toggleLocationSharing(fr.id);
+                setNotifications(n=>[{id:Date.now(),icon:"📍",text:(locOn?"Stopped":"Started")+" sharing your live location with "+fr.name+".",ts:"now",read:false},...n]);
+              }} style={{width:42,height:24,borderRadius:14,border:"none",cursor:"pointer",position:"relative",background:locOn?"#22c55e":"#3a3d45",flexShrink:0}}>
+                <div style={{position:"absolute",top:2,left:locOn?20:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .15s"}}/>
+              </button>
+            </div>
+
+            {/* Combined walkie-talkie + text thread */}
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:1.2,color:"#8a8f98",marginBottom:8}}>WALKIE-TALKIE &amp; CHAT</div>
+            {msgs.length===0 && (
+              <div style={{textAlign:"center",color:"#6b6f78",fontSize:13,padding:"30px 10px"}}>No messages yet — send a text below, or hold the mic to walkie-talkie {firstName}.</div>
+            )}
+            {msgs.map(m=>(
+              <div key={m.id} style={{display:"flex",justifyContent:m.mine?"flex-end":"flex-start",marginBottom:8}}>
+                <div style={{maxWidth:"75%",background:m.mine?OR:"#262933",color:"#fff",borderRadius:14,padding:"8px 12px"}}>
+                  {m.isVoice ? (
+                    <button onClick={()=>toggleTop3Voice(m)} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:"#fff",cursor:"pointer",fontFamily:F,padding:0}}>
+                      <span style={{fontSize:16}}>{top3PlayingId===m.id?"⏸":"▶"}</span>
+                      <span style={{fontSize:12}}>🎙️ Voice · {m.voiceSeconds}s</span>
+                    </button>
+                  ) : (
+                    <div style={{fontSize:14}}>{m.text}</div>
+                  )}
+                  <div style={{fontSize:9,opacity:0.7,marginTop:3,textAlign:"right"}}>{m.ts}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom bar — text chat box, or the walkie mic when the box is empty */}
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderTop:"1px solid #262933",flexShrink:0,background:"#14161c"}}>
+            <input value={top3ChatText} onChange={e=>setTop3ChatText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendTop3Text(fr);}} placeholder="Message…" style={{flex:1,padding:"10px 14px",borderRadius:20,border:"1px solid #2c2f38",background:"#1c1f27",color:"#fff",fontSize:14,fontFamily:F,outline:"none"}}/>
+            {top3ChatText.trim() ? (
+              <button onClick={()=>sendTop3Text(fr)} title="Send" style={{width:40,height:40,borderRadius:"50%",background:OR,border:"none",color:"#fff",fontSize:16,cursor:"pointer",flexShrink:0}}>➤</button>
+            ) : (
+              <button onClick={()=>setWalkieTarget(fr)} title="Walkie-talkie" style={{width:40,height:40,borderRadius:"50%",background:"#22c55e",border:"none",color:"#fff",fontSize:17,cursor:"pointer",flexShrink:0}}>🎙️</button>
+            )}
+          </div>
+          <WalkieTalkieSheet/>
+        </div>
+      );
+    }
+
     if(subPanel==="friends") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>👥 Friends</div>
-          <VN action={()=>setShowAddFriend(true)} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</VN>
-        </div>
+        {/* Own header removed — the shared TopBar shows back/+ Add while
+            this page is open (see <TopBar/>). */}
+        <div style={{padding:"10px 14px 0",fontSize:16,fontWeight:800,color:"#111",flexShrink:0}}>👥 Friends</div>
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 24px"}}>
           <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:14}}>TOP 3 FRIENDS</div>
           <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:24}}>
@@ -4180,7 +4500,7 @@ export default function SonoLane() {
                     text, and a follow toggle */}
                 <div style={{display:"flex",gap:8,marginBottom:isTop3?12:0}}>
                   <button onClick={()=>setWalkieTarget(selFriend)} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>🎙️ Walkie</button>
-                  <button onClick={()=>{setActiveChan(selFriend.id);go("create");}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
+                  <button onClick={()=>{setActiveChan(selFriend.id);go("create",{lanesRoom:true});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
                   <button onClick={()=>{
                     const isF=following.some(f=>f.id===selFriend.id);
                     if(isF){setFollowing(f=>f.filter(x=>x.id!==selFriend.id));}
@@ -4307,11 +4627,8 @@ export default function SonoLane() {
     /* edit profile sub — full config page */
     if(subPanel==="edit") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>Edit Profile</div>
-          <button onClick={()=>{setEditMode(false);saveProfileToSupabase();back();}} style={{padding:"5px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Save</button>
-        </div>
+        {/* Own header removed — the shared TopBar shows back/Save while this
+            page is open (see <TopBar/>). */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
 
           {/* Profile photo */}
@@ -4443,10 +4760,8 @@ export default function SonoLane() {
        only via the Edit button on the Discovery Radius card in Profile. */
     if(subPanel==="radius") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>Discovery Radius</div>
-        </div>
+        {/* Own header removed — the shared TopBar shows the back button
+            while this page is open (see <TopBar/>). */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
           <div style={{...CARD,marginBottom:14}}>
             <div style={{fontSize:13,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
@@ -4722,10 +5037,8 @@ export default function SonoLane() {
         /* rewards sub */
     if(subPanel==="rewards") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"linear-gradient(180deg,#1a1a2e 0%,#16213e 40%,#0f3460 100%)"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ffffff18",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#aaa",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:16,fontWeight:800,color:"#fff",flex:1}}>🏆 SonoLane Rewards</div>
-        </div>
+        {/* Own header removed — the shared TopBar (dark, to match this page)
+            shows the back button while this page is open (see <TopBar/>). */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"24px 20px 40px",display:"flex",flexDirection:"column",alignItems:"center"}}>
 
           {/* Coming soon hero */}
@@ -4989,7 +5302,7 @@ export default function SonoLane() {
               }
               const fr=friends[aiInTop3?i-1:i];
               return (
-                <button key={i} onClick={()=>{if(fr){setSubPanel("friends");setSelFriend(fr);}else{setShowTop3Chooser(true);}}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:i<2?"1px solid #ebebeb":"none",cursor:"pointer",fontFamily:F}}>
+                <button key={i} onClick={()=>{if(fr){setSelFriend(fr);setSubPanel("top3friend");}else{setShowTop3Chooser(true);}}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:i<2?"1px solid #ebebeb":"none",cursor:"pointer",fontFamily:F}}>
                   <div style={{width:42,height:42,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?17:20,color:fr?"#fff":"#ccc",fontWeight:800,overflow:"hidden"}}>
                     {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
                   </div>
@@ -5743,9 +6056,6 @@ export default function SonoLane() {
   const CreatePanel = useStablePanel(() => {
     const unreadNotifs = notifications.filter(n=>!n.read).length;
     const curFriend = friends.find(f=>f.id===activeChan);
-    // Sidebar collapse — lets the actual chat take the full screen width
-    // instead of always sharing it with the lane/DM list.
-    const [sidebarOpen, setSidebarOpen] = useState(true);
     // Lanes settings sheet (replaces the old mic/voice-command button in the
     // user bar) — display of your own online status, muting the 🔔
     // notifications badge for Lanes activity, and which chats are pinned.
@@ -6000,7 +6310,7 @@ export default function SonoLane() {
     const allMsgs = activeChan==="notes"||activeChan==="notifications"||activeChan==="sono" ? [] : (friendMsgs[activeChan]||laneMsgs[activeChan]||[]);
 
     const SideBtn = ({id, icon, label, badge, sub, color}) => (
-      <button onClick={()=>setActiveChan(id)} style={{
+      <button onClick={()=>{setActiveChan(id);setLanesView("room");}} style={{
         width:"100%",display:"flex",alignItems:"center",gap:6,
         padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
         background:activeChan===id?"#42464d":"transparent",marginBottom:1,
@@ -6015,8 +6325,12 @@ export default function SonoLane() {
     return (
       <div style={{flex:1,display:"flex",flexDirection:"row",overflow:"hidden",background:"#36393f",position:"relative"}}>
 
-        {/* ── Sidebar ── */}
-        <div style={{width:sidebarOpen?196:0,background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",transition:"width 0.2s ease"}}>
+        {/* ── Chat list — its own full page now (was a fixed 196px sidebar
+            always shown alongside the chat). Tapping any chat switches
+            lanesView to "room"; the shared TopBar becomes that room's back
+            button to return here. ── */}
+        {lanesView==="list" && (
+        <div style={{width:"100%",background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden"}}>
           {/* App name */}
           <div style={{padding:"11px 12px 9px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
             <div style={{flex:1}}>
@@ -6046,7 +6360,7 @@ export default function SonoLane() {
             </div>
             {publicLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
             {publicLanes.map(lane=>(
-              <button key={lane.id} onClick={()=>setActiveChan(lane.id)} style={{
+              <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
                 width:"100%",display:"flex",alignItems:"center",gap:6,
                 padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
                 background:activeChan===lane.id?"#42464d":"transparent",marginBottom:1,
@@ -6065,7 +6379,7 @@ export default function SonoLane() {
             {sidebarCustomLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
             {sortPinned(sidebarCustomLanes).map(lane=>(
               <div key={lane.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
-                <button onClick={()=>setActiveChan(lane.id)} style={{
+                <button onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
                   flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,
                   padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
                   background:activeChan===lane.id?"#42464d":"transparent",
@@ -6090,7 +6404,7 @@ export default function SonoLane() {
               )}
               {sortPinned(laneUserSearch.trim() ? friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())) : friends).map(fr=>(
                 <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
-                  <button onClick={()=>setActiveChan(fr.id)} style={{
+                  <button onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{
                     flex:1,minWidth:0,display:"flex",alignItems:"center",gap:7,
                     padding:"4px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
                     background:activeChan===fr.id?"#42464d":"transparent",
@@ -6123,6 +6437,7 @@ export default function SonoLane() {
             <button onClick={()=>setShowLanesSettings(true)} title="Lanes settings" style={{width:20,height:20,borderRadius:4,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#8e9297"}}>⚙️</button>
           </div>
         </div>
+        )}
 
         {/* Lanes settings sheet */}
         {showLanesSettings && (
@@ -6161,8 +6476,13 @@ export default function SonoLane() {
           </div>
         )}
 
-        {/* ── Main area ── */}
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {/* ── Chat room — its own full page, opened by tapping a chat in the
+            list. The shared TopBar's back arrow (see BACK_PAGES-style
+            handling in TopBar for panel==="create") returns to the list;
+            this page's own header below still shows who/what the chat is,
+            same pattern as the Top 3 Friend page. ── */}
+        {lanesView==="room" && (
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",width:"100%"}}>
 
           {/* Header */}
           <div style={{padding:"9px 14px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:8,background:"#36393f"}}>
@@ -6394,12 +6714,11 @@ export default function SonoLane() {
                 </div>
               ) : (
               <div style={{display:"flex",alignItems:"center",gap:6,opacity:laneLocked?0.6:1}}>
-                {/* Chat menu / lane-list toggle — was a floating overlay, now
-                    sits to the left of the text bar so it's always in the
-                    same reachable spot, whether the sidebar is open or the
-                    chat is full screen. */}
-                <button onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?"Hide lane list":"Show lane list"} style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>
-                  {sidebarOpen?"◀":"☰"}
+                {/* Back to the chat list — the list is now its own full page
+                    (see lanesView), so this is a second, always-reachable
+                    way back besides the shared TopBar's back arrow above. */}
+                <button onClick={()=>setLanesView("list")} title="Back to chats" style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>
+                  ☰
                 </button>
 
                 {/* Text bar */}
@@ -6447,6 +6766,7 @@ export default function SonoLane() {
             </div>
           )}
         </div>
+        )}
 
         {/* Create Lane sheet */}
         {showCreateLane&&(
@@ -6794,7 +7114,7 @@ export default function SonoLane() {
        slot(s) are equal flex children of the same row/column, so 2 widgets
        split the space 50/50 and 1 widget fills it completely, automatically. */
     const widgetIsActive = id => {
-      if(id==="dashcam") return dashOn;
+      if(id==="dashcam") return camLive || dashOn;
       if(id==="spotify") return spotifyPlaying;
       if(id==="cbradio") return isBroad || !!currentFreewayId;
       if(id==="none") return false; // Empty is never "active" — with the
@@ -6901,6 +7221,18 @@ export default function SonoLane() {
                     <span style={{color:"#8e9297",fontSize:18}}>›</span>
                   </button>
                 ))}
+
+                {dashcamConsent && (
+                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",borderRadius:12,background:"#242424",marginTop:4}}>
+                    <div style={{flex:1,paddingRight:10}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Auto-Record Dashcam</div>
+                      <div style={{fontSize:11,color:"#8e9297",marginTop:2,lineHeight:1.5}}>The Dashcam widget always shows the live camera in Drive mode. With this on, it also starts saving a clip automatically once you're over 5 mph — no need to open the widget. Turn off to only record when you start a clip yourself.</div>
+                    </div>
+                    <button onClick={()=>{const next=!dashcamBgRecord;setDashcamBgRecord(next);if(!next&&dashOn)stopDrive();}} style={{width:44,height:26,borderRadius:13,border:"none",background:dashcamBgRecord?OR:"#333",position:"relative",cursor:"pointer",flexShrink:0,padding:0}}>
+                      <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:dashcamBgRecord?21:3,transition:"left 0.15s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+                    </button>
+                  </div>
+                )}
               </>)}
 
               {driveSettingsTab==="voice" && (<>
@@ -7314,14 +7646,14 @@ export default function SonoLane() {
   const TopNav = () => {
     const onLanes = panel==="create";
     return (
-    <div style={{flexShrink:0,display:"flex",gap:4,padding:"8px 8px 4px",paddingBottom:"calc(4px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+    <div style={{flexShrink:0,display:"flex",gap:4,padding:"6px 8px 0",paddingBottom:"calc(2px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
       {TOPNAV_ITEMS.map(it=>{
         const active = panel===it.id;
         const color = DPAD_COLORS[it.iconId];
         return (
           <button key={it.id} onClick={()=>go(it.id)} style={{
             flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-            padding:"12px 6px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,
+            padding:"7px 6px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,
             background:active?color+"14":"transparent",
           }}>
             {it.id==="profile" ? <CompassStar size={20} color={color}/> : <DPadIcon id={it.iconId} color={color} size={20}/>}
@@ -7339,50 +7671,83 @@ export default function SonoLane() {
   // info drawer (Settings, Terms of Service, Privacy Policy, About, Help).
   // Used to live only inside Profile — now shared so Discover and Lanes get
   // it too, instead of only Profile having quick access to it.
+  // Every full-screen Profile sub-page that draws its own back button gets
+  // its entry here instead — whenever one of these is open, the shared
+  // TopBar itself becomes that page's back button (and its one main
+  // right-side action, where it has one), replacing the usual +/☰, rather
+  // than the page drawing a second header row underneath. `back`/`onBack`
+  // handlers were hoisted up next to `go()` for exactly this reason.
+  const BACK_PAGES = {
+    car:          { onBack: ()=>setSubPanel(carDetailFrom==="garage"?"garage":null), right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
+    editcar:      { onBack: ()=>setSubPanel("car"), title:"Edit Car", right: {label:"Save", onClick:saveEditCar} },
+    createroute:  { onBack: cancelCreateRoute, title: editingRouteId?"Edit Route":"Create Route", right: {label:"Save", onClick:saveCreateRoute} },
+    sharedgarage: { onBack: cancelSharedGarage, right: {label:"💬 Chat", onClick:openSharedGarageChat} },
+    following:    { onBack: back, title:"Following" },
+    followerslist:{ onBack: back, title:"Followers" },
+    friends:      { onBack: back, title:"Friends", right: {label:"+ Add", onClick:()=>setShowAddFriend(true)} },
+    edit:         { onBack: back, title:"Edit Profile", right: {label:"Save", onClick:saveEditProfile} },
+    radius:       { onBack: back, title:"Discovery Radius" },
+    rewards:      { onBack: back, title:"🏆 Rewards", dark:true },
+    top3friend:   { onBack: ()=>setSubPanel(null), dark:true },
+  };
   const TopBar = () => {
     const onLanes = panel==="create";
-    const onCarDetails = panel==="profile" && subPanel==="car";
-    const btnBg = onLanes ? "#2f3136" : "#f3f3f3";
-    const btnColor = onLanes ? "#dcddde" : "#111";
+    // Lanes' chat room is its own full page too (see lanesView) — the
+    // shared TopBar becomes its back button the same way BACK_PAGES does
+    // for Profile sub-pages, even though Lanes isn't driven by subPanel.
+    // No title/right action here since the chat room's own header (name,
+    // online status, etc.) already renders as page content underneath.
+    const backPage = panel==="profile" ? BACK_PAGES[subPanel]
+      : (onLanes && lanesView==="room") ? { onBack: ()=>setLanesView("list") }
+      : null;
+    const dark = onLanes || !!backPage?.dark;
+    const btnBg = dark ? "#2f3136" : "#f3f3f3";
+    const btnColor = dark ? "#dcddde" : "#111";
     return (
       <>
-        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexShrink:0,background:onLanes?"#36393f":"#fff",borderBottom:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
-          {/* Left button — the plain "+" everywhere, except the Car Details
-              page where it becomes a back button (see item 6). */}
-          {onCarDetails ? (
-            <button onClick={()=>setSubPanel(carDetailFrom==="garage"?"garage":null)} title="Back" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexShrink:0,background:dark?"#36393f":"#fff",borderBottom:"1px solid "+(dark?"#202225":"#ebebeb"),zIndex:100}}>
+          {/* Left button — the plain "+" everywhere, except on a page that
+              has its own back button, where the TopBar becomes that button. */}
+          {backPage ? (
+            <button onClick={backPage.onBack} title="Back" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
           ) : (
             <button onClick={()=>setShowQuickCreate(true)} title="Create" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:20,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,flexShrink:0}}>+</button>
           )}
 
-          {/* Middle — page-specific content: search on Discover (Routes or
-              Events, whichever tab is active) and Lanes (find users), the
-              username centered on Profile, nothing extra on Car Details
-              (its title lives in the page content below). */}
-          {panel==="discover" && (
+          {/* Middle — page-specific content: a back page's own title (when
+              it has one — some, like Car Details, keep their title in the
+              page content instead), search on Discover (Routes or Events,
+              whichever tab is active) and Lanes (find users), or the
+              username centered on Profile home. */}
+          {backPage ? (
+            backPage.title && <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:dark?"#fff":"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{backPage.title}</div>
+          ) : panel==="discover" ? (
             <input
               value={discoverTab==="routes" ? feedSearch : evSearch}
               onChange={e=>discoverTab==="routes" ? setFeedSearch(e.target.value) : setEvSearch(e.target.value)}
               placeholder={discoverTab==="routes" ? "Search routes…" : "Search events…"}
               style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
             />
-          )}
-          {panel==="profile" && !onCarDetails && (
+          ) : panel==="profile" ? (
             <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName || "You"}</div>
-          )}
-          {onLanes && (
+          ) : onLanes ? (
             <input
               value={laneUserSearch}
               onChange={e=>setLaneUserSearch(e.target.value)}
               placeholder="Find users…"
               style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #4f545c",background:"#40444b",color:"#dcddde",fontSize:13,fontFamily:F,outline:"none"}}
             />
-          )}
+          ) : null}
 
-          {/* Right button — the hamburger menu everywhere, except Car
-              Details where it becomes the edit button. */}
-          {onCarDetails ? (
-            <button onClick={()=>setSubPanel("editcar")} title="Edit car" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+          {/* Right button — the hamburger menu everywhere, except on a back
+              page, where it becomes that page's one main action (Save,
+              +Add, …) if it has one, or disappears entirely if it doesn't. */}
+          {backPage ? (
+            backPage.right && (
+              <button onClick={backPage.right.onClick} title={backPage.right.title} style={backPage.right.label ? {padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0} : {width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {backPage.right.label || backPage.right.icon}
+              </button>
+            )
           ) : (
             <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>☰</button>
           )}
@@ -7539,13 +7904,42 @@ export default function SonoLane() {
 
       {panel!=="drive" && <TopBar/>}
 
-      <div
-        style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}
-        onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}
-        onMouseDown={onSwipeStart} onMouseUp={onSwipeEnd}
-      >
-        <ActivePanel/>
-      </div>
+      {(() => {
+        // While a live carousel drag is in progress (swipeDir set — see
+        // onSwipeMove), render the current page AND whichever neighbor tab
+        // is being revealed side by side in a 2x-wide row, and slide that
+        // row by the live drag offset — so the next page visibly follows
+        // the finger in from the edge, proportional to how far it's
+        // dragged, instead of only snapping once the gesture ends.
+        const carouselIdx = CAROUSEL.indexOf(panel);
+        const neighborId = swipeDir==="next" ? CAROUSEL[carouselIdx+1] : swipeDir==="prev" ? CAROUSEL[carouselIdx-1] : null;
+        const NeighborPanel = neighborId ? PANELS[neighborId] : null;
+        const w = typeof window!=="undefined" ? window.innerWidth : 390;
+        return (
+          <div
+            style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative"}}
+            onTouchStart={onSwipeStart} onTouchMove={onSwipeMove} onTouchEnd={onSwipeEnd}
+            onMouseDown={onSwipeStart} onMouseMove={onSwipeMove} onMouseUp={onSwipeEnd}
+          >
+            {NeighborPanel ? (
+              <div style={{
+                position:"absolute", top:0, left:0, bottom:0, display:"flex", width:w*2,
+                transform:`translateX(${swipeDir==="next" ? swipeDX : swipeDX-w}px)`,
+                transition: swipeSettling ? "transform 0.22s ease" : "none",
+              }}>
+                <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                  {swipeDir==="next" ? <ActivePanel/> : <NeighborPanel/>}
+                </div>
+                <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                  {swipeDir==="next" ? <NeighborPanel/> : <ActivePanel/>}
+                </div>
+              </div>
+            ) : (
+              <ActivePanel/>
+            )}
+          </div>
+        );
+      })()}
 
       {panel!=="drive" && <TopNav/>}
 
@@ -7757,7 +8151,7 @@ export default function SonoLane() {
               <div style={{textAlign:"center",marginBottom:14}}>
                 <div style={{fontSize:38,marginBottom:6}}>📹</div>
                 <div style={{fontSize:16,fontWeight:900,color:"#111",marginBottom:4}}>Set Up the Dashcam Widget</div>
-                <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>One-time setup. Once enabled, this widget shows a live recording preview and starts recording automatically the moment you enter Drive mode.</div>
+                <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>One-time setup. Once enabled, this widget shows a live camera preview the whole time you're in Drive mode, and starts saving a clip automatically once you're moving over 5 mph.</div>
               </div>
               <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"14px",marginBottom:16,fontSize:13,color:"#111",lineHeight:1.7}}>
                 Camera and mic access is used only while SonoLane is open in the foreground. Footage stays on this device and is viewable anytime from Profile → Dashcam, where you can also revoke access.
