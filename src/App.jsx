@@ -1071,18 +1071,27 @@ export default function SonoLane() {
   /* state */
   const [panel,        setPanel]        = useState("profile");
   const [discoverTab,  setDiscoverTab]  = useState("routes"); // "routes" | "events" — toggle within the combined Discover page
+  // Shared top bar (+ quick-create / ☰ menu) — lives at the app shell level
+  // now instead of inside Profile alone, so every page (Profile, Discover,
+  // Lanes) shows the same persistent bar up top, matching the persistent
+  // TopNav down below.
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [showInfoDrawer,  setShowInfoDrawer]  = useState(false);
+  const [infoDrawerPage,  setInfoDrawerPage]  = useState(null); // null (list) | "tos" | "privacy" | "about" | "help"
   const [voiceOn,      setVoiceOn]      = useState(false);
   const [voiceText,    setVoiceText]    = useState("");
   const [aiThinking,   setAiThinking]   = useState(false);
   const [aiPalId,      setAiPalId]      = usePersistedState("sl_aiPalId", "nova");
   // "Say Sono to Wake" — Profile > AI setting. Governs voice control
   // everywhere OUTSIDE Drive mode. When on, the voice-command listener
-  // below starts automatically the moment you leave Drive mode.
-  const [sayWakeEnabled, setSayWakeEnabled] = usePersistedState("sl_sayWake", true);
+  // below starts automatically the moment you leave Drive mode. Off by
+  // default — voice control is opt-in, not something that starts listening
+  // the first time you open the app.
+  const [sayWakeEnabled, setSayWakeEnabled] = usePersistedState("sl_sayWake", false);
   // Drive mode's own separate voice-control setting, in Drive mode's own
   // Settings sheet — lets you keep voice on inside Drive mode independently
-  // of whatever the rest-of-app setting above is set to.
-  const [driveSayWakeEnabled, setDriveSayWakeEnabled] = usePersistedState("sl_driveSayWake", true);
+  // of whatever the rest-of-app setting above is set to. Also off by default.
+  const [driveSayWakeEnabled, setDriveSayWakeEnabled] = usePersistedState("sl_driveSayWake", false);
   // AI Co-Pilot as a Top 3 Friend — tapping it starts a live voice call
   // instead of opening a normal friend chat.
   const [aiInTop3,     setAiInTop3]     = usePersistedState("sl_aiInTop3", false);
@@ -1681,6 +1690,13 @@ export default function SonoLane() {
     };
   }, []);
   const [appRadius,    setAppRadius]    = usePersistedState("sl_radius", null); // global radius in miles (null = any)
+  // Global Discovery — like Instagram, see every public post/event/lane
+  // everywhere, ignoring the mile radius above entirely. Toggled from the
+  // Discovery Radius edit page. `radiusActive` is the one thing every
+  // radius-based filter in the app should check instead of `appRadius`
+  // directly, so turning this on immediately overrides any mile setting.
+  const [globalDiscovery, setGlobalDiscovery] = usePersistedState("sl_globalDiscovery", false);
+  const radiusActive = !globalDiscovery && appRadius;
   const [radiusColor,  setRadiusColor]  = usePersistedState("sl_radiusColor", OR); // color of the Discovery Radius bar, changeable from Edit Profile
   const [startDriveStyle, setStartDriveStyle] = usePersistedState("sl_startDriveStyle", "flag"); // "flag" | "solid" | "outline" — changeable from Edit Profile
   const [startDriveColor, setStartDriveColor] = usePersistedState("sl_startDriveColor", "#000000"); // accent color for the Start Drive button
@@ -2423,20 +2439,14 @@ export default function SonoLane() {
     // Private car info now opens from a wallet button at the bottom of the
     // car page instead of always sitting inline on the page.
     const [showPrivateCard, setShowPrivateCard] = useState(false);
-    // Home screen's top bar — plus button opens a quick menu to jump
-    // straight into creating a route post or an event from anywhere.
-    const [showQuickCreate, setShowQuickCreate] = useState(false);
-    // Top-right hamburger — a side drawer of profile-adjacent info pages
-    // (Settings, Terms of Service, Privacy Policy, About) instead of
-    // jumping straight to Settings like the old gear icon did. Settings is
-    // still the first row in the drawer, and also still reachable from the
-    // My Stuff tile grid, so nothing was lost by repurposing the icon.
-    const [showInfoDrawer, setShowInfoDrawer] = useState(false);
-    const [infoDrawerPage, setInfoDrawerPage] = useState(null); // null (list) | "tos" | "privacy" | "about" | "help"
-    // The row of profile tile buttons (My Garage, My Routes, Settings, …)
-    // sits behind a single toggle now instead of always taking up a full
-    // 2x4 grid's worth of space on the home screen — tap it to expand.
-    const [showTiles, setShowTiles] = useState(false);
+    // Home screen's top bar (+ quick-create, ☰ menu) is now shared across
+    // every page — its state (showQuickCreate/showInfoDrawer/infoDrawerPage)
+    // and JSX live at the app shell level instead of here; see <TopBar/>.
+    // The row of profile tile buttons (My Garage, My Routes, Settings, …) is
+    // now a row of toggle icons under TOP 3 instead of a grid — which of
+    // them is open reuses `subPanel` itself (same as every other subpage),
+    // so links elsewhere in the app that jump straight to e.g.
+    // setSubPanel("routes") still land in the right place.
     // Confirm-before-delete for a car in the garage — {id,name} of the car
     // pending deletion, or null. Deleting a car wipes its photos/details,
     // so this is a deliberate extra tap rather than an instant ✕.
@@ -2795,16 +2805,26 @@ export default function SonoLane() {
       );
     };
 
+    /* ── My Stuff sections — My Garage, My Routes, My Events, Drive
+         History, Dashcam, Achievements, Radio Stations, Settings all used to
+         be their own full-screen pages under Profile; now each just fills
+         one of these variables with its content, shown inline below the
+         icon toggle row on the Profile home screen instead (see "home
+         grid" below). Each block below still only runs its content when
+         its own subPanel value is active, same as before. ── */
+    let garageSection = null, routesSection = null, myeventsSection = null,
+        historySection = null, dashcamSection = null, achievementsSection = null,
+        radiostationsSection = null, settingsSection = null;
+
     /* routes sub */
     const myPostedRoutes = posts.filter(p=>p.authorId==="me");
-    if(subPanel==="routes") return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
+    if(subPanel==="routes") routesSection = (
+      <div>
+        <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:10}}>
           <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> My Routes</div>
           <VN action={()=>{setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});setEditingRouteId(null);setSubPanel("createroute");}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Route</VN>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 24px"}}>
+        <div style={{padding:"10px 14px 4px"}}>
 
           {/* My Created Routes */}
           {routes.length===0 && savedFromFeed.length===0 && myPostedRoutes.length===0 && (
@@ -3009,13 +3029,12 @@ export default function SonoLane() {
        plus shared garages; tap a car tile to make it active and open its
        full detail view (banner, stats, photos), or "Add Another Car" to
        park the current one and start a new blank one. */
-    if(subPanel==="garage") return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+    if(subPanel==="garage") garageSection = (
+      <div>
+        <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:10}}>
           <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DefaultAvatar size={18} color="#555"/> My Profile</div>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 7px"}}>
+        <div style={{padding:"16px 14px 7px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <span style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
             <span style={{fontSize:11,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
@@ -3656,20 +3675,19 @@ export default function SonoLane() {
       };
       // Simulated path colors for variety
       const PATH_COLORS = ["#f97316","#6366f1","#22c55e","#a855f7","#ef4444","#14b8a6","#f59e0b","#ec4899"];
-      return (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      historySection = (
+        <div>
           {/* Header */}
-          <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={()=>{setSelTrip(null);back();}} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
             <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>🛤️ Drive History</div>
             <div style={{fontSize:13,fontWeight:700,color:OR}}>{tripHistory.length} trip{tripHistory.length!==1?"s":""}</div>
           </div>
 
           {selTrip ? (
             /* ── Trip detail view ── */
-            <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div>
               {/* Map with simulated route highlight */}
-              <div style={{position:"relative",height:"44%",flexShrink:0,background:"#e5e3df",overflow:"hidden"}}>
+              <div style={{position:"relative",height:220,flexShrink:0,background:"#e5e3df",overflow:"hidden"}}>
                 <iframe
                   title="Trip Map"
                   style={{width:"100%",height:"100%",border:"none",display:"block"}}
@@ -3755,7 +3773,7 @@ export default function SonoLane() {
             </div>
           ) : (
             /* ── Trip list ── */
-            <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 7px"}}>
+            <div style={{padding:"10px 14px 7px"}}>
               {tripHistory.length===0 ? (
                 <div style={{textAlign:"center",padding:"52px 20px",color:"#111"}}>
                   <div style={{fontSize:50,marginBottom:12}}>🛤️</div>
@@ -3847,13 +3865,12 @@ export default function SonoLane() {
     }
 
         if(subPanel==="dashcam") {
-      if(!dashcamConsent) return (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+      if(!dashcamConsent) { dashcamSection = (
+        <div>
+          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
             <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
           </div>
-          <div style={{flex:1,overflowY:"auto",padding:"22px 18px 7px"}}>
+          <div style={{padding:"12px 18px 7px"}}>
             <div style={{textAlign:"center",marginBottom:18}}>
               <div style={{fontSize:46,marginBottom:8}}>📹</div>
               <div style={{fontSize:17,fontWeight:900,color:"#111",marginBottom:4}}>Terms of Service &amp; Privacy Notice</div>
@@ -3872,12 +3889,12 @@ export default function SonoLane() {
             <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
               I Agree — Enable Dashcam
             </button>
-            <button onClick={back} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+            <button onClick={()=>setSubPanel(null)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>
               Not Now
             </button>
           </div>
         </div>
-      );
+      ); } else {
       const calMap={};
       clips.forEach(c=>{if(!calMap[c.date])calMap[c.date]=[];calMap[c.date].push(c);});
       const today=new Date();
@@ -3885,15 +3902,14 @@ export default function SonoLane() {
       const fd=new Date(today.getFullYear(),today.getMonth(),1).getDay();
       const ml=today.toLocaleDateString("en-US",{month:"long",year:"numeric"});
       const dk=d=>new Date(today.getFullYear(),today.getMonth(),d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
-      return (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          {/* Storage page is calendar/footage only — just a back button to
-              return to Profile, no AI star/name or Map button. The dashcam
-              widget itself shows the live feed while a drive is recording. */}
-          <div style={{padding:"10px 14px",display:"flex",alignItems:"center",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+      dashcamSection = (
+        <div>
+          {/* Storage page is calendar/footage only — the dashcam widget
+              itself shows the live feed while a drive is recording. */}
+          <div style={{padding:"0 14px 8px"}}>
+            <div style={{fontSize:16,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
           </div>
-          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 24px"}}>
+          <div style={{padding:"4px 14px 24px"}}>
             <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6,marginTop:4}}>{ml.toUpperCase()}</div>
             <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",marginBottom:14}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:"#f0f0f0",borderBottom:"1px solid #ebebeb",borderRadius:"12px 12px 0 0"}}>
@@ -3966,7 +3982,7 @@ export default function SonoLane() {
             </button>
           </div>
         </div>
-      );
+      ); }
     }
 
     /* following sub — people you follow */
@@ -4004,13 +4020,12 @@ export default function SonoLane() {
        created via Register as Radio Host in the CB Radio/Music sheet. */
     if(subPanel==="radiostations") {
       const _saved = radioHosts.filter(h=>savedStations.includes(h.name));
-      return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <VN action={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</VN>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>📻 Radio Stations</div>
+      radiostationsSection = (
+      <div>
+        <div style={{padding:"0 14px 12px"}}>
+          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>📻 Radio Stations</div>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 24px"}}>
+        <div style={{padding:"4px 14px 24px"}}>
 
           <div style={SEC}>SAVED STATIONS</div>
           {_saved.length===0 ? (
@@ -4445,19 +4460,34 @@ export default function SonoLane() {
               <span>100+ mi</span>
             </div>
           </div>
+
+          {/* Global Discovery — like Instagram, every public post is visible
+              to everyone regardless of location. Overrides the mile radius
+              above entirely while on, without losing the mile setting for
+              when it's turned back off. */}
+          <div style={{...CARD}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{flex:1,paddingRight:10}}>
+                <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:3}}>🌎 Global Discovery</div>
+                <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>See any public route or event around the world, like Instagram — ignores the mile radius above while on.</div>
+              </div>
+              <button onClick={()=>setGlobalDiscovery(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:globalDiscovery?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+                <div style={{position:"absolute",top:2,left:globalDiscovery?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
 
     /* settings sub — the AI Co-Pilot picker + outside-Drive-mode voice
        toggle live here now instead of on the Edit Profile page. */
-    if(subPanel==="settings") return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+    if(subPanel==="settings") settingsSection = (
+      <div>
+        <div style={{padding:"0 16px 12px"}}>
           <div style={{fontSize:16,fontWeight:800,color:"#111"}}>⚙️ Settings</div>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
+        <div style={{padding:"4px 16px 24px"}}>
 
           <button onClick={()=>setSubPanel("edit")} style={{width:"100%",padding:"9px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:12}}>Edit full profile →</button>
 
@@ -4561,14 +4591,13 @@ export default function SonoLane() {
           </div>
         );
       };
-      return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+      myeventsSection = (
+      <div>
+        <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:10}}>
           <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/> My Events</div>
           <button onClick={()=>{resetEventForm();setShowEvent(true);}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Event</button>
         </div>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 7px"}}>
+        <div style={{padding:"0 14px 7px"}}>
           {myCreatedEvents.length===0 && mySavedEvents.length===0 ? (
             <div style={{textAlign:"center",padding:"48px 20px",color:"#111"}}>
               <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}><CompassStar size={48}/></div>
@@ -4688,23 +4717,22 @@ export default function SonoLane() {
     if(subPanel==="achievements") {
       const CAT_LABELS = {milestone:"🏁 Milestones", distance:"🛣️ Distance", safe:"🚦 Safe Driving", social:"👥 Social", car:"🚗 Car", bonus:"⭐ Bonus"};
       const cats = [...new Set(ACHIEVEMENTS.map(a=>a.cat))];
-      return (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-            <button onClick={back} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
+      achievementsSection = (
+        <div>
+          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
             <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>🏅 Achievements</div>
             <div style={{fontSize:13,fontWeight:700,color:"#e94560"}}>{unlockedAch.length}/{ACHIEVEMENTS.length}</div>
           </div>
 
           {/* Progress bar */}
-          <div style={{padding:"10px 14px 0",flexShrink:0}}>
+          <div style={{padding:"0 14px"}}>
             <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:4}}>
               <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#e94560,#f5a623)",width:(unlockedAch.length/ACHIEVEMENTS.length*100)+"%",transition:"width 0.5s ease"}}/>
             </div>
             <div style={{fontSize:11,color:"#111",textAlign:"right"}}>{Math.round(unlockedAch.length/ACHIEVEMENTS.length*100)}% complete</div>
           </div>
 
-          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"10px 14px 7px"}}>
+          <div style={{padding:"10px 14px 7px"}}>
             {cats.map(cat=>(
               <div key={cat}>
                 <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:10}}>{CAT_LABELS[cat]||cat.toUpperCase()}</div>
@@ -4787,123 +4815,6 @@ export default function SonoLane() {
     /* home grid */
     return (
       <div ref={setScroll} style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column"}}>
-
-        {/* ── Top bar — plus (quick create) on the left, a hamburger menu on
-             the right opening the info drawer (Settings, Terms of Service,
-             Privacy Policy, About). ── */}
-        <div style={{padding:"10px 14px 0",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-          <button onClick={()=>setShowQuickCreate(true)} title="Create" style={{width:34,height:34,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:20,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
-          <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:34,height:34,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
-        </div>
-
-        {/* Quick create sheet */}
-        {showQuickCreate && (
-          <div onClick={()=>setShowQuickCreate(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
-            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:"12px 16px 20px"}}>
-              <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:12}}>Create</div>
-              <button onClick={()=>{
-                setShowQuickCreate(false);
-                setNewPost({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
-                setPostPhotos([]); setPostRouteMode("new"); setPostSavedRoute(null); setEditingPostId(null);
-                setShowPost(true); go("discover"); setDiscoverTab("routes");
-              }} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                <DPadIcon id="road" color={DPAD_COLORS.road} size={20}/>
-                <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Route Post</div>
-              </button>
-              <button onClick={()=>{
-                setShowQuickCreate(false);
-                setNewEvent({title:"",type:"car meet",desc:"",address:"",date:""});
-                setEventPhotos([]); setEditingEventId(null);
-                setShowEvent(true); go("discover"); setDiscoverTab("events");
-              }} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                <DPadIcon id="event" color={DPAD_COLORS.event} size={20}/>
-                <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Event</div>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Info drawer — Settings + Terms of Service / Privacy Policy /
-            About / Help, opened from the hamburger in the top bar. Slides
-            in from the right like a standard side menu. */}
-        {showInfoDrawer && (() => {
-          const INFO_PAGES = {
-            tos: {
-              title:"Terms of Service",
-              body:[
-                ["Using SonoLane","By using SonoLane, you agree to use it responsibly — never operate Drive Mode, the Dashcam, or any other in-app feature in a way that distracts you from driving safely. Pull over before interacting with the app if you need to."],
-                ["Your content","Routes, events, photos, and car avatars you post stay yours. Posting something publicly gives other SonoLane users permission to view it in their feeds. Don't post anything you don't have the rights to."],
-                ["Community conduct","Don't use SonoLane to harass, spam, or scam other drivers. Accounts that break these rules can be suspended."],
-                ["Demo notice","SonoLane is a demo app — this text is placeholder copy, not a binding legal agreement."],
-              ],
-            },
-            privacy: {
-              title:"Privacy Policy",
-              body:[
-                ["What we store","Your profile info, car avatars, routes, events, messages, and location-sharing preferences are stored so the app can show them back to you and to the friends you choose to share with."],
-                ["Location sharing","Live location is only ever shared with a Top 3 Friend after you explicitly turn Share Live Location on for them, and stays off for everyone else by default."],
-                ["Dashcam clips","Dashcam recordings stay on your device/account and are never shared automatically — you choose if and when to share a clip."],
-                ["Demo notice","SonoLane is a demo app — this text is placeholder copy describing intended behavior, not a real data-handling policy."],
-              ],
-            },
-            about: {
-              title:"About SonoLane",
-              body:[
-                ["What it is","SonoLane is a social driving app — track drives, share routes and meetup events, keep a garage of car avatars, and stay in touch with friends over Lanes chat and walkie-talkie voice messages."],
-                ["Version","SonoLane · demo build."],
-              ],
-            },
-            help: {
-              title:"Help & Support",
-              body:[
-                ["Getting started","Set up your profile and car avatar from the Profile tab, then post your first route or event from Discover."],
-                ["Need something else?","This is a demo build without a live support line — check back here for updates as new features ship."],
-              ],
-            },
-          };
-          const page = infoDrawerPage ? INFO_PAGES[infoDrawerPage] : null;
-          return (
-            <div onClick={()=>{setShowInfoDrawer(false);setInfoDrawerPage(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:850,display:"flex",justifyContent:"flex-end"}}>
-              <div onClick={e=>e.stopPropagation()} style={{width:"82%",maxWidth:320,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"-4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
-                {!page ? (<>
-                  <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-                    <div style={{fontSize:17,fontWeight:800,color:"#111"}}>Menu</div>
-                    <button onClick={()=>setShowInfoDrawer(false)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>✕</button>
-                  </div>
-                  <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-                    {[
-                      ["⚙️","Settings", ()=>{setShowInfoDrawer(false);setSubPanel("settings");}],
-                      ["📄","Terms of Service", ()=>setInfoDrawerPage("tos")],
-                      ["🔒","Privacy Policy", ()=>setInfoDrawerPage("privacy")],
-                      ["ℹ️","About SonoLane", ()=>setInfoDrawerPage("about")],
-                      ["💬","Help & Support", ()=>setInfoDrawerPage("help")],
-                    ].map(([icon,label,action])=>(
-                      <button key={label} onClick={action} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 8px",borderRadius:10,background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                        <span style={{fontSize:17,flexShrink:0}}>{icon}</span>
-                        <span style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{label}</span>
-                        <span style={{color:"#ccc",fontSize:14}}>›</span>
-                      </button>
-                    ))}
-                  </div>
-                </>) : (<>
-                  <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                    <button onClick={()=>setInfoDrawerPage(null)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>←</button>
-                    <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>{page.title}</div>
-                  </div>
-                  <div style={{flex:1,overflowY:"auto",padding:"16px 18px"}}>
-                    {page.body.map(([h,b])=>(
-                      <div key={h} style={{marginBottom:16}}>
-                        <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:4}}>{h}</div>
-                        <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>{b}</div>
-                      </div>
-                    ))}
-                  </div>
-                </>)}
-              </div>
-            </div>
-          );
-        })()}
 
         {/* ── Car hero — standalone car banner/avatar; tap for details.
              Uses the same banner (custom photo or preset) set on the car
@@ -5167,79 +5078,48 @@ export default function SonoLane() {
             </div>
           )}
 
-          {/* Toggle for the tile grid below — collapsed by default so the
-              home screen isn't dominated by 8 tiles' worth of height; tap
-              to expand them all into the grid. */}
-          <button onClick={()=>setShowTiles(v=>!v)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"13px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",fontFamily:F,marginBottom:showTiles?10:14,flexShrink:0}}>
-            <span style={{fontSize:14,fontWeight:800,color:"#111"}}>My Stuff</span>
-            <span style={{fontSize:13,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:4}}>{showTiles?"Hide":"Show all"} {showTiles?"▲":"▼"}</span>
-          </button>
-
-          {showTiles && (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"repeat(4,1fr)",gap:10,flex:1}}>
-
-            {/* My Car — garage tile — sized to match every other tile below.
-                Title always reads "My Garage" and the icon always stays the
-                garage-door symbol; once a car is saved, only the info line
-                changes to show the car's name. */}
-            <VN action={()=>setSubPanel("garage")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8}}><GarageDoorIcon size={26} color={carSaved?OR:"#8a8f98"}/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>My Garage</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{carSaved?(carName||"Saved"):carModel}</div>
-            </VN>
-
-            {/* My Routes */}
-            <VN action={()=>setSubPanel("routes")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8}}><DPadIcon id="road" color={DPAD_COLORS.road} size={26}/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>My Routes</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{routes.length} saved</div>
-            </VN>
-
-            {/* My Events tile — shows only events the user created */}
-            <VN action={()=>setSubPanel("myevents")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8}}><DPadIcon id="event" color={DPAD_COLORS.event} size={26}/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>My Events</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{events.length} created</div>
-            </VN>
-
-            {/* Driving History */}
-            <VN action={()=>setSubPanel("history")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8}}><ProfileIcon id="history" size={26} color="#8a8f98"/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Drive History</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{tripHistory.length} trips</div>
-            </VN>
-
-            {/* Dashcam */}
-            <VN action={()=>setSubPanel("dashcam")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8}}><ProfileIcon id="video" size={26} color="#8a8f98"/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Dashcam</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{clips.length} clips</div>
-            </VN>
-
-            {/* Achievements */}
-            <VN action={()=>setSubPanel("achievements")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,background:"#f8f8f8",border:"1.5px solid #ebebeb",cursor:"pointer",textAlign:"left",fontFamily:F,position:"relative",overflow:"hidden"}}>
-              {newAchQueue.length>0 && <div style={{position:"absolute",top:8,right:8,width:8,height:8,borderRadius:"50%",background:"#e94560",boxShadow:"0 0 6px #e94560"}}/>}
-              <span style={{marginBottom:8}}><ProfileIcon id="trophy" size={26} color="#f5a623"/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Achievements</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{unlockedAch.length}/{ACHIEVEMENTS.length} unlocked</div>
-            </VN>
-
-            {/* Radio Stations — saved & created */}
-            <VN action={()=>setSubPanel("radiostations")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8,fontSize:28}}>📻</span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Radio Stations</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>{savedStations.length} saved</div>
-            </VN>
-
-            {/* Settings — 8th tile, fills the 2x4 grid exactly */}
-            <VN action={()=>setSubPanel("settings")} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center",padding:"16px 14px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{marginBottom:8}}><ProfileIcon id="gear" size={26} color="#8a8f98"/></span>
-              <div style={{fontSize:15,fontWeight:700,color:"#111"}}>Settings</div>
-              <div style={{fontSize:12,color:"#111",marginTop:3}}>Preferences</div>
-            </VN>
-
+          {/* Row of icon toggles — My Garage, My Routes, My Events, Drive
+              History, Dashcam, Achievements, Radio Stations, Settings — tap
+              one to show its content right below this row; tap the active
+              one again (or another one) to switch. Reuses `subPanel` itself
+              as the toggle state, so every other link in the app that jumps
+              straight to e.g. setSubPanel("routes") still lands here. */}
+          <div style={{display:"flex",margin:"0 -14px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb",overflowX:"auto"}}>
+            {[
+              {id:"garage",        label:"Garage",   icon:<GarageDoorIcon size={22} color={subPanel==="garage"?OR:(carSaved?OR:"#8a8f98")}/>},
+              {id:"routes",        label:"Routes",   icon:<DPadIcon id="road" color={subPanel==="routes"?OR:DPAD_COLORS.road} size={22}/>},
+              {id:"myevents",      label:"Events",   icon:<DPadIcon id="event" color={subPanel==="myevents"?OR:DPAD_COLORS.event} size={22}/>},
+              {id:"history",       label:"History",  icon:<ProfileIcon id="history" size={22} color={subPanel==="history"?OR:"#8a8f98"}/>},
+              {id:"dashcam",       label:"Dashcam",  icon:<ProfileIcon id="video" size={22} color={subPanel==="dashcam"?OR:"#8a8f98"}/>},
+              {id:"achievements",  label:"Trophies", icon:<span style={{position:"relative",display:"inline-flex"}}><ProfileIcon id="trophy" size={22} color={subPanel==="achievements"?OR:"#f5a623"}/>{newAchQueue.length>0 && <span style={{position:"absolute",top:-2,right:-2,width:7,height:7,borderRadius:"50%",background:"#e94560",boxShadow:"0 0 6px #e94560"}}/>}</span>},
+              {id:"radiostations", label:"Radio",    icon:<span style={{fontSize:20}}>📻</span>},
+              {id:"settings",      label:"Settings", icon:<ProfileIcon id="gear" size={22} color={subPanel==="settings"?OR:"#8a8f98"}/>},
+            ].map(t=>{
+              const active = subPanel===t.id;
+              return (
+                <button key={t.id} onClick={()=>setSubPanel(active?null:t.id)} style={{
+                  flex:"1 0 auto",minWidth:52,display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                  padding:"10px 4px 8px",background:active?OR+"10":"none",border:"none",
+                  borderBottom:"2px solid "+(active?OR:"transparent"),cursor:"pointer",fontFamily:F,
+                }}>
+                  {t.icon}
+                  <span style={{fontSize:9,fontWeight:active?800:600,color:active?OR:"#8a8f98",whiteSpace:"nowrap"}}>{t.label}</span>
+                </button>
+              );
+            })}
           </div>
-          )}
+
+          {/* Whichever tile is toggled on shows its content right here,
+              below the row — same content each page always had, just
+              inline on the home screen now instead of its own full page. */}
+          {subPanel==="garage" && <div style={{margin:"14px -14px 0"}}>{garageSection}</div>}
+          {subPanel==="routes" && <div style={{margin:"14px -14px 0"}}>{routesSection}</div>}
+          {subPanel==="myevents" && <div style={{margin:"14px -14px 0"}}>{myeventsSection}</div>}
+          {subPanel==="history" && <div style={{margin:"14px -14px 0"}}>{historySection}</div>}
+          {subPanel==="dashcam" && <div style={{margin:"14px -14px 0"}}>{dashcamSection}</div>}
+          {subPanel==="achievements" && <div style={{margin:"14px -14px 0"}}>{achievementsSection}</div>}
+          {subPanel==="radiostations" && <div style={{margin:"14px -14px 0"}}>{radiostationsSection}</div>}
+          {subPanel==="settings" && <div style={{margin:"14px -14px 0"}}>{settingsSection}</div>}
 
           {/* Rewards Program — full width banner at bottom */}
           <VN action={()=>setSubPanel("rewards")} style={{
@@ -5278,7 +5158,7 @@ export default function SonoLane() {
       const matchSearch = !feedSearch||p.title.toLowerCase().includes(feedSearch.toLowerCase());
       const matchCat = feedCats.includes("All") ? true
         : feedCats.some(c => c==="Following" ? following.some(f=>f.id===p.authorId) : p.type===c);
-      const matchRadius = !appRadius || p.authorId==="me" || milesAwayFor(p.id)<=appRadius;
+      const matchRadius = !radiusActive || p.authorId==="me" || milesAwayFor(p.id)<=appRadius;
       return matchSearch&&matchCat&&matchRadius;
     });
     const GhostPost = () => (
@@ -5371,7 +5251,7 @@ export default function SonoLane() {
           ))}
         </div>
         {/* Radius indicator — set in Profile Settings */}
-        {appRadius&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
+        {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
           <span style={{fontSize:11,color:"#111"}}>📍</span>
           <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
           <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
@@ -5386,14 +5266,14 @@ export default function SonoLane() {
             <div style={{fontSize:14,color:"#111"}}>No routes from people you follow yet.</div>
           </div>
         )}
-        {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && appRadius && posts.length>0 && (
+        {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && radiusActive && posts.length>0 && (
           <div style={{textAlign:"center",padding:"30px 20px",color:"#111"}}>
             <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="road" size={34} color="#ddd"/></div>
             <div style={{fontSize:14,color:"#111",marginBottom:4}}>No routes within {appRadius} mi.</div>
             <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
           </div>
         )}
-        {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && !(appRadius && posts.length>0) && <><GhostPost/><GhostPost/><GhostPost/></>}
+        {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && !(radiusActive && posts.length>0) && <><GhostPost/><GhostPost/><GhostPost/></>}
         {filtered.map(post=>(
           <div key={post.id} onClick={()=>setViewRouteId(post.id)} style={{...CARD,padding:0,overflow:"hidden",cursor:"pointer"}}>
             {post.photos?.length>0 && (
@@ -5711,7 +5591,7 @@ export default function SonoLane() {
       const ms = !evSearch || ev.title.toLowerCase().includes(evSearch.toLowerCase()) || (ev.address||"").toLowerCase().includes(evSearch.toLowerCase());
       const mf = evFilters.includes("All") ? true
         : evFilters.some(t => t==="Following" ? following.some(f=>f.id===ev.authorId) : ev.type===t);
-      const mr = !appRadius || ev.authorId==="me" || milesAwayFor(ev.id)<=appRadius;
+      const mr = !radiusActive || ev.authorId==="me" || milesAwayFor(ev.id)<=appRadius;
       return ms && mf && mr;
     });
 
@@ -5746,7 +5626,7 @@ export default function SonoLane() {
             ))}
           </div>
           {/* Radius indicator — set in Profile Settings */}
-          {appRadius&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
+          {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
             <span style={{fontSize:11,color:"#111"}}>📍</span>
             <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
             <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
@@ -5768,14 +5648,14 @@ export default function SonoLane() {
               <div style={{fontSize:14,color:"#111"}}>No events from people you follow yet.</div>
             </div>
           )}
-          {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && appRadius && !evSearch && (
+          {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && radiusActive && !evSearch && (
             <div style={{textAlign:"center",padding:"40px 20px",color:"#111"}}>
               <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><DPadIcon id="event" color="#ddd" size={34}/></div>
               <div style={{fontSize:14,color:"#111",marginBottom:4}}>No events within {appRadius} mi.</div>
               <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
             </div>
           )}
-          {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && !(appRadius && !evSearch) && (
+          {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && !(radiusActive && !evSearch) && (
             <div style={{textAlign:"center",padding:"40px 20px",color:"#111"}}>
               <div style={{fontSize:34,marginBottom:8}}>🔍</div>
               <div style={{fontSize:14,color:"#111"}}>No events match your search.</div>
@@ -5956,7 +5836,7 @@ export default function SonoLane() {
     // browsed here, so they're kept out of the My Lanes list.
     const sidebarCustomLanes = customLanes.filter(l=>!l.garageId);
     const myPublicLanes = customLanes.filter(l=>l.visibility==="public" && !l.garageId);
-    const communityPublicLanes = SEED_PUBLIC_LANES.filter(l=>!appRadius || milesAwayFor(l.id)<=appRadius);
+    const communityPublicLanes = SEED_PUBLIC_LANES.filter(l=>!radiusActive || milesAwayFor(l.id)<=appRadius);
     const publicLanes = [...myPublicLanes, ...communityPublicLanes];
 
     const curCustomLane = customLanes.find(l=>l.id===activeChan) || communityPublicLanes.find(l=>l.id===activeChan);
@@ -6229,7 +6109,7 @@ export default function SonoLane() {
                 Filtered to the discovery radius, like the freeway CB channels. */}
             <div style={{padding:"10px 6px 3px"}}>
               <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
-              <div style={{fontSize:10,color:"#5b5e66",marginTop:1}}>{appRadius ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
+              <div style={{fontSize:10,color:"#5b5e66",marginTop:1}}>{radiusActive ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
             </div>
             {publicLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
             {publicLanes.map(lane=>(
@@ -6785,7 +6665,7 @@ export default function SonoLane() {
                 )}
 
                 <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
-                  {appRadius ? "STATIONS · "+appRadius+" MI" : "ALL STATIONS"}
+                  {radiusActive ? "STATIONS · "+appRadius+" MI" : "ALL STATIONS"}
                 </div>
                 {radioHosts.length===0 ? (
                   <div style={{textAlign:"center",padding:"30px 10px",color:"#555"}}>
@@ -6810,12 +6690,12 @@ export default function SonoLane() {
             )}
 
             {driveApp==="cbradio" && (() => {
-              const visibleLanes = appRadius ? CB_CITY_LANES.filter(l=>!l.city||l.city==="San Diego") : CB_CITY_LANES;
+              const visibleLanes = radiusActive ? CB_CITY_LANES.filter(l=>!l.city||l.city==="San Diego") : CB_CITY_LANES;
               if(!driveCbLane){
                 return (
                   <div style={{position:"absolute",inset:0,overflowY:"auto",padding:"14px 16px 20px"}}>
                     <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
-                      {appRadius ? "NEARBY FREEWAY LANES · "+appRadius+" MI" : "ALL FREEWAY LANES"}
+                      {radiusActive ? "NEARBY FREEWAY LANES · "+appRadius+" MI" : "ALL FREEWAY LANES"}
                     </div>
                     <div style={{fontSize:12,color:currentFreewayId?"#23a55a":"#8e9297",marginBottom:10,lineHeight:1.5}}>
                       {currentFreewayId
@@ -7133,7 +7013,7 @@ export default function SonoLane() {
       setDragging(false);
       dragStartYRef.current = null;
     };
-    const visibleLanes = appRadius
+    const visibleLanes = radiusActive
       ? CB_CITY_LANES.filter(l=>!l.city||l.city==="San Diego")
       : CB_CITY_LANES;
     // Auto-join: opening CB Radio drops you straight into whichever freeway
@@ -7185,7 +7065,7 @@ export default function SonoLane() {
         {musicTab==="lanes" && !activeCbLane && (
           <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
             <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
-              {appRadius ? "NEARBY FREEWAY LANES · "+appRadius+" MI" : "ALL FREEWAY LANES"}
+              {radiusActive ? "NEARBY FREEWAY LANES · "+appRadius+" MI" : "ALL FREEWAY LANES"}
             </div>
             <div style={{fontSize:12,color:currentFreewayId?"#23a55a":"#666",marginBottom:10,lineHeight:1.5}}>
               {currentFreewayId
@@ -7218,7 +7098,7 @@ export default function SonoLane() {
                 </button>
               );
             })}
-            {appRadius && <div style={{fontSize:11,color:"#444",textAlign:"center",paddingTop:4}}>Radius: {appRadius} mi · <button onClick={()=>{setShowMusic(false);go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{background:"none",border:"none",color:OR,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change</button></div>}
+            {radiusActive && <div style={{fontSize:11,color:"#444",textAlign:"center",paddingTop:4}}>Radius: {appRadius} mi · <button onClick={()=>{setShowMusic(false);go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{background:"none",border:"none",color:OR,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change</button></div>}
           </div>
         )}
 
@@ -7379,7 +7259,7 @@ export default function SonoLane() {
             )}
 
             <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
-              {appRadius ? "RADIO HOSTS · "+appRadius+" MI" : "ALL RADIO HOSTS"}
+              {radiusActive ? "RADIO HOSTS · "+appRadius+" MI" : "ALL RADIO HOSTS"}
             </div>
             {radioHosts.length===0 ? (
               <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
@@ -7515,6 +7395,135 @@ export default function SonoLane() {
     );
   };
 
+  // Shared top bar — a persistent header above every page (Profile, Discover,
+  // Lanes), matching the persistent TopNav below. "+" opens the same
+  // quick-create sheet (Route Post / Event) from anywhere; "☰" opens the
+  // info drawer (Settings, Terms of Service, Privacy Policy, About, Help).
+  // Used to live only inside Profile — now shared so Discover and Lanes get
+  // it too, instead of only Profile having quick access to it.
+  const TopBar = () => {
+    const onLanes = panel==="create";
+    const btnBg = onLanes ? "#2f3136" : "#f3f3f3";
+    const btnColor = onLanes ? "#dcddde" : "#111";
+    return (
+      <>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,background:onLanes?"#36393f":"#fff",borderBottom:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+          <button onClick={()=>setShowQuickCreate(true)} title="Create" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:20,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
+          <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
+        </div>
+
+        {/* Quick create sheet */}
+        {showQuickCreate && (
+          <div onClick={()=>setShowQuickCreate(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:"12px 16px 20px"}}>
+              <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:12}}>Create</div>
+              <button onClick={()=>{
+                setShowQuickCreate(false);
+                setNewPost({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
+                setPostPhotos([]); setPostRouteMode("new"); setPostSavedRoute(null); setEditingPostId(null);
+                setShowPost(true); go("discover"); setDiscoverTab("routes");
+              }} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                <DPadIcon id="road" color={DPAD_COLORS.road} size={20}/>
+                <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Route Post</div>
+              </button>
+              <button onClick={()=>{
+                setShowQuickCreate(false);
+                setNewEvent({title:"",type:"car meet",desc:"",address:"",date:""});
+                setEventPhotos([]); setEditingEventId(null);
+                setShowEvent(true); go("discover"); setDiscoverTab("events");
+              }} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                <DPadIcon id="event" color={DPAD_COLORS.event} size={20}/>
+                <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Event</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Info drawer — Settings + Terms of Service / Privacy Policy /
+            About / Help, opened from the hamburger in the top bar. Slides
+            in from the right like a standard side menu. */}
+        {showInfoDrawer && (() => {
+          const INFO_PAGES = {
+            tos: {
+              title:"Terms of Service",
+              body:[
+                ["Using SonoLane","By using SonoLane, you agree to use it responsibly — never operate Drive Mode, the Dashcam, or any other in-app feature in a way that distracts you from driving safely. Pull over before interacting with the app if you need to."],
+                ["Your content","Routes, events, photos, and car avatars you post stay yours. Posting something publicly gives other SonoLane users permission to view it in their feeds. Don't post anything you don't have the rights to."],
+                ["Community conduct","Don't use SonoLane to harass, spam, or scam other drivers. Accounts that break these rules can be suspended."],
+                ["Demo notice","SonoLane is a demo app — this text is placeholder copy, not a binding legal agreement."],
+              ],
+            },
+            privacy: {
+              title:"Privacy Policy",
+              body:[
+                ["What we store","Your profile info, car avatars, routes, events, messages, and location-sharing preferences are stored so the app can show them back to you and to the friends you choose to share with."],
+                ["Location sharing","Live location is only ever shared with a Top 3 Friend after you explicitly turn Share Live Location on for them, and stays off for everyone else by default."],
+                ["Dashcam clips","Dashcam recordings stay on your device/account and are never shared automatically — you choose if and when to share a clip."],
+                ["Demo notice","SonoLane is a demo app — this text is placeholder copy describing intended behavior, not a real data-handling policy."],
+              ],
+            },
+            about: {
+              title:"About SonoLane",
+              body:[
+                ["What it is","SonoLane is a social driving app — track drives, share routes and meetup events, keep a garage of car avatars, and stay in touch with friends over Lanes chat and walkie-talkie voice messages."],
+                ["Version","SonoLane · demo build."],
+              ],
+            },
+            help: {
+              title:"Help & Support",
+              body:[
+                ["Getting started","Set up your profile and car avatar from the Profile tab, then post your first route or event from Discover."],
+                ["Need something else?","This is a demo build without a live support line — check back here for updates as new features ship."],
+              ],
+            },
+          };
+          const page = infoDrawerPage ? INFO_PAGES[infoDrawerPage] : null;
+          return (
+            <div onClick={()=>{setShowInfoDrawer(false);setInfoDrawerPage(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:850,display:"flex",justifyContent:"flex-end"}}>
+              <div onClick={e=>e.stopPropagation()} style={{width:"82%",maxWidth:320,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"-4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
+                {!page ? (<>
+                  <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+                    <div style={{fontSize:17,fontWeight:800,color:"#111"}}>Menu</div>
+                    <button onClick={()=>setShowInfoDrawer(false)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>✕</button>
+                  </div>
+                  <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
+                    {[
+                      ["⚙️","Settings", ()=>{setShowInfoDrawer(false);go("profile");setTimeout(()=>setSubPanel("settings"),100);}],
+                      ["📄","Terms of Service", ()=>setInfoDrawerPage("tos")],
+                      ["🔒","Privacy Policy", ()=>setInfoDrawerPage("privacy")],
+                      ["ℹ️","About SonoLane", ()=>setInfoDrawerPage("about")],
+                      ["💬","Help & Support", ()=>setInfoDrawerPage("help")],
+                    ].map(([icon,label,action])=>(
+                      <button key={label} onClick={action} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 8px",borderRadius:10,background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                        <span style={{fontSize:17,flexShrink:0}}>{icon}</span>
+                        <span style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{label}</span>
+                        <span style={{color:"#ccc",fontSize:14}}>›</span>
+                      </button>
+                    ))}
+                  </div>
+                </>) : (<>
+                  <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                    <button onClick={()=>setInfoDrawerPage(null)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>←</button>
+                    <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1}}>{page.title}</div>
+                  </div>
+                  <div style={{flex:1,overflowY:"auto",padding:"16px 18px"}}>
+                    {page.body.map(([h,b])=>(
+                      <div key={h} style={{marginBottom:16}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:4}}>{h}</div>
+                        <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>{b}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>)}
+              </div>
+            </div>
+          );
+        })()}
+      </>
+    );
+  };
+
   // Real-backend mode only: block on the session check, then require a
   // signed-in user before the app itself ever renders. Local demo mode
   // (isSupabaseConfigured === false) skips all of this entirely.
@@ -7551,6 +7560,8 @@ export default function SonoLane() {
       // bar is showing runs its own background all the way to the true edge.
       style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",boxSizing:"border-box"}}>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
+
+      {panel!=="drive" && <TopBar/>}
 
       <div
         style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}
