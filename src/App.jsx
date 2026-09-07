@@ -1444,6 +1444,8 @@ export default function SonoLane() {
   const [editingPostId,setEditingPostId]= useState(null);
   const [likedPosts,   setLikedPosts]   = useState({});
   const [feedSearch,   setFeedSearch]   = useState("");
+  const [evSearch,     setEvSearch]     = useState(""); // Events search — lifted up so the shared TopBar can drive it
+  const [laneUserSearch, setLaneUserSearch] = useState(""); // Lanes TopBar — look up users
   const [events,       setEvents]       = usePersistedState("sl_events", []);
   // One-time seed: drop the 10 San Diego events into the feed the first time
   // this runs, same pattern as the route posts seed above. Never repeats.
@@ -1776,7 +1778,13 @@ export default function SonoLane() {
     if(panel==="drive" && p!=="drive" && dashOn){
       stopDrive();
     }
-    setPanel(p); setSubPanel(null); setShowAgent(false); setMapInteractive(false);
+    // Re-tapping the bottom-nav tab you're already on used to always reset
+    // subPanel — closing whatever Profile toggle section (Garage, History,
+    // etc.) was open every time. Only reset it when actually switching to a
+    // different panel, so the open section survives a re-tap.
+    setPanel(p);
+    if(p!==panel) setSubPanel(null);
+    setShowAgent(false); setMapInteractive(false);
     // Entering Drive mode always opens straight to Maps — carrying the
     // just-picked route's directions along if this call came from "Get
     // Directions" on a route card, or clearing any stale ones from a
@@ -2813,7 +2821,7 @@ export default function SonoLane() {
          grid" below). Each block below still only runs its content when
          its own subPanel value is active, same as before. ── */
     let garageSection = null, routesSection = null, myeventsSection = null,
-        historySection = null, dashcamSection = null, achievementsSection = null,
+        historySection = null,
         radiostationsSection = null, settingsSection = null;
 
     /* routes sub */
@@ -3322,13 +3330,8 @@ export default function SonoLane() {
       const bannerBg = carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css;
       return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <button onClick={()=>setSubPanel(carDetailFrom==="garage"?"garage":null)} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer"}}>←</button>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}>
-            {carDetailFrom==="garage" ? <><GarageDoorIcon size={18} color="#555"/> My Garage</> : <><DefaultAvatar size={18} color="#555"/> My Profile</>}
-          </div>
-          <button onClick={()=>setSubPanel("editcar")} title="Edit car" style={{width:34,height:34,borderRadius:"50%",fontSize:21,background:"none",color:"#111",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
-        </div>
+        {/* Own header removed — the shared TopBar switches to back(left)/
+            edit(right) buttons while this page is open (see <TopBar/>). */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 7px"}}>
 
           {/* Hero — customizable banner (upload or premade) behind either the custom SVG avatar or an uploaded car photo. Banner is edited from the Edit Car menu. */}
@@ -3675,6 +3678,27 @@ export default function SonoLane() {
       };
       // Simulated path colors for variety
       const PATH_COLORS = ["#f97316","#6366f1","#22c55e","#a855f7","#ef4444","#14b8a6","#f59e0b","#ec4899"];
+
+      // Calendar — merged in from the old Dashcam tab: marks any date with
+      // either a logged trip or recorded footage (current month only).
+      // Tapping a date with exactly one trip jumps straight into that trip's
+      // detail view (nav/stops + any footage); a date with several trips (or
+      // footage but no trip) expands a short list below the calendar instead.
+      const tripByDate = {};
+      tripHistory.forEach(t=>{ (tripByDate[t.date]=tripByDate[t.date]||[]).push(t); });
+      const clipByDate = {};
+      clips.forEach(c=>{ (clipByDate[c.date]=clipByDate[c.date]||[]).push(c); });
+      const calToday=new Date();
+      const calDim=new Date(calToday.getFullYear(),calToday.getMonth()+1,0).getDate();
+      const calFd=new Date(calToday.getFullYear(),calToday.getMonth(),1).getDay();
+      const calMl=calToday.toLocaleDateString("en-US",{month:"long",year:"numeric"});
+      const calDk=d=>new Date(calToday.getFullYear(),calToday.getMonth(),d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+      const onCalDateTap = (key) => {
+        const dayTrips = tripByDate[key]||[];
+        if(dayTrips.length===1){ setSelTrip({...dayTrips[0], path:undefined}); return; }
+        setSelCalDate(prev => prev===key ? null : key);
+      };
+
       historySection = (
         <div>
           {/* Header */}
@@ -3772,8 +3796,105 @@ export default function SonoLane() {
               )}
             </div>
           ) : (
-            /* ── Trip list ── */
+            /* ── Calendar + trip list ── */
             <div style={{padding:"10px 14px 7px"}}>
+              {/* Calendar */}
+              <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>{calMl.toUpperCase()}</div>
+              <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",marginBottom:14}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:"#f0f0f0",borderBottom:"1px solid #ebebeb",borderRadius:"12px 12px 0 0"}}>
+                  {["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{padding:"6px 0",textAlign:"center",fontSize:11,fontWeight:700,color:"#111"}}>{d}</div>)}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
+                  {Array.from({length:calFd}).map((_,i)=><div key={"e"+i} style={{minHeight:36}}/>)}
+                  {Array.from({length:calDim}).map((_,i)=>{
+                    const day=i+1, key=calDk(day);
+                    const dayTrips=tripByDate[key]||[], dayClips=clipByDate[key]||[];
+                    const isT=day===calToday.getDate(), isSel=selCalDate===key;
+                    return (
+                      <button key={day} onClick={()=>onCalDateTap(key)}
+                        style={{minHeight:36,padding:"4px 2px",background:isSel?OR:isT?OR+"11":"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                        <span style={{fontSize:13,fontWeight:isT||isSel?800:400,color:isSel?"#fff":isT?OR:"#333"}}>{day}</span>
+                        {(dayTrips.length>0||dayClips.length>0) && (
+                          <div style={{display:"flex",gap:2,marginTop:1}}>
+                            {dayTrips.length>0 && <span style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":OR,display:"block"}}/>}
+                            {dayClips.length>0 && <span style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":"#6366f1",display:"block"}}/>}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selected date — multiple trips to choose from, or footage
+                  with no logged trip that day */}
+              {selCalDate && (() => {
+                const dayTrips = tripByDate[selCalDate]||[];
+                const dayClips = clipByDate[selCalDate]||[];
+                if(dayTrips.length===0 && dayClips.length===0) return (
+                  <div style={{textAlign:"center",padding:"16px",color:"#111",fontSize:13}}>No activity on {selCalDate}</div>
+                );
+                return (
+                  <div style={{marginBottom:14}}>
+                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
+                    {dayTrips.map(trip=>(
+                      <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:"1px solid #ebebeb",background:"#fff",marginBottom:8,cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                        <div style={{fontSize:18}}>🛣️</div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{trip.time} · {trip.startAddr}</div>
+                          <div style={{fontSize:11,color:"#111"}}>{trip.dist} mi · +{trip.pts} pts{dayClips.length>0?" · 📹":""}</div>
+                        </div>
+                        <div style={{fontSize:16,color:"#111"}}>›</div>
+                      </button>
+                    ))}
+                    {dayTrips.length===0 && dayClips.map(clip=>(
+                      <div key={clip.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
+                        <div style={{background:"#111",position:"relative",cursor:"pointer",height:80}} onClick={()=>setPlayingClip(p=>p===clip.id?null:clip.id)}>
+                          <video src={clip.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.55,display:"block",pointerEvents:"none"}}/>
+                          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                              {playingClip===clip.id?"⏸":"▶"}
+                            </div>
+                          </div>
+                        </div>
+                        {playingClip===clip.id && <video src={clip.url} controls autoPlay style={{width:"100%",maxHeight:200,display:"block",background:"#000"}}/>}
+                        <div style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{clip.time}</div>
+                            <div style={{fontSize:11,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
+                          </div>
+                          <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,cursor:"pointer"}}>⬇</button>
+                          <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer"}}>🗑</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Dashcam enable prompt, or the background-record toggle once
+                  enabled — merged in from the old Dashcam tab */}
+              {!dashcamConsent ? (
+                <div style={{background:"#fff8f0",border:"1px solid #fde8d8",borderRadius:12,padding:"14px",marginBottom:16,textAlign:"center"}}>
+                  <div style={{fontSize:28,marginBottom:6}}>📹</div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:4}}>Enable Dashcam</div>
+                  <div style={{fontSize:12,color:"#111",lineHeight:1.6,marginBottom:12}}>Automatically record video of your drives once you're moving over 5 mph. Footage stays on this device and is only viewable here.</div>
+                  <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");}} style={{width:"100%",padding:"11px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>
+                    I Agree — Enable Dashcam
+                  </button>
+                </div>
+              ) : (
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",marginBottom:16}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Record in Background</div>
+                    <div style={{fontSize:11,color:"#111",marginTop:2}}>Auto-record once you hit 5 mph in Drive mode. Turn off to only record when you start a clip yourself.</div>
+                  </div>
+                  <button onClick={()=>{const next=!dashcamBgRecord;setDashcamBgRecord(next);if(!next&&dashOn)stopDrive();}} style={{width:44,height:26,borderRadius:13,border:"none",background:dashcamBgRecord?OR:"#ddd",position:"relative",cursor:"pointer",flexShrink:0,padding:0}}>
+                    <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:dashcamBgRecord?21:3,transition:"left 0.15s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+                  </button>
+                </div>
+              )}
+
               {tripHistory.length===0 ? (
                 <div style={{textAlign:"center",padding:"52px 20px",color:"#111"}}>
                   <div style={{fontSize:50,marginBottom:12}}>🛤️</div>
@@ -3858,131 +3979,16 @@ export default function SonoLane() {
                   })}
                 </>
               )}
+
+              {dashcamConsent && (
+                <button onClick={()=>{setDashcamConsent(false);memStore.removeItem("sl_dashcamConsent");if(dashOn)stopDrive();}} style={{width:"100%",marginTop:6,padding:"10px",borderRadius:10,background:"transparent",border:"1px solid #fde8d8",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+                  Revoke Dashcam Access
+                </button>
+              )}
             </div>
           )}
         </div>
       );
-    }
-
-        if(subPanel==="dashcam") {
-      if(!dashcamConsent) { dashcamSection = (
-        <div>
-          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
-            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
-          </div>
-          <div style={{padding:"12px 18px 7px"}}>
-            <div style={{textAlign:"center",marginBottom:18}}>
-              <div style={{fontSize:46,marginBottom:8}}>📹</div>
-              <div style={{fontSize:17,fontWeight:900,color:"#111",marginBottom:4}}>Terms of Service &amp; Privacy Notice</div>
-              <div style={{fontSize:13,color:"#111",lineHeight:1.6}}>Review and accept before SonoLane can record your drives.</div>
-            </div>
-            <div style={{background:"#f8f8f8",borderRadius:14,border:"1px solid #ebebeb",padding:"16px",marginBottom:16,fontSize:13,color:"#111",lineHeight:1.75}}>
-              <div style={{fontWeight:800,color:"#111",marginBottom:6}}>What this turns on</div>
-              <div style={{marginBottom:10}}>Once enabled, SonoLane automatically starts recording video (and audio, if your device provides it) any time it detects you're moving over 5 mph, and stops shortly after you slow down — never the instant you open Drive mode itself. This requires SonoLane to stay open in the foreground — camera and mic access pause if you switch apps or lock your device. You can also start or stop a recording manually from this screen any time, and turn automatic background recording off entirely below while keeping access granted.</div>
-              <div style={{fontWeight:800,color:"#111",marginBottom:6}}>What gets recorded</div>
-              <div style={{marginBottom:10}}>Speed, drive duration, and driving-behavior data (like green lights hit) are logged for every automatic drive and shown in Drive History. Video footage is saved and only viewable here, in the Dashcam section.</div>
-              <div style={{fontWeight:800,color:"#111",marginBottom:6}}>Where it's stored</div>
-              <div style={{marginBottom:10}}>Footage and drive data stay on this device, are kept for 72 hours to save space, and are never sent anywhere unless you take an explicit action, like sharing or downloading a clip.</div>
-              <div style={{fontWeight:800,color:"#111",marginBottom:6}}>Your control</div>
-              <div>You can revoke this permission at any time from this screen — doing so immediately stops any active or future automatic recording.</div>
-            </div>
-            <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");go("drive",{forceDashcamConsent:true});}} style={{width:"100%",padding:"13px",borderRadius:12,background:OR,color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>
-              I Agree — Enable Dashcam
-            </button>
-            <button onClick={()=>setSubPanel(null)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>
-              Not Now
-            </button>
-          </div>
-        </div>
-      ); } else {
-      const calMap={};
-      clips.forEach(c=>{if(!calMap[c.date])calMap[c.date]=[];calMap[c.date].push(c);});
-      const today=new Date();
-      const dim=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
-      const fd=new Date(today.getFullYear(),today.getMonth(),1).getDay();
-      const ml=today.toLocaleDateString("en-US",{month:"long",year:"numeric"});
-      const dk=d=>new Date(today.getFullYear(),today.getMonth(),d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
-      dashcamSection = (
-        <div>
-          {/* Storage page is calendar/footage only — the dashcam widget
-              itself shows the live feed while a drive is recording. */}
-          <div style={{padding:"0 14px 8px"}}>
-            <div style={{fontSize:16,fontWeight:800,color:"#111"}}>📹 Dashcam</div>
-          </div>
-          <div style={{padding:"4px 14px 24px"}}>
-            <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6,marginTop:4}}>{ml.toUpperCase()}</div>
-            <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",marginBottom:14}}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:"#f0f0f0",borderBottom:"1px solid #ebebeb",borderRadius:"12px 12px 0 0"}}>
-                {["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{padding:"6px 0",textAlign:"center",fontSize:11,fontWeight:700,color:"#111"}}>{d}</div>)}
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
-                {Array.from({length:fd}).map((_,i)=><div key={"e"+i} style={{minHeight:36}}/>)}
-                {Array.from({length:dim}).map((_,i)=>{
-                  const day=i+1, key=dk(day), dc=calMap[key]||[];
-                  const isT=day===today.getDate(), isSel=selCalDate===key;
-                  return (
-                    <button key={day} onClick={()=>setSelCalDate(isSel?null:key)}
-                      style={{minHeight:36,padding:"4px 2px",background:isSel?OR:isT?OR+"11":"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                      <span style={{fontSize:13,fontWeight:isT||isSel?800:400,color:isSel?"#fff":isT?OR:"#333"}}>{day}</span>
-                      {dc.length>0 && (
-                        <div style={{display:"flex",gap:2,marginTop:1}}>
-                          {Array.from({length:Math.min(dc.length,3)}).map((_,di)=>(
-                            <span key={di} style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":OR,display:"block"}}/>
-                          ))}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {selCalDate && calMap[selCalDate] ? (
-              <div>
-                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
-                {calMap[selCalDate].map(clip=>(
-                  <div key={clip.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
-                    <div style={{background:"#111",position:"relative",cursor:"pointer",height:80}} onClick={()=>setPlayingClip(p=>p===clip.id?null:clip.id)}>
-                      <video src={clip.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.55,display:"block",pointerEvents:"none"}}/>
-                      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
-                          {playingClip===clip.id?"⏸":"▶"}
-                        </div>
-                      </div>
-                    </div>
-                    {playingClip===clip.id && <video src={clip.url} controls autoPlay style={{width:"100%",maxHeight:200,display:"block",background:"#000"}}/>}
-                    <div style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{clip.time}</div>
-                        <div style={{fontSize:11,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
-                      </div>
-                      <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,cursor:"pointer"}}>⬇</button>
-                      <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer"}}>🗑</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : selCalDate ? (
-              <div style={{textAlign:"center",padding:"20px",color:"#111",fontSize:13}}>No recordings on {selCalDate}</div>
-            ) : (
-              <div style={{textAlign:"center",padding:"20px 0",color:"#111",fontSize:13}}>
-                {clips.length===0 ? (dashcamBgRecord ? "Drives record automatically once you're moving over 5 mph." : "Automatic recording is off — start a clip manually, or turn background recording back on below.") : "Tap a date with dots to view footage."}
-              </div>
-            )}
-            <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",marginTop:18}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Record in Background</div>
-                <div style={{fontSize:11,color:"#111",marginTop:2}}>Auto-record once you hit 5 mph in Drive mode. Turn off to only record when you start a clip yourself.</div>
-              </div>
-              <button onClick={()=>{const next=!dashcamBgRecord;setDashcamBgRecord(next);if(!next&&dashOn)stopDrive();}} style={{width:44,height:26,borderRadius:13,border:"none",background:dashcamBgRecord?OR:"#ddd",position:"relative",cursor:"pointer",flexShrink:0,padding:0}}>
-                <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:dashcamBgRecord?21:3,transition:"left 0.15s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
-              </button>
-            </div>
-            <button onClick={()=>{setDashcamConsent(false);memStore.removeItem("sl_dashcamConsent");if(dashOn)stopDrive();}} style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,background:"transparent",border:"1px solid #fde8d8",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
-              Revoke Dashcam Access
-            </button>
-          </div>
-        </div>
-      ); }
     }
 
     /* following sub — people you follow */
@@ -4713,64 +4719,6 @@ export default function SonoLane() {
     const _pct       = Math.round(_doneCount / _OBJECTIVES.length * 100);
     const _incomplete= _OBJECTIVES.filter(o=>!o.done);
 
-    /* achievements sub */
-    if(subPanel==="achievements") {
-      const CAT_LABELS = {milestone:"🏁 Milestones", distance:"🛣️ Distance", safe:"🚦 Safe Driving", social:"👥 Social", car:"🚗 Car", bonus:"⭐ Bonus"};
-      const cats = [...new Set(ACHIEVEMENTS.map(a=>a.cat))];
-      achievementsSection = (
-        <div>
-          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
-            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>🏅 Achievements</div>
-            <div style={{fontSize:13,fontWeight:700,color:"#e94560"}}>{unlockedAch.length}/{ACHIEVEMENTS.length}</div>
-          </div>
-
-          {/* Progress bar */}
-          <div style={{padding:"0 14px"}}>
-            <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:4}}>
-              <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#e94560,#f5a623)",width:(unlockedAch.length/ACHIEVEMENTS.length*100)+"%",transition:"width 0.5s ease"}}/>
-            </div>
-            <div style={{fontSize:11,color:"#111",textAlign:"right"}}>{Math.round(unlockedAch.length/ACHIEVEMENTS.length*100)}% complete</div>
-          </div>
-
-          <div style={{padding:"10px 14px 7px"}}>
-            {cats.map(cat=>(
-              <div key={cat}>
-                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:10}}>{CAT_LABELS[cat]||cat.toUpperCase()}</div>
-                {ACHIEVEMENTS.filter(a=>a.cat===cat).map(ach=>{
-                  const done = unlockedAch.includes(ach.id);
-                  return (
-                    <div key={ach.id} style={{
-                      display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
-                      borderRadius:14,marginBottom:8,
-                      background:done?"linear-gradient(135deg,#1a1a2e,#0f3460)":"#f8f8f8",
-                      border:"1.5px solid "+(done?"#e9456044":"#ebebeb"),
-                      opacity:done?1:0.7,
-                    }}>
-                      <div style={{
-                        width:44,height:44,borderRadius:12,flexShrink:0,
-                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
-                        background:done?"linear-gradient(135deg,#e94560,#f5a623)":"#e0e0e0",
-                        filter:done?"none":"grayscale(1)",
-                      }}>{done?ach.icon:"🔒"}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:15,fontWeight:800,color:done?"#fff":"#111",marginBottom:2}}>{ach.title}</div>
-                        <div style={{fontSize:12,color:done?"#aaa":"#111",lineHeight:1.4}}>{ach.desc}</div>
-                      </div>
-                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,flexShrink:0}}>
-                        <span style={{fontSize:14,fontWeight:900,color:done?"#f5a623":"#111"}}>+{ach.pts}</span>
-                        <span style={{fontSize:9,color:done?"#aaa":"#111"}}>pts</span>
-                        {done&&<span style={{fontSize:10,marginTop:2}}>✓</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
         /* rewards sub */
     if(subPanel==="rewards") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"linear-gradient(180deg,#1a1a2e 0%,#16213e 40%,#0f3460 100%)"}}>
@@ -5078,22 +5026,21 @@ export default function SonoLane() {
             </div>
           )}
 
-          {/* Row of icon toggles — My Garage, My Routes, My Events, Drive
-              History, Dashcam, Achievements, Radio Stations, Settings — tap
-              one to show its content right below this row; tap the active
-              one again (or another one) to switch. Reuses `subPanel` itself
-              as the toggle state, so every other link in the app that jumps
-              straight to e.g. setSubPanel("routes") still lands here. */}
+          {/* Row of icon toggles — My Garage, My Routes, My Events, History
+              (drive history + dashcam calendar/footage, merged), Radio
+              Stations — tap one to show its content right below this row;
+              tap the active one again (or another one) to switch. Reuses
+              `subPanel` itself as the toggle state, so every other link in
+              the app that jumps straight to e.g. setSubPanel("routes")
+              still lands here. Trophies moved into the Points detail page;
+              Settings is still reachable from the ☰ menu. */}
           <div style={{display:"flex",margin:"0 -14px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb",overflowX:"auto"}}>
             {[
               {id:"garage",        label:"Garage",   icon:<GarageDoorIcon size={22} color={subPanel==="garage"?OR:(carSaved?OR:"#8a8f98")}/>},
               {id:"routes",        label:"Routes",   icon:<DPadIcon id="road" color={subPanel==="routes"?OR:DPAD_COLORS.road} size={22}/>},
               {id:"myevents",      label:"Events",   icon:<DPadIcon id="event" color={subPanel==="myevents"?OR:DPAD_COLORS.event} size={22}/>},
               {id:"history",       label:"History",  icon:<ProfileIcon id="history" size={22} color={subPanel==="history"?OR:"#8a8f98"}/>},
-              {id:"dashcam",       label:"Dashcam",  icon:<ProfileIcon id="video" size={22} color={subPanel==="dashcam"?OR:"#8a8f98"}/>},
-              {id:"achievements",  label:"Trophies", icon:<span style={{position:"relative",display:"inline-flex"}}><ProfileIcon id="trophy" size={22} color={subPanel==="achievements"?OR:"#f5a623"}/>{newAchQueue.length>0 && <span style={{position:"absolute",top:-2,right:-2,width:7,height:7,borderRadius:"50%",background:"#e94560",boxShadow:"0 0 6px #e94560"}}/>}</span>},
               {id:"radiostations", label:"Radio",    icon:<span style={{fontSize:20}}>📻</span>},
-              {id:"settings",      label:"Settings", icon:<ProfileIcon id="gear" size={22} color={subPanel==="settings"?OR:"#8a8f98"}/>},
             ].map(t=>{
               const active = subPanel===t.id;
               return (
@@ -5116,8 +5063,6 @@ export default function SonoLane() {
           {subPanel==="routes" && <div style={{margin:"14px -14px 0"}}>{routesSection}</div>}
           {subPanel==="myevents" && <div style={{margin:"14px -14px 0"}}>{myeventsSection}</div>}
           {subPanel==="history" && <div style={{margin:"14px -14px 0"}}>{historySection}</div>}
-          {subPanel==="dashcam" && <div style={{margin:"14px -14px 0"}}>{dashcamSection}</div>}
-          {subPanel==="achievements" && <div style={{margin:"14px -14px 0"}}>{achievementsSection}</div>}
           {subPanel==="radiostations" && <div style={{margin:"14px -14px 0"}}>{radiostationsSection}</div>}
           {subPanel==="settings" && <div style={{margin:"14px -14px 0"}}>{settingsSection}</div>}
 
@@ -5240,11 +5185,6 @@ export default function SonoLane() {
             </button>
           </div>
         </div>
-        <div style={{display:"flex",gap:6,marginBottom:8}}>
-          <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("routes"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Routes</VN>
-          <VN action={()=>{resetPostForm();setShowPost(true);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
-        </div>
-        <input value={feedSearch} onChange={e=>setFeedSearch(e.target.value)} placeholder="Search routes…" style={{...INP,marginBottom:6}}/>
         <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2}}>
           {FEED_CATS.map(c=>(
             <button key={c} onClick={()=>toggleFeedCat(c)} style={{...TAG(feedCats.includes(c)),whiteSpace:"nowrap",flexShrink:0,fontSize:12,padding:"4px 10px"}}>{c==="Following"?"👥 Following":c}</button>
@@ -5565,7 +5505,6 @@ export default function SonoLane() {
 
   /* ── EVENTS FEED ── */
   const MapPanel = useStablePanel(() => {
-    const [evSearch, setEvSearch] = useState("");
     // Multi-select category filter — tap "All" to reset, tap any other chip to
     // toggle it in/out of the active set (events matching ANY selected chip show).
     const [evFilters, setEvFilters] = useState(["All"]);
@@ -5613,12 +5552,6 @@ export default function SonoLane() {
               </button>
             </div>
           </div>
-          <div style={{display:"flex",gap:6,marginBottom:8}}>
-            <VN action={()=>{go("profile");setTimeout(()=>setSubPanel("myevents"),100);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#111",border:"1px solid #ebebeb",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>My Events</VN>
-            <VN action={()=>{resetEventForm();setShowEvent(true);}} style={{flex:1,padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,textAlign:"center"}}>+ Create</VN>
-          </div>
-          {/* Search */}
-          <input value={evSearch} onChange={e=>setEvSearch(e.target.value)} placeholder="Search events…" style={{...INP,marginBottom:6,fontSize:14,padding:"8px 12px"}}/>
           {/* Category filter */}
           <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:6}}>
             {["All","Following",...Object.keys(EV_ICONS)].map(t=>(
@@ -6145,12 +6078,17 @@ export default function SonoLane() {
               </div>
             ))}
 
-            {/* Direct Messages */}
+            {/* Direct Messages — filtered by the "Find users…" search in the
+                shared TopBar (see laneUserSearch) so typing there narrows
+                this list down to matching friends. */}
             {friends.length>0&&<>
               <div style={{padding:"10px 6px 3px"}}>
                 <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Direct Messages</span>
               </div>
-              {sortPinned(friends).map(fr=>(
+              {laneUserSearch.trim() && friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())).length===0 && (
+                <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No users match "{laneUserSearch}".</div>
+              )}
+              {sortPinned(laneUserSearch.trim() ? friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())) : friends).map(fr=>(
                 <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
                   <button onClick={()=>setActiveChan(fr.id)} style={{
                     flex:1,minWidth:0,display:"flex",alignItems:"center",gap:7,
@@ -7403,13 +7341,51 @@ export default function SonoLane() {
   // it too, instead of only Profile having quick access to it.
   const TopBar = () => {
     const onLanes = panel==="create";
+    const onCarDetails = panel==="profile" && subPanel==="car";
     const btnBg = onLanes ? "#2f3136" : "#f3f3f3";
     const btnColor = onLanes ? "#dcddde" : "#111";
     return (
       <>
-        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,background:onLanes?"#36393f":"#fff",borderBottom:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
-          <button onClick={()=>setShowQuickCreate(true)} title="Create" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:20,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
-          <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexShrink:0,background:onLanes?"#36393f":"#fff",borderBottom:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+          {/* Left button — the plain "+" everywhere, except the Car Details
+              page where it becomes a back button (see item 6). */}
+          {onCarDetails ? (
+            <button onClick={()=>setSubPanel(carDetailFrom==="garage"?"garage":null)} title="Back" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+          ) : (
+            <button onClick={()=>setShowQuickCreate(true)} title="Create" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:20,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,flexShrink:0}}>+</button>
+          )}
+
+          {/* Middle — page-specific content: search on Discover (Routes or
+              Events, whichever tab is active) and Lanes (find users), the
+              username centered on Profile, nothing extra on Car Details
+              (its title lives in the page content below). */}
+          {panel==="discover" && (
+            <input
+              value={discoverTab==="routes" ? feedSearch : evSearch}
+              onChange={e=>discoverTab==="routes" ? setFeedSearch(e.target.value) : setEvSearch(e.target.value)}
+              placeholder={discoverTab==="routes" ? "Search routes…" : "Search events…"}
+              style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
+            />
+          )}
+          {panel==="profile" && !onCarDetails && (
+            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName || "You"}</div>
+          )}
+          {onLanes && (
+            <input
+              value={laneUserSearch}
+              onChange={e=>setLaneUserSearch(e.target.value)}
+              placeholder="Find users…"
+              style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #4f545c",background:"#40444b",color:"#dcddde",fontSize:13,fontFamily:F,outline:"none"}}
+            />
+          )}
+
+          {/* Right button — the hamburger menu everywhere, except Car
+              Details where it becomes the edit button. */}
+          {onCarDetails ? (
+            <button onClick={()=>setSubPanel("editcar")} title="Edit car" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+          ) : (
+            <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>☰</button>
+          )}
         </div>
 
         {/* Quick create sheet */}
@@ -7673,6 +7649,51 @@ export default function SonoLane() {
                     <div style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{v}</div>
                   </div>
                 ))}
+
+                {/* Trophies — moved here from its own toggle icon */}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginTop:24,marginBottom:8}}>
+                  <div style={{flex:1,fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2}}>🏅 TROPHIES</div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#e94560"}}>{unlockedAch.length}/{ACHIEVEMENTS.length}</div>
+                </div>
+                <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden",marginBottom:14}}>
+                  <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#e94560,#f5a623)",width:(unlockedAch.length/ACHIEVEMENTS.length*100)+"%",transition:"width 0.5s ease"}}/>
+                </div>
+                {[...new Set(ACHIEVEMENTS.map(a=>a.cat))].map(cat=>{
+                  const CAT_LABELS = {milestone:"🏁 Milestones", distance:"🛣️ Distance", safe:"🚦 Safe Driving", social:"👥 Social", car:"🚗 Car", bonus:"⭐ Bonus"};
+                  return (
+                  <div key={cat}>
+                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8,marginTop:10}}>{CAT_LABELS[cat]||cat.toUpperCase()}</div>
+                    {ACHIEVEMENTS.filter(a=>a.cat===cat).map(ach=>{
+                      const done = unlockedAch.includes(ach.id);
+                      return (
+                        <div key={ach.id} style={{
+                          display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
+                          borderRadius:14,marginBottom:8,
+                          background:done?"linear-gradient(135deg,#1a1a2e,#0f3460)":"#f8f8f8",
+                          border:"1.5px solid "+(done?"#e9456044":"#ebebeb"),
+                          opacity:done?1:0.7,
+                        }}>
+                          <div style={{
+                            width:44,height:44,borderRadius:12,flexShrink:0,
+                            display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
+                            background:done?"linear-gradient(135deg,#e94560,#f5a623)":"#e0e0e0",
+                            filter:done?"none":"grayscale(1)",
+                          }}>{done?ach.icon:"🔒"}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:15,fontWeight:800,color:done?"#fff":"#111",marginBottom:2}}>{ach.title}</div>
+                            <div style={{fontSize:12,color:done?"#aaa":"#111",lineHeight:1.4}}>{ach.desc}</div>
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,flexShrink:0}}>
+                            <span style={{fontSize:14,fontWeight:900,color:done?"#f5a623":"#111"}}>+{ach.pts}</span>
+                            <span style={{fontSize:9,color:done?"#aaa":"#111"}}>pts</span>
+                            {done&&<span style={{fontSize:10,marginTop:2}}>✓</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  );
+                })}
               </div>
             </>}
             {widgetAction==="friends" && <>
