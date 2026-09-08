@@ -1292,6 +1292,7 @@ export default function SonoLane() {
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showInfoDrawer,  setShowInfoDrawer]  = useState(false);
   const [infoDrawerPage,  setInfoDrawerPage]  = useState(null); // null (list) | "tos" | "privacy" | "about" | "help"
+  const [confirmSignOut,  setConfirmSignOut]  = useState(false);
   const [voiceOn,      setVoiceOn]      = useState(false);
   const [voiceText,    setVoiceText]    = useState("");
   const [aiThinking,   setAiThinking]   = useState(false);
@@ -2212,7 +2213,7 @@ export default function SonoLane() {
   // back button — swipe-back below needs that distinction, or it would
   // treat the Profile home screen itself as "on a sub-page" simply because
   // Garage is expanded by default.
-  const PROFILE_INLINE_SECTIONS = ["garage","routes","myevents","history","radiostations","settings"];
+  const PROFILE_INLINE_SECTIONS = ["garage","routes","myevents","history","radiostations"];
   // Whenever the current screen already has its own ← back button (a Profile
   // sub-page like Edit Car/Settings/My Routes, or a route's full-screen
   // detail view), swipe-right should trigger THAT back action instead of the
@@ -2234,11 +2235,19 @@ export default function SonoLane() {
     const t = e.touches ? e.touches[0] : e;
     const tag = e.target.tagName;
     if(tag==="INPUT"||tag==="TEXTAREA"){ swipeStartRef.current=null; return; }
-    // Ignore touches starting inside a horizontally-scrolling row (filter chips, photo strips, etc.)
+    // Ignore touches starting inside a horizontally-scrolling row (filter
+    // chips, photo strips, etc.) — the +8 tolerance (not +1) is deliberate:
+    // real iPhone Safari renders at a fractional device-pixel ratio, so
+    // scrollWidth/clientWidth can come back a pixel or so apart on a row
+    // that isn't actually scrollable at all. A too-tight tolerance meant
+    // ordinary rows (the Garage/Routes/Events tab strip, the Lanes bubble
+    // row) could falsely read as "scrollable" on a real device and quietly
+    // cancel the swipe before it ever started — never reproduced against
+    // Chromium, which doesn't round the same way.
     let el = e.target;
     while(el && el.getAttribute){
       const cs = window.getComputedStyle(el);
-      if((cs.overflowX==="auto"||cs.overflowX==="scroll") && el.scrollWidth > el.clientWidth + 1){ swipeStartRef.current=null; return; }
+      if((cs.overflowX==="auto"||cs.overflowX==="scroll") && el.scrollWidth > el.clientWidth + 8){ swipeStartRef.current=null; return; }
       el = el.parentElement;
     }
     swipeStartRef.current = {x:t.clientX, y:t.clientY};
@@ -3520,24 +3529,26 @@ export default function SonoLane() {
     };
 
     /* ── My Stuff sections — My Garage, My Routes, My Events, Drive
-         History, Dashcam, Achievements, Radio Stations, Settings all used to
+         History, Dashcam, Achievements, Radio Stations all used to
          be their own full-screen pages under Profile; now each just fills
          one of these variables with its content, shown inline below the
          icon toggle row on the Profile home screen instead (see "home
          grid" below). Each block below still only runs its content when
-         its own subPanel value is active, same as before. ── */
+         its own subPanel value is active, same as before. Settings is NOT
+         one of these anymore — it's its own full-screen page (see
+         subPanel==="settings" below, and BACK_PAGES), same as Edit Profile
+         or Car Details, instead of opening on top of the Profile dashboard. ── */
     let garageSection = null, routesSection = null, myeventsSection = null,
         historySection = null,
-        radiostationsSection = null, settingsSection = null;
+        radiostationsSection = null;
 
     /* routes sub */
     const myPostedRoutes = posts.filter(p=>p.authorId==="me");
     if(subPanel==="routes") routesSection = (
       <div>
-        <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:10}}>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/> My Routes</div>
-          <VN action={()=>{setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});setEditingRouteId(null);setSubPanel("createroute");}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Route</VN>
-        </div>
+        {/* The "My Routes" title + "+ Create Route" row that used to sit
+            here is gone — the tab row above already says "Routes", and
+            Create Route is a ＋ button option in the top bar now instead. */}
         <div style={{padding:"10px 14px 4px"}}>
 
           {/* My Created Routes */}
@@ -3720,16 +3731,22 @@ export default function SonoLane() {
        park the current one and start a new blank one. */
     if(subPanel==="garage") garageSection = (
       <div>
-        <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:10}}>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DefaultAvatar size={18} color="#555"/> My Profile</div>
-        </div>
+        {/* The "My Profile" title row that used to sit here is gone — the
+            Garage/Routes/Events/History/Radio tab row right above already
+            says which section you're in, so a second title repeating it
+            was redundant (Law of Uniform Connectedness: the active tab
+            already carries that job). */}
         <div style={{padding:"16px 14px 7px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <span style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
             <span style={{fontSize:11,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-            {/* Active car — reads the live carName/carColor/etc. fields, same as every other screen that shows "your car". */}
+            {/* Active car — reads the live carName/carColor/etc. fields, same
+                as every other screen that shows "your car", including the
+                avatar window at the top of Profile. The ★ badge here (vs.
+                the ★ button on parked cars below) just confirms this is the
+                one currently shown up there. */}
             <div style={{position:"relative"}}>
               <button onClick={()=>setSubPanel("car")} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
                 <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
@@ -3740,9 +3757,12 @@ export default function SonoLane() {
                 {carName && <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{carName}</div>}
                 <div style={{fontSize:11,color:"#111",marginTop:carName?2:0}}>{carSaved?"✓ saved":carModel}</div>
               </button>
+              <div title="Displayed at the top of your profile" style={{position:"absolute",top:6,left:6,width:24,height:24,borderRadius:"50%",background:OR,color:"#fff",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.25)"}}>★</div>
               <button onClick={()=>setConfirmDeleteCar({id:activeCarId,name:carName||carModel||"this car"})} title="Delete car" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             </div>
-            {/* Other saved cars — tap to make one active and open its details. */}
+            {/* Other saved cars — tap the tile to make one active and open
+                its full details, or tap the ★ to just display that car's
+                avatar up top without leaving the Garage grid. */}
             {myCars.map(car=>(
               <div key={car.id} style={{position:"relative"}}>
                 <button onClick={()=>{switchToCar(car.id);setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:car.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:car.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
@@ -3754,17 +3774,15 @@ export default function SonoLane() {
                   {car.name && <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{car.name}</div>}
                   <div style={{fontSize:11,color:"#111",marginTop:car.name?2:0}}>{car.saved?"✓ saved":car.model}</div>
                 </button>
+                <button onClick={e=>{e.stopPropagation();switchToCar(car.id);}} title="Display This Car" style={{position:"absolute",top:6,left:6,width:24,height:24,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ccc",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>★</button>
                 <button onClick={()=>setConfirmDeleteCar({id:car.id,name:car.name||car.model||"this car"})} title="Delete car" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
               </div>
             ))}
-            {/* Add another car — up to MAX_CARS total. */}
-            {(1+myCars.length) < MAX_CARS && (
-              <button onClick={()=>{addNewCar();setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
-                <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,flexShrink:0,fontSize:30,color:"#ccc"}}>＋</div>
-                <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center"}}>Add Another Car</div>
-                <div style={{fontSize:11,color:"#111",marginTop:2}}>{MAX_CARS-1-myCars.length} slot{MAX_CARS-1-myCars.length===1?"":"s"} left</div>
-              </button>
-            )}
+            {/* "Add Another Car" used to be a tile here — it's a ＋ button
+                option in the top bar's Create sheet now instead, alongside
+                Create Shared Garage, so every "start something new" action
+                lives in one place (the ＋) instead of being split between
+                the top bar and cards buried in each section. */}
           </div>
 
           {/* Confirm before deleting a car — wipes its photos/details, so a
@@ -3799,13 +3817,8 @@ export default function SonoLane() {
             </>
           )}
 
-          <button onClick={()=>setShowCreateSharedGarage(true)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",borderRadius:14,border:"1.5px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-            <div style={{width:40,height:40,borderRadius:10,background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#ccc",flexShrink:0}}>＋</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
-              <div style={{fontSize:11,color:"#111",marginTop:1}}>Invite friends to add their own vehicle, chat, and call.</div>
-            </div>
-          </button>
+          {/* "Create Shared Garage" used to be a card here — it's in the
+              top bar's ＋ Create sheet now instead (see above). */}
         </div>
 
         {showCreateSharedGarage && (
@@ -5285,13 +5298,13 @@ export default function SonoLane() {
     );
 
     /* settings sub — the AI Co-Pilot picker + outside-Drive-mode voice
-       toggle live here now instead of on the Edit Profile page. */
-    if(subPanel==="settings") settingsSection = (
-      <div>
-        <div style={{padding:"0 16px 12px"}}>
-          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>⚙️ Settings</div>
-        </div>
-        <div style={{padding:"4px 16px 24px"}}>
+       toggle live here now instead of on the Edit Profile page. Its own
+       full-screen page now (BACK_PAGES entry "settings") instead of opening
+       inline on top of the Profile dashboard — own title row removed since
+       the shared TopBar shows back + "Settings" while this page is open. */
+    if(subPanel==="settings") return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
 
           <button onClick={()=>setSubPanel("edit")} style={{width:"100%",padding:"9px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:12}}>Edit full profile →</button>
 
@@ -5426,11 +5439,10 @@ export default function SonoLane() {
       };
       myeventsSection = (
       <div>
-        <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:10}}>
-          <div style={{fontSize:16,fontWeight:800,color:"#111",flex:1,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/> My Events</div>
-          <button onClick={()=>{resetEventForm();setShowEvent(true);}} style={{padding:"6px 13px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Create Event</button>
-        </div>
-        <div style={{padding:"0 14px 7px"}}>
+        {/* The "My Events" title + "+ Create Event" row that used to sit
+            here is gone — the tab row above already says "Events", and
+            Create Event is a ＋ button option in the top bar now instead. */}
+        <div style={{padding:"10px 14px 7px"}}>
           {myCreatedEvents.length===0 && mySavedEvents.length===0 ? (
             <div style={{textAlign:"center",padding:"48px 20px",color:"#111"}}>
               <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}><CompassStar size={48}/></div>
@@ -5897,7 +5909,6 @@ export default function SonoLane() {
           {subPanel==="myevents" && <div style={{margin:"14px -14px 0"}}>{myeventsSection}</div>}
           {subPanel==="history" && <div style={{margin:"14px -14px 0"}}>{historySection}</div>}
           {subPanel==="radiostations" && <div style={{margin:"14px -14px 0"}}>{radiostationsSection}</div>}
-          {subPanel==="settings" && <div style={{margin:"14px -14px 0"}}>{settingsSection}</div>}
         </div>
       </div>
     );
@@ -8153,27 +8164,29 @@ export default function SonoLane() {
     {id:"profile",  label:"SonoLane", iconId:"profile"},
     {id:"discover", label:"Discover", iconId: discoverTab==="events" ? "event" : "road"},
   ];
-  // Now a bottom tab bar (moved down from the top) — a top border separates
-  // it from the page content above instead of a bottom border below it.
-  // While Lanes is the active page, it picks up Lanes' own dark grey theme
-  // (matching the chat above it) instead of staying white like every other
-  // page — only the currently-open page's own nav bar tints, not the app
-  // globally.
+  // A slim, icon-only bottom tab bar — matching how Instagram/Mastodon/most
+  // social apps do theirs (no per-tab background pill, no text labels, thin
+  // padding so it sits close to the true bottom edge instead of leaving a
+  // tall empty-feeling strip). Active vs inactive is just the icon's own
+  // color now, the same way those apps darken/highlight only the active
+  // icon rather than boxing it in a tinted background. A top border still
+  // separates it from the page content above. While Lanes is the active
+  // page, it picks up Lanes' own dark grey theme (matching the chat above
+  // it) instead of staying white like every other page — only the
+  // currently-open page's own nav bar tints, not the app globally.
   const TopNav = () => {
     const onLanes = panel==="create";
     return (
-    <div style={{flexShrink:0,display:"flex",gap:4,padding:"6px 8px 0",paddingBottom:"calc(2px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+    <div style={{flexShrink:0,display:"flex",padding:"9px 8px",paddingBottom:"calc(9px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
       {TOPNAV_ITEMS.map(it=>{
         const active = panel===it.id;
-        const color = DPAD_COLORS[it.iconId];
+        const color = active ? DPAD_COLORS[it.iconId] : (onLanes?"#72767d":"#9a9a9a");
         return (
-          <button key={it.id} onClick={()=>go(it.id)} style={{
-            flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-            padding:"7px 6px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,
-            background:active?color+"14":"transparent",
+          <button key={it.id} onClick={()=>go(it.id)} title={it.label} style={{
+            flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+            padding:"4px",border:"none",background:"transparent",cursor:"pointer",fontFamily:F,
           }}>
-            {it.id==="profile" ? <CompassStar size={20} color={color}/> : <DPadIcon id={it.iconId} color={color} size={20}/>}
-            <span style={{fontSize:14,fontWeight:active?800:600,color:active?color:(onLanes?"#8e9297":"#888")}}>{it.label}</span>
+            {it.id==="profile" ? <CompassStar size={25} color={color}/> : <DPadIcon id={it.iconId} color={color} size={25}/>}
           </button>
         );
       })}
@@ -8202,6 +8215,7 @@ export default function SonoLane() {
     followerslist:{ onBack: back, title:"Followers" },
     friends:      { onBack: back, title:"Friends", right: {label:"+ Add", onClick:()=>setShowAddFriend(true)} },
     edit:         { onBack: back, title:"Edit Profile", right: {label:"Save", onClick:saveEditProfile} },
+    settings:     { onBack: back, title:"⚙️ Settings" },
     radius:       { onBack: back, title:"Discovery Radius" },
     rewards:      { onBack: back, title:"🏆 Rewards", dark:true },
     top3friend:   { onBack: ()=>setSubPanel("garage"), dark:true },
@@ -8292,12 +8306,46 @@ export default function SonoLane() {
           )}
         </div>
 
-        {/* Quick create sheet */}
+        {/* Quick create sheet — Add Another Car / Create Shared Garage /
+            Create Route / Create Event used to be their own buttons or
+            cards sitting inside each Profile tab's content; they're ＋
+            button options here now instead, shown only while that tab is
+            actually open, ahead of the two options (Route Post, Event)
+            that were already always here. One place to start anything new,
+            instead of it being split between the top bar and buried cards. */}
         {showQuickCreate && (
           <div onClick={()=>setShowQuickCreate(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
             <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:"12px 16px 20px"}}>
               <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
               <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:12}}>Create</div>
+
+              {panel==="profile" && subPanel==="garage" && (<>
+                {(1+myCars.length) < MAX_CARS && (
+                  <button onClick={()=>{setShowQuickCreate(false);addNewCar();setSubPanel("car");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                    <GarageDoorIcon size={20} color={OR}/>
+                    <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Add Another Car</div>
+                  </button>
+                )}
+                <button onClick={()=>{setShowQuickCreate(false);setShowCreateSharedGarage(true);}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                  <span style={{fontSize:20,width:20,textAlign:"center",flexShrink:0}}>🚗</span>
+                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Shared Garage</div>
+                </button>
+              </>)}
+
+              {panel==="profile" && subPanel==="routes" && (
+                <button onClick={()=>{setShowQuickCreate(false);setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});setEditingRouteId(null);setSubPanel("createroute");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                  <DPadIcon id="road" color={DPAD_COLORS.road} size={20}/>
+                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Route</div>
+                </button>
+              )}
+
+              {panel==="profile" && subPanel==="myevents" && (
+                <button onClick={()=>{setShowQuickCreate(false);resetEventForm();setShowEvent(true);}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                  <DPadIcon id="event" color={DPAD_COLORS.event} size={20}/>
+                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Event</div>
+                </button>
+              )}
+
               <button onClick={()=>{
                 setShowQuickCreate(false);
                 setNewPost({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
@@ -8374,10 +8422,14 @@ export default function SonoLane() {
                       ["🔒","Privacy Policy", ()=>setInfoDrawerPage("privacy")],
                       ["ℹ️","About SonoLane", ()=>setInfoDrawerPage("about")],
                       ["💬","Help & Support", ()=>setInfoDrawerPage("help")],
+                      // Only shown once there's an actual signed-in session
+                      // to sign out of — local demo mode (no Supabase, e.g.
+                      // this app's Claude Artifact preview) has none.
+                      ...(isSupabaseConfigured && session ? [["🚪","Sign Out", ()=>{setShowInfoDrawer(false);setConfirmSignOut(true);}]] : []),
                     ].map(([icon,label,action])=>(
                       <button key={label} onClick={action} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 8px",borderRadius:10,background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                         <span style={{fontSize:17,flexShrink:0}}>{icon}</span>
-                        <span style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{label}</span>
+                        <span style={{flex:1,fontSize:14,fontWeight:700,color:label==="Sign Out"?"#ef4444":"#111"}}>{label}</span>
                         <span style={{color:"#ccc",fontSize:14}}>›</span>
                       </button>
                     ))}
@@ -8400,6 +8452,21 @@ export default function SonoLane() {
             </div>
           );
         })()}
+
+        {/* Confirm before signing out — same bottom-sheet pattern as
+            confirming a car delete elsewhere in the app, since it's a real
+            action (ends the session) rather than just navigating. */}
+        {confirmSignOut && (
+          <div onClick={()=>setConfirmSignOut(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:900,display:"flex",alignItems:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,paddingBottom:"calc(18px + env(safe-area-inset-bottom, 0px))",boxSizing:"border-box"}}>
+              <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:6}}>Sign out of SonoLane?</div>
+              <div style={{fontSize:13,color:"#111",lineHeight:1.6,marginBottom:16}}>You'll need to sign back in to see your profile, chats, and garage again.</div>
+              <button onClick={()=>{setConfirmSignOut(false);supabase.auth.signOut();}} style={{width:"100%",padding:"13px",borderRadius:12,background:"#ef4444",color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>Sign Out</button>
+              <button onClick={()=>setConfirmSignOut(false)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>Cancel</button>
+            </div>
+          </div>
+        )}
       </>
     );
   };
@@ -8439,7 +8506,19 @@ export default function SonoLane() {
       // (most visible as white under Lanes' dark chat). This way whatever
       // bar is showing runs its own background all the way to the true edge.
       style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",boxSizing:"border-box"}}>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
+      {/* iOS Safari specifically (not Chromium, which is why the swipe
+          carousel tested fine here but still failed on a real iPhone) has
+          its own native touch gesture recognizers that can claim a
+          horizontal drag before onSwipeMove ever sees a full
+          touchmove/touchend sequence for it — dragging on an <img> can
+          start Safari's own "drag/save this image" gesture, a slow-starting
+          drag over ordinary text can start native text selection, and the
+          screen-edge swipe-to-go-back gesture competes directly with this
+          app's own "swipe right = back" convention. Kept inline (not in
+          index.css) specifically so it always ships with App.jsx alone —
+          this app is hand-delivered as a single file, and a separate CSS
+          file is too easy to forget to also upload. */}
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}img{-webkit-user-drag:none;-webkit-touch-callout:none;}input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
 
       {panel!=="drive" && <TopBar/>}
 
