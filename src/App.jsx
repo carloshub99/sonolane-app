@@ -125,6 +125,103 @@ function usePersistedState(key, initial) {
   return [value, setValue];
 }
 
+// Generic key→value store in IndexedDB, for persisted state too big or too
+// numerous to trust to localStorage (see usePersistedIDBState below).
+const kvDB = (() => {
+  const DB_NAME = "sonolane_kv", STORE = "kv";
+  let dbPromise = null;
+  const open = () => {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") { reject(new Error("no indexedDB")); return; }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  };
+  return {
+    async get(key) {
+      try {
+        const db = await open();
+        return await new Promise((res, rej) => {
+          const tx = db.transaction(STORE, "readonly");
+          const req = tx.objectStore(STORE).get(key);
+          req.onsuccess = () => res(req.result);
+          req.onerror = () => rej(req.error);
+        });
+      } catch { return undefined; }
+    },
+    async set(key, value) {
+      try {
+        const db = await open();
+        await new Promise((res, rej) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put(value, key);
+          tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+        });
+      } catch { /* IndexedDB unavailable (e.g. sandboxed preview) — falls back to whatever usePersistedIDBState already had in memory */ }
+    },
+  };
+})();
+
+// Same shape/contract as usePersistedState (drop-in replacement) but backed
+// by IndexedDB instead of localStorage — for state that can hold big base64
+// photos (car exterior/interior/private galleries, avatars, banners, shared
+// garages, route/event posts, the whole myCars array…). localStorage's
+// total quota is only ~5-10MB PER ORIGIN, shared across every sl_* key —
+// once a device's saved photos add up to that, a browser's
+// localStorage.setItem() call throws QuotaExceededError. usePersistedState's
+// memStore swallows that error and silently keeps the new value in an
+// in-memory-only fallback object instead of on disk — so the app doesn't
+// crash, but that value quietly stops surviving a real reload: it looks
+// saved while the app stays open, then reverts to the last value that
+// actually fit, the moment the app is closed and reopened. That's exactly
+// what "my interior photo doesn't save when I close the app" was — the
+// interior gallery just happened to be the item that pushed a device over
+// the localStorage limit. IndexedDB has no such tiny quota (typically a
+// large share of free disk space), so moving anything photo-sized here
+// removes the failure mode entirely instead of papering over one symptom.
+// One-time migration: the first time this runs for a given key, if
+// IndexedDB doesn't have a value yet but the OLD localStorage-backed copy
+// does, that gets copied over (and cleared out of localStorage, freeing up
+// the quota that was the whole problem) so upgrading never looks like it
+// wiped out anyone's saved cars/photos.
+function usePersistedIDBState(key, initial) {
+  const [value, setValue] = useState(initial);
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let v = await kvDB.get(key);
+      if (v === undefined) {
+        const raw = memStore.getItem(key);
+        if (raw !== null) {
+          try { v = JSON.parse(raw); } catch { v = undefined; }
+          if (v !== undefined) {
+            kvDB.set(key, v);
+            memStore.removeItem(key);
+          }
+        }
+      }
+      if (cancelled) return;
+      if (v !== undefined) setValue(v);
+      loadedRef.current = true;
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    // Never write before the load above finishes — otherwise this fires on
+    // mount with `initial` and overwrites the real saved value with a blank
+    // one a split second before the load resolves.
+    if (!loadedRef.current) return;
+    kvDB.set(key, value);
+  }, [value]);
+  return [value, setValue];
+}
+
 const OR = "#f97316";
 const STAR_LOGO = "data:image/png;base64,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"; // golden compass-star app logo (sign-up header, PWA icon match)
 const F = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
@@ -1226,8 +1323,8 @@ export default function SonoLane() {
   const [activeModCat, setActiveModCat] = useState("Wheels");
   const [carEditTab,   setCarEditTab]   = useState("banner"); // which Edit Car appearance tab is showing: banner|bodystyle|color|brand|mods
   const [carAvatarMode,  setCarAvatarMode]  = usePersistedState("sl_carAvatarMode", "avatar"); // "avatar" (custom CarSVG) | "photo" (uploaded pic)
-  const [carAvatarPhoto, setCarAvatarPhoto] = usePersistedState("sl_carAvatarPhoto", null); // base64 data URL
-  const [carBannerPhoto, setCarBannerPhoto] = usePersistedState("sl_carBannerPhoto", null); // base64 data URL, overrides preset if set
+  const [carAvatarPhoto, setCarAvatarPhoto] = usePersistedIDBState("sl_carAvatarPhoto", null); // base64 data URL
+  const [carBannerPhoto, setCarBannerPhoto] = usePersistedIDBState("sl_carBannerPhoto", null); // base64 data URL, overrides preset if set
   const [carBannerPreset,setCarBannerPreset]= usePersistedState("sl_carBannerPreset", "midnight");
   const [carShowInfoHome,setCarShowInfoHome]= usePersistedState("sl_carShowInfoHome", false); // show car name/model text on the home hero avatar window
   const [carBio,       setCarBio]       = usePersistedState("sl_carBio", ""); // free-text description (mods done, build notes, etc.) — shown on the car details page, above Photos
@@ -1235,7 +1332,7 @@ export default function SonoLane() {
   const [carRegDate,   setCarRegDate]   = usePersistedState("sl_carRegDate", ""); // private — registration date
   const [carMileage,   setCarMileage]   = usePersistedState("sl_carMileage", ""); // private — current odometer reading
   const [carPrivateNotes, setCarPrivateNotes] = usePersistedState("sl_carPrivateNotes", ""); // private — any other handy info (VIN, insurance, service reminders, etc.)
-  const [carPrivatePhotos, setCarPrivatePhotos] = usePersistedState("sl_carPrivatePhotos", []); // private — [{id,url}] snapshots of insurance card, registration, etc.
+  const [carPrivatePhotos, setCarPrivatePhotos] = usePersistedIDBState("sl_carPrivatePhotos", []); // private — [{id,url}] snapshots of insurance card, registration, etc.
   const carAvatarPhotoRef = useRef(null);
   const carBannerPhotoRef = useRef(null);
   const carPrivatePhotoRef = useRef(null);
@@ -1252,11 +1349,11 @@ export default function SonoLane() {
   // their own separate Lanes Settings sheet.
   const [showOnlineStatus, setShowOnlineStatus] = usePersistedState("sl_showOnlineStatus", true);
   const [lanesNotifications, setLanesNotifications] = usePersistedState("sl_lanesNotifications", true);
-  const [profilePhoto, setProfilePhoto] = usePersistedState("sl_profilePhoto", null); // base64 data URL
+  const [profilePhoto, setProfilePhoto] = usePersistedIDBState("sl_profilePhoto", null); // base64 data URL
   const profilePhotoRef = useRef(null);
   const garagePhotoRef = useRef(null); // Shared Garage's own profile-photo upload (Edit Garage sheet)
-  const [carExteriorPhotos, setCarExteriorPhotos] = usePersistedState("sl_carExteriorPhotos", []); // [{id,url}] — up to 4 garage exterior shots
-  const [carInteriorPhotos, setCarInteriorPhotos] = usePersistedState("sl_carInteriorPhotos", []); // [{id,url}] — up to 4 garage interior shots
+  const [carExteriorPhotos, setCarExteriorPhotos] = usePersistedIDBState("sl_carExteriorPhotos", []); // [{id,url}] — up to 4 garage exterior shots
+  const [carInteriorPhotos, setCarInteriorPhotos] = usePersistedIDBState("sl_carInteriorPhotos", []); // [{id,url}] — up to 4 garage interior shots
   const carExteriorPhotoRef = useRef(null);
   const carInteriorPhotoRef = useRef(null);
 
@@ -1267,7 +1364,7 @@ export default function SonoLane() {
   // active without needing any changes. myCars holds snapshots of the
   // OTHER (inactive) cars; switching cars just swaps which snapshot is
   // loaded into the live fields vs. parked in this array.
-  const [myCars, setMyCars] = usePersistedState("sl_myCars", []); // [{id,name,color,model,bodyStyle,brand,mods,saved,avatarMode,avatarPhoto,bannerPhoto,bannerPreset,showInfoHome,bio,plate,regDate,mileage,privateNotes,privatePhotos,exteriorPhotos,interiorPhotos}]
+  const [myCars, setMyCars] = usePersistedIDBState("sl_myCars", []); // [{id,name,color,model,bodyStyle,brand,mods,saved,avatarMode,avatarPhoto,bannerPhoto,bannerPreset,showInfoHome,bio,plate,regDate,mileage,privateNotes,privatePhotos,exteriorPhotos,interiorPhotos}]
   const [activeCarId, setActiveCarId] = usePersistedState("sl_activeCarId", "car_1");
   const snapshotActiveCar = (id) => ({
     id, name:carName, color:carColor, model:carModel, bodyStyle:carBodyStyle, brand:carBrand,
@@ -1579,7 +1676,7 @@ export default function SonoLane() {
   const [totalMiles, setTotalMiles] = useState(()=>parseFloat(memStore.getItem("sl_miles")||"0"));
   const [playingClip,  setPlayingClip]  = useState(null);
   const [selCalDate,   setSelCalDate]   = useState(null);
-  const [posts,        setPosts]        = usePersistedState("sl_posts", []);
+  const [posts,        setPosts]        = usePersistedIDBState("sl_posts", []);
   // One-time seed: drop the 10 San Diego route posts into the feed the first
   // time this runs, regardless of what's already in posts (so it still
   // happens even though "posts" already had a persisted, possibly-empty,
@@ -1606,13 +1703,21 @@ export default function SonoLane() {
   const [feedSearch,   setFeedSearch]   = useState("");
   const [evSearch,     setEvSearch]     = useState(""); // Events search — lifted up so the shared TopBar can drive it
   const [laneUserSearch, setLaneUserSearch] = useState(""); // Lanes TopBar — look up users
+  // Lanes shows a centered page title in the TopBar by default, with a 🔍
+  // button on the right that swaps the title out for the actual search box
+  // (Minimize Target Distance / Doherty Threshold — search is one tap away
+  // without permanently taking up the title's spot). Tapping the ✕ that
+  // replaces 🔍 while searching clears the search text and switches back
+  // to the title. Discover (Routes/Events) went back to always showing its
+  // search box in the TopBar, like before.
+  const [lanesSearchActive, setLanesSearchActive] = useState(false);
   // Where the car detail page was opened from — the hero avatar at the top
   // of the profile, or a car tile inside My Garage — so its back button (now
   // the shared TopBar's back button) can return you to wherever you actually
   // came from instead of always one place. Lifted up so both ProfilePanel
   // and TopBar can read/set it.
   const [carDetailFrom, setCarDetailFrom] = useState("profile");
-  const [events,       setEvents]       = usePersistedState("sl_events", []);
+  const [events,       setEvents]       = usePersistedIDBState("sl_events", []);
   // One-time seed: drop the 10 San Diego events into the feed the first time
   // this runs, same pattern as the route posts seed above. Never repeats.
   useEffect(() => {
@@ -1716,7 +1821,7 @@ export default function SonoLane() {
   // own member roster, a vehicle (with a bio) per member, and a dedicated
   // group chat lane (auto-created, id "garage_<id>") that reuses the same
   // Lanes chat plumbing as everything else in Lanes.
-  const [sharedGarages, setSharedGarages] = usePersistedState("sl_sharedGarages", []); // [{id,name,color,memberIds:[...friendIds],vehicles:[{id,ownerId,ownerName,ownerInitials,ownerColor,name,bio}],laneId}]
+  const [sharedGarages, setSharedGarages] = usePersistedIDBState("sl_sharedGarages", []); // [{id,name,color,memberIds:[...friendIds],vehicles:[{id,ownerId,ownerName,ownerInitials,ownerColor,name,bio}],laneId}]
   const [showCreateSharedGarage, setShowCreateSharedGarage] = useState(false);
   const [newSharedGarageName, setNewSharedGarageName] = useState("");
   const [newGarageInvitees, setNewGarageInvitees] = useState([]); // friend ids picked to invite when creating
@@ -1988,6 +2093,9 @@ export default function SonoLane() {
     // into that chat's room instead.
     if(lanesRoom) setLanesView("room");
     else if(p!==panel && p==="create") setLanesView("list");
+    // Landing on Lanes fresh always shows the page title first, not
+    // whatever search box was left open last time you were here.
+    if(p!==panel && p==="create"){ setLanesSearchActive(false); setLaneUserSearch(""); }
     // A Lanes room only remembers "came from a Shared Garage" when THIS
     // call explicitly says so — every other way of reaching Lanes (the tab
     // itself, a plain "message this friend" button) clears it, so it can
@@ -2881,6 +2989,95 @@ export default function SonoLane() {
         }}>{n}</div>}
         <button onClick={action} style={style} {...rest}>{children}</button>
       </div>
+    );
+  };
+
+  // Radio Stations content — shared between Profile's own Radio Stations
+  // page (subPanel==="radiostations") and the Lanes chat list's SonoLane
+  // Radio pill, so it only needs to be written once. Every value it closes
+  // over (radioHosts, savedStations, showReg, hostForm, isBroad, broadName,
+  // CARD/SEC/INP/VN) lives at this same top level, so it works unchanged
+  // from either place. Pass dark:true from Lanes (dark background) so text
+  // and card colors match that theme instead of Profile's light one —
+  // Jakob's Law: content shouldn't look like a dropped-in white card on a
+  // page that's dark everywhere else.
+  const renderRadioStationsSection = (dark=false) => {
+    const _saved = radioHosts.filter(h=>savedStations.includes(h.name));
+    const textPrimary = dark ? "#fff" : "#111";
+    const textSecondary = dark ? "#dcddde" : "#111";
+    const secStyle = dark ? {...SEC,color:"#8e9297"} : SEC;
+    const cardStyle = dark ? {background:"#40444b",borderRadius:14,border:"1px solid #4f545c",padding:"14px",marginBottom:10} : CARD;
+    const inpStyle = dark ? {...INP,background:"#2f3136",border:"1px solid #4f545c",color:"#fff"} : INP;
+    const cancelBtnStyle = dark ? {background:"#2f3136",border:"1px solid #4f545c",color:"#dcddde"} : {background:"#f3f3f3",border:"1px solid #ebebeb",color:"#555"};
+    const chipInactive = dark ? {background:"#2f3136",color:"#8e9297"} : {background:"#f3f3f3",color:"#888"};
+    return (
+    <div>
+      <div style={{padding:"0 14px 12px"}}>
+        <div style={{fontSize:16,fontWeight:800,color:textPrimary}}>📻 Radio Stations</div>
+      </div>
+      <div style={{padding:"4px 14px 24px"}}>
+
+        <div style={secStyle}>SAVED STATIONS</div>
+        {_saved.length===0 ? (
+          <div style={{...cardStyle,textAlign:"center",color:textSecondary,fontSize:13,padding:"24px 16px"}}>
+            <div style={{marginBottom:12}}>Star a station from SonoLane Radio.</div>
+            <VN action={()=>{setMusicTab("nearby");setShowMusic(true);}} style={{padding:"9px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Go to SonoLane Radio</VN>
+          </div>
+        ) : _saved.map((h,i)=>(
+          <div key={i} style={{...cardStyle,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:700,color:textPrimary}}>{h.name}</div>
+              <div style={{fontSize:12,color:textSecondary}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
+            </div>
+            <button onClick={()=>toggleSavedStation(h.name)} title="Remove from saved" style={{background:"none",border:"none",color:OR,fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>★</button>
+          </div>
+        ))}
+
+        <div style={{...secStyle,marginTop:16}}>MY STATIONS</div>
+        {radioHosts.length===0 ? (
+          <div style={{...cardStyle,textAlign:"center",color:textSecondary,fontSize:13,padding:"24px 16px"}}>
+            {!showReg ? (
+              <>
+                <div style={{marginBottom:12}}>You haven't registered a station yet.</div>
+                <VN action={()=>setShowReg(true)} style={{padding:"9px 18px",borderRadius:20,background:"transparent",border:"1.5px dashed "+OR,color:OR,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Apply to be a Radio Host</VN>
+              </>
+            ) : (
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:15,fontWeight:800,color:textPrimary,marginBottom:12}}>Host Registration</div>
+                <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...inpStyle,marginBottom:8}}/>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+                  {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
+                    <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:chipInactive.background,color:hostForm.genre===g?"#fff":chipInactive.color,border:"none",fontFamily:F}}>{g}</button>
+                  ))}
+                </div>
+                <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...inpStyle,marginBottom:8}}/>
+                <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...inpStyle,resize:"none",marginBottom:12}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
+                  <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,...cancelBtnStyle,cursor:"pointer",fontFamily:F}}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : radioHosts.map((h,i)=>(
+          <div key={i} style={{...cardStyle,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:700,color:textPrimary}}>{h.name}</div>
+              <div style={{fontSize:12,color:textSecondary}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
+              {h.bio && <div style={{fontSize:12,color:textSecondary,marginTop:3}}>{h.bio}</div>}
+            </div>
+            {isBroad&&broadName===h.name && (
+              <div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px",flexShrink:0}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/>
+                <span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
     );
   };
 
@@ -4583,76 +4780,7 @@ export default function SonoLane() {
     /* radio stations sub — saved (favorited) stations and stations you've
        created via Register as Radio Host in the CB Radio/Music sheet. */
     if(subPanel==="radiostations") {
-      const _saved = radioHosts.filter(h=>savedStations.includes(h.name));
-      radiostationsSection = (
-      <div>
-        <div style={{padding:"0 14px 12px"}}>
-          <div style={{fontSize:16,fontWeight:800,color:"#111"}}>📻 Radio Stations</div>
-        </div>
-        <div style={{padding:"4px 14px 24px"}}>
-
-          <div style={SEC}>SAVED STATIONS</div>
-          {_saved.length===0 ? (
-            <div style={{...CARD,textAlign:"center",color:"#111",fontSize:13,padding:"24px 16px"}}>
-              <div style={{marginBottom:12}}>Star a station from SonoLane Radio.</div>
-              <VN action={()=>{setMusicTab("nearby");setShowMusic(true);}} style={{padding:"9px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Go to SonoLane Radio</VN>
-            </div>
-          ) : _saved.map((h,i)=>(
-            <div key={i} style={{...CARD,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{h.name}</div>
-                <div style={{fontSize:12,color:"#111"}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
-              </div>
-              <button onClick={()=>toggleSavedStation(h.name)} title="Remove from saved" style={{background:"none",border:"none",color:OR,fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>★</button>
-            </div>
-          ))}
-
-          <div style={{...SEC,marginTop:16}}>MY STATIONS</div>
-          {radioHosts.length===0 ? (
-            <div style={{...CARD,textAlign:"center",color:"#111",fontSize:13,padding:"24px 16px"}}>
-              {!showReg ? (
-                <>
-                  <div style={{marginBottom:12}}>You haven't registered a station yet.</div>
-                  <VN action={()=>setShowReg(true)} style={{padding:"9px 18px",borderRadius:20,background:"transparent",border:"1.5px dashed "+OR,color:OR,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>📻 Apply to be a Radio Host</VN>
-                </>
-              ) : (
-                <div style={{textAlign:"left"}}>
-                  <div style={{fontSize:15,fontWeight:800,color:"#111",marginBottom:12}}>Host Registration</div>
-                  <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,marginBottom:8}}/>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
-                    {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
-                      <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#f3f3f3",color:hostForm.genre===g?"#fff":"#888",border:"none",fontFamily:F}}>{g}</button>
-                    ))}
-                  </div>
-                  <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,marginBottom:8}}/>
-                  <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,resize:"none",marginBottom:12}}/>
-                  <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
-                    <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : radioHosts.map((h,i)=>(
-            <div key={i} style={{...CARD,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📻</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{h.name}</div>
-                <div style={{fontSize:12,color:"#111"}}>{h.genre}{h.handle?" · @"+h.handle:""}</div>
-                {h.bio && <div style={{fontSize:12,color:"#111",marginTop:3}}>{h.bio}</div>}
-              </div>
-              {isBroad&&broadName===h.name && (
-                <div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px",flexShrink:0}}>
-                  <div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/>
-                  <span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-      );
+      radiostationsSection = renderRadioStationsSection();
     }
 
     /* followers sub — people following you */
@@ -6416,6 +6544,10 @@ export default function SonoLane() {
   const CreatePanel = useStablePanel(() => {
     const unreadNotifs = notifications.filter(n=>!n.read).length;
     const curFriend = friends.find(f=>f.id===activeChan);
+    // Self-chat avatar/initials — "You" (notifications) uses the same
+    // initials fallback as everywhere else your own avatar shows without a
+    // photo (see the old notes-lane bubble this replaced).
+    const myInitials = userName ? userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "ME";
     const [pinnedChans, setPinnedChans] = usePersistedState("sl_pinnedChans", []);
     // Which section pill is showing on the chat list — "chats" (your
     // friends' DMs) is the default/main view, matching a normal messaging
@@ -6677,73 +6809,59 @@ export default function SonoLane() {
             button to return here. ── */}
         {lanesView==="list" && (
         <div style={{width:"100%",background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden"}}>
-          {/* App name */}
-          <div style={{padding:"11px 12px 9px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:-0.5,display:"flex",alignItems:"center",gap:6}}><DPadIcon id="chat" color={DPAD_COLORS.chat} size={14}/> Lanes</div>
-              <div style={{fontSize:10,color:"#72767d",marginTop:1}}>Chat · Notes · Calls</div>
-            </div>
-            <div style={{width:8,height:8,borderRadius:"50%",background:"#23a55a",flexShrink:0}}/>
-          </div>
+          {/* The "Lanes" icon+title used to live here as its own header row —
+              it's now the shared TopBar's centered title instead (see
+              <TopBar/>), so this page starts straight at its own content. */}
 
-          {/* Quick-access bubbles — Your Note / Sono AI / New Lane, story-
-              bubble style (like a messaging app's "Your note" bubble)
-              instead of full list rows, so the main list below is all
-              real chats. */}
+          {/* Quick-access bubbles — now your pinned chats, story-bubble
+              style, instead of fixed shortcuts. Your AI pal is always here
+              since it's just a chat now too; anything else you tap 📌 Pin
+              on below shows up here right next to it. "You" (notifications)
+              intentionally isn't in this row — it still lives as a regular
+              chat at the top of the Chats list below, just not bubbled up
+              here. Starting something new (a Lane, a Shared Garage, a Radio
+              Channel) moved to the ＋ up in the header / Profile, instead of
+              competing for space in a row about chats you already have
+              (Law of Proximity: different kind of action, doesn't belong in
+              this group anymore). */}
           <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0}}>
-            <button onClick={()=>{setActiveChan("notes");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px solid "+(activeChan==="notes"&&lanesView==="room"?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,position:"relative"}}>
-                📝
-                <div style={{position:"absolute",bottom:-2,right:-2,width:18,height:18,borderRadius:"50%",background:OR,border:"2px solid #2f3136",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",fontWeight:700}}>+</div>
-              </div>
-              <span style={{fontSize:10,color:"#8e9297",fontWeight:600}}>Your note</span>
-            </button>
             <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
               <div style={{width:52,height:52,borderRadius:"50%",background:pal.color+"22",border:"2px solid "+(activeChan==="sono"&&lanesView==="room"?pal.color:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center"}}>
                 <CompassStar size={24} color={pal.color}/>
               </div>
               <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{pal.name}</span>
             </button>
-            <button onClick={()=>setShowCreateLane(true)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px dashed #4f545c",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#8e9297"}}>＋</div>
-              <span style={{fontSize:10,color:"#8e9297",fontWeight:600}}>New Lane</span>
-            </button>
-
-            {/* Thin divider — groups "open something" bubbles (note/Sono/
-                New Lane, all things you jump straight into) apart from
-                "start a bigger thing" shortcuts below (Law of Proximity:
-                the gap itself tells you these two are different kinds of
-                actions, no label needed). */}
-            <div style={{width:1,alignSelf:"stretch",background:"#40444b",flexShrink:0,margin:"6px 2px"}}/>
-
-            {/* Create Shared Garage / Create Radio Channel — same dashed-
-                circle "start something new" look as New Lane (Law of
-                Similarity: dashed border = create, filled = open), so both
-                creation flows are reachable from chat without a trip to
-                Profile first. */}
-            <button onClick={()=>{go("profile");setTimeout(()=>setShowCreateSharedGarage(true),100);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px dashed #4f545c",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#8e9297"}}>🚗</div>
-              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,textAlign:"center",lineHeight:1.15}}>Shared<br/>Garage</span>
-            </button>
-            <button onClick={()=>{go("profile");setTimeout(()=>{setSubPanel("radiostations");setShowReg(true);},100);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px dashed #4f545c",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#8e9297"}}>📻</div>
-              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,textAlign:"center",lineHeight:1.15}}>Radio<br/>Channel</span>
-            </button>
+            {friends.filter(fr=>pinnedChans.includes(fr.id)).map(fr=>(
+              <button key={fr.id} onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+                <FriendAvatar fr={fr} size={52} fontSize={19} style={{border:"2px solid "+(activeChan===fr.id&&lanesView==="room"?OR:"#4f545c")}}/>
+                <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{fr.name.split(" ")[0]}</span>
+              </button>
+            ))}
+            {sidebarCustomLanes.filter(lane=>pinnedChans.includes(lane.id)).map(lane=>(
+              <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+                <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px solid "+(activeChan===lane.id&&lanesView==="room"?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:lane.color||"#8e9297",fontWeight:700}}>#</div>
+                <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{lane.name}</span>
+              </button>
+            ))}
           </div>
-
           {/* Section pills — Chats (your friends, the main list) / Lanes
-              (public + your own) / Notifications — a toggle row instead of
-              always-stacked section headers. Chats opens by default so
-              your personal DMs are what you see first, like a normal
-              messaging inbox. */}
+              (public + your own) / Radio (SonoLane Radio's saved stations
+              and your own host registration, same content as Profile's
+              Radio Stations page) — a toggle row instead of always-stacked
+              section headers. Chats opens by default so your personal DMs
+              are what you see first, like a normal messaging inbox.
+              Notifications used to be a third pill here; it's the "You"
+              chat now instead (see the Chats list above) — Law of Uniform
+              Connectedness: activity about you reads as a conversation with
+              you, not a separate inbox. */}
           <div style={{display:"flex",gap:8,padding:"2px 14px 12px",flexShrink:0,overflowX:"auto"}}>
-            {[["chats","Chats"],["lanes","Lanes"],["notifs","Notifications"]].map(([id,label])=>(
+            {[["chats","Chats"],["lanes","Lanes"],["radio","SonoLane Radio"]].map(([id,label])=>(
               <button key={id} onClick={()=>setLanesListTab(id)} style={{
                 padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:F,
                 fontSize:13,fontWeight:700,whiteSpace:"nowrap",flexShrink:0,
                 background:lanesListTab===id?"#fff":"#40444b",
                 color:lanesListTab===id?"#111":"#dcddde",
-              }}>{label}{id==="notifs"&&lanesNotifications&&unreadNotifs>0?" · "+unreadNotifs:""}</button>
+              }}>{label}</button>
             ))}
           </div>
 
@@ -6751,14 +6869,49 @@ export default function SonoLane() {
 
             {/* Chats — friends' DMs, filtered by the "Find users…" search in
                 the shared TopBar (see laneUserSearch). Bigger avatars, one
-                real messaging-app-style row per friend. */}
-            {lanesListTab==="chats" && (
-              friends.length===0 ? (
-                <div style={{textAlign:"center",color:"#4f545c",padding:"46px 20px"}}>
-                  <div style={{fontSize:38,marginBottom:8}}>💬</div>
-                  <div style={{fontSize:14,fontWeight:700,color:"#8e9297"}}>No chats yet</div>
-                  <div style={{fontSize:12,marginTop:4,lineHeight:1.6}}>Add some friends to start messaging them here.</div>
-                </div>
+                real messaging-app-style row per friend. "You" (notifications)
+                and your AI pal are permanent rows at the top — not filtered
+                by search, always there like a real messaging app's Saved
+                Messages / assistant thread. */}
+            {lanesListTab==="chats" && (<>
+              {!laneUserSearch.trim() && (<>
+                <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{
+                  width:"100%",display:"flex",alignItems:"center",gap:12,
+                  padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
+                  background:(activeChan==="notifications"&&lanesView==="room")?"#3a3d42":"transparent",
+                }}>
+                  <div style={{position:"relative",flexShrink:0}}>
+                    <FriendAvatar fr={{photo:profilePhoto,color:OR,initials:myInitials}} size={54} fontSize={19}/>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>You</div>
+                    <div style={{fontSize:12,color:"#8e9297",marginTop:1}}>{unreadNotifs>0 ? unreadNotifs+" new notification"+(unreadNotifs>1?"s":"") : "Notifications & activity"}</div>
+                  </div>
+                  {unreadNotifs>0 && <div style={{minWidth:20,height:20,borderRadius:10,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",padding:"0 5px",flexShrink:0}}>{unreadNotifs}</div>}
+                </button>
+                <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{
+                  width:"100%",display:"flex",alignItems:"center",gap:12,
+                  padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
+                  background:(activeChan==="sono"&&lanesView==="room")?"#3a3d42":"transparent",
+                }}>
+                  <div style={{width:54,height:54,borderRadius:"50%",background:pal.color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <CompassStar size={26} color={pal.color}/>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{pal.name}</div>
+                    <div style={{fontSize:12,color:pal.color,marginTop:1}}>{pal.desc} · AI</div>
+                  </div>
+                </button>
+                <div style={{height:1,background:"#40444b",margin:"6px 4px 8px"}}/>
+              </>)}
+              {friends.length===0 ? (
+                !laneUserSearch.trim() && (
+                  <div style={{textAlign:"center",color:"#4f545c",padding:"30px 20px"}}>
+                    <div style={{fontSize:30,marginBottom:8}}>💬</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#8e9297"}}>No friend chats yet</div>
+                    <div style={{fontSize:12,marginTop:4,lineHeight:1.6}}>Add some friends to start messaging them here.</div>
+                  </div>
+                )
               ) : (<>
                 {laneUserSearch.trim() && friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())).length===0 && (
                   <div style={{fontSize:12,color:"#4f545c",padding:"16px 10px",fontStyle:"italic",textAlign:"center"}}>No users match "{laneUserSearch}".</div>
@@ -6782,8 +6935,8 @@ export default function SonoLane() {
                     <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:26,height:26,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:13,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
                   </div>
                 ))}
-              </>)
-            )}
+              </>)}
+            </>)}
 
             {/* Lanes — Public Lanes (a live network of public proximity
                 chats, anybody can create one and anybody nearby can see or
@@ -6828,18 +6981,15 @@ export default function SonoLane() {
               ))}
             </>)}
 
-            {/* Notifications — a single row into the same notifications
-                feed as before (activeChan==="notifications"), just reached
-                through its own pill instead of a stacked "Personal" list. */}
-            {lanesListTab==="notifs" && (
-              <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"10px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",background:(activeChan==="notifications"&&lanesView==="room")?"#3a3d42":"transparent",marginTop:6}}>
-                <div style={{width:44,height:44,borderRadius:"50%",background:"#faa61a22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🔔</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Notifications</div>
-                  <div style={{fontSize:12,color:"#8e9297",marginTop:1}}>SonoLane activity</div>
-                </div>
-                {lanesNotifications && unreadNotifs>0 && <div style={{minWidth:20,height:20,borderRadius:10,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",padding:"0 5px",flexShrink:0}}>{unreadNotifs}</div>}
-              </button>
+            {/* SonoLane Radio — same Radio Stations content as Profile
+                (saved stations + your own host registration), reachable
+                right from Lanes now instead of needing a trip to Profile.
+                dark:true keeps it on Lanes' own dark background instead of
+                dropping a white card onto it. */}
+            {lanesListTab==="radio" && (
+              <div style={{margin:"6px 0 0"}}>
+                {renderRadioStationsSection(true)}
+              </div>
             )}
 
           </div>
@@ -8072,24 +8222,32 @@ export default function SonoLane() {
       : (onLanes && lanesView==="room") ? { onBack: backFromLanesRoom }
       : null;
     const dark = onLanes || !!backPage?.dark;
-    const btnBg = dark ? "#2f3136" : "#f3f3f3";
+    // Top bar icon buttons are transparent now — no circular shading behind
+    // them — just the glyph itself, colored for whichever background this
+    // page's top bar has.
     const btnColor = dark ? "#dcddde" : "#111";
     return (
       <>
         <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexShrink:0,background:dark?"#36393f":"#fff",borderBottom:"1px solid "+(dark?"#202225":"#ebebeb"),zIndex:100}}>
           {/* Left button — the plain "+" everywhere, except on a page that
-              has its own back button, where the TopBar becomes that button. */}
+              has its own back button, where the TopBar becomes that button.
+              On the Lanes chat list specifically, + starts a new Lane
+              instead of the generic Route Post/Event sheet — chat is what
+              this page is for, so + here should do the chat thing (Jakob's
+              Law: a + inside a chat list is expected to start a chat). */}
           {backPage ? (
-            <button onClick={backPage.onBack} title="Back" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+            <button onClick={backPage.onBack} title="Back" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
           ) : (
-            <button onClick={()=>setShowQuickCreate(true)} title="Create" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:20,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,flexShrink:0}}>+</button>
+            <button onClick={()=>(onLanes&&lanesView==="list") ? setShowCreateLane(true) : setShowQuickCreate(true)} title={(onLanes&&lanesView==="list") ? "New Lane" : "Create"} style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:40,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,flexShrink:0}}>+</button>
           )}
 
           {/* Middle — page-specific content: a back page's own title (when
               it has one — some, like Car Details, keep their title in the
               page content instead), search on Discover (Routes or Events,
-              whichever tab is active) and Lanes (find users), or the
-              username centered on Profile home. */}
+              whichever tab is active), the username centered on Profile
+              home, or — on Lanes — the page's icon+title centered by
+              default, swapped for the actual search box while search is
+              active (see the 🔍/✕ button on the right). */}
           {backPage ? (
             backPage.title && <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:dark?"#fff":"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{backPage.title}</div>
           ) : panel==="discover" ? (
@@ -8102,25 +8260,40 @@ export default function SonoLane() {
           ) : panel==="profile" ? (
             <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName || "You"}</div>
           ) : onLanes ? (
-            <input
-              value={laneUserSearch}
-              onChange={e=>setLaneUserSearch(e.target.value)}
-              placeholder="Find users…"
-              style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #4f545c",background:"#40444b",color:"#dcddde",fontSize:13,fontFamily:F,outline:"none"}}
-            />
+            lanesSearchActive ? (
+              <input
+                autoFocus
+                value={laneUserSearch}
+                onChange={e=>setLaneUserSearch(e.target.value)}
+                placeholder="Find users…"
+                style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #4f545c",background:"#40444b",color:"#dcddde",fontSize:13,fontFamily:F,outline:"none"}}
+              />
+            ) : (
+              <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                <DPadIcon id="chat" color={DPAD_COLORS.chat} size={16}/> Lanes
+              </div>
+            )
           ) : null}
 
-          {/* Right button — the hamburger menu everywhere, except on a back
+          {/* Right button — the hamburger menu everywhere, except: a back
               page, where it becomes that page's one main action (Save,
-              +Add, …) if it has one, or disappears entirely if it doesn't. */}
+              +Add, …) if it has one, or disappears entirely if it doesn't;
+              and Lanes, where it's a 🔍 that swaps the centered title for
+              the search box above (and back to ✕ to close search and clear
+              it) instead of the menu. */}
           {backPage ? (
             backPage.right && (
-              <button onClick={backPage.right.onClick} title={backPage.right.title} style={backPage.right.label ? {padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0} : {width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <button onClick={backPage.right.onClick} title={backPage.right.title} style={backPage.right.label ? {padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0} : {width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                 {backPage.right.label || backPage.right.icon}
               </button>
             )
+          ) : onLanes ? (
+            <button onClick={()=>{
+              if(lanesSearchActive){ setLanesSearchActive(false); setLaneUserSearch(""); }
+              else setLanesSearchActive(true);
+            }} title={lanesSearchActive?"Close search":"Search"} style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{lanesSearchActive?"✕":"🔍"}</button>
           ) : (
-            <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:34,height:34,borderRadius:"50%",background:btnBg,border:"none",color:btnColor,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>☰</button>
+            <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>☰</button>
           )}
         </div>
 
@@ -8292,21 +8465,42 @@ export default function SonoLane() {
             style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative",touchAction:"pan-y"}}
             onMouseDown={onSwipeStart} onMouseMove={onSwipeMove} onMouseUp={onSwipeEnd}
           >
-            {NeighborPanel ? (
-              <div ref={swipeWrapperRef} style={{
-                position:"absolute", top:0, left:0, bottom:0, display:"flex", width:w*2, willChange:"transform",
-                transform:`translateX(${swipeDir==="next" ? swipeDXRef.current : swipeDXRef.current-w}px)`,
-              }}>
-                <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                  {swipeDir==="next" ? <ActivePanel/> : <NeighborPanel/>}
-                </div>
-                <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                  {swipeDir==="next" ? <NeighborPanel/> : <ActivePanel/>}
-                </div>
+            {/* ActivePanel always renders in this SAME first slot, on every
+                render, whether or not a neighbor is showing — this is load-
+                bearing, not cosmetic. The previous version swapped which
+                literal JSX slot ActivePanel occupied depending on swipeDir
+                (so a "prev" drag could put NeighborPanel first), which
+                looked identical when idle but meant the very first
+                touchmove of a real carousel drag (the one that sets
+                swipeDir and mounts the neighbor) changed ActivePanel's
+                position in the tree. React has no way to "move" a subtree
+                across a re-parent like that — it unmounts the old DOM and
+                mounts fresh — and doing that WHILE a finger is still touching
+                an element inside it makes the browser cancel the rest of
+                that touch sequence outright (no touchmove/touchend ever
+                follow — confirmed by dispatching real touch input in
+                Playwright: exactly one touchmove arrived, then silence).
+                That's the actual bug behind "swipe doesn't work" — it fired
+                once, tore itself down, and every gesture died right there.
+                Keeping ActivePanel's slot fixed and using CSS
+                (flexDirection: row-reverse) to flip which SIDE it visually
+                appears on for a "prev" drag gets the same look without ever
+                touching ActivePanel's position in the tree. */}
+            <div ref={swipeWrapperRef} style={{
+              position:"absolute", top:0, left:0, bottom:0, display:"flex",
+              flexDirection: swipeDir==="prev" ? "row-reverse" : "row",
+              width: NeighborPanel ? w*2 : w, willChange:"transform",
+              transform:`translateX(${swipeDir==="prev" ? swipeDXRef.current-w : swipeDXRef.current}px)`,
+            }}>
+              <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                <ActivePanel/>
               </div>
-            ) : (
-              <ActivePanel/>
-            )}
+              {NeighborPanel && (
+                <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                  <NeighborPanel/>
+                </div>
+              )}
+            </div>
           </div>
         );
       })()}
