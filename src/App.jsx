@@ -8457,7 +8457,7 @@ export default function SonoLane() {
         return (
           <div
             ref={swipeContainerRef}
-            style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative",touchAction:"pan-y"}}
+            style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative",touchAction:"pan-y",overscrollBehaviorX:"none"}}
             onMouseDown={onSwipeStart} onMouseMove={onSwipeMove} onMouseUp={onSwipeEnd}
           >
             {/* ActivePanel always renders in this SAME first slot, on every
