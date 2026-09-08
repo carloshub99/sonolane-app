@@ -1015,6 +1015,17 @@ const DPadIcon = ({ id, color, size=17 }) => {
 
 /* DPad removed — navigation is now the top page-switcher + swipe carousel (see TopNav in SonoLane()). */
 
+/* Bold magnifying-glass icon for the top bar's search toggle button —
+   a thick ring + thick diagonal handle (matching the reference glyph
+   the user provided), drawn with currentColor via `color` so it tints
+   the same way the emoji it replaces did. */
+const SearchIcon = ({ size=24, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="10" cy="10" r="7" stroke={color} strokeWidth="3.6"/>
+    <line x1="15.3" y1="15.3" x2="21" y2="21" stroke={color} strokeWidth="3.6" strokeLinecap="round"/>
+  </svg>
+);
+
 /* ── Achievement sound — triumphant fanfare ── */
 const playAchievementSound = () => {
   try {
@@ -6813,18 +6824,26 @@ export default function SonoLane() {
               it's now the shared TopBar's centered title instead (see
               <TopBar/>), so this page starts straight at its own content. */}
 
-          {/* Quick-access bubbles — now your pinned chats, story-bubble
-              style, instead of fixed shortcuts. Your AI pal is always here
-              since it's just a chat now too; anything else you tap 📌 Pin
-              on below shows up here right next to it. "You" (notifications)
-              intentionally isn't in this row — it still lives as a regular
-              chat at the top of the Chats list below, just not bubbled up
-              here. Starting something new (a Lane, a Shared Garage, a Radio
+          {/* Quick-access bubbles — "You" (notifications) and your AI pal
+              are always here, pinned first and second respectively, since
+              they're the two chats everyone always has; anything else you
+              tap 📌 Pin on below shows up here right after them. Both used
+              to also have their own rows in the Chats list below — those
+              were removed so each chat lives in exactly one place instead
+              of two (Law of Uniform Connectedness / avoiding duplication).
+              Starting something new (a Lane, a Shared Garage, a Radio
               Channel) moved to the ＋ up in the header / Profile, instead of
               competing for space in a row about chats you already have
               (Law of Proximity: different kind of action, doesn't belong in
               this group anymore). */}
           <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0}}>
+            <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+              <div style={{position:"relative"}}>
+                <FriendAvatar fr={{photo:profilePhoto,color:OR,initials:myInitials}} size={52} fontSize={19} style={{border:"2px solid "+(activeChan==="notifications"&&lanesView==="room"?OR:"#4f545c")}}/>
+                {unreadNotifs>0 && <div style={{position:"absolute",top:-2,right:-2,minWidth:18,height:18,borderRadius:9,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 4px",border:"2px solid #2f3136",boxSizing:"border-box"}}>{unreadNotifs}</div>}
+              </div>
+              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>You</span>
+            </button>
             <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
               <div style={{width:52,height:52,borderRadius:"50%",background:pal.color+"22",border:"2px solid "+(activeChan==="sono"&&lanesView==="room"?pal.color:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center"}}>
                 <CompassStar size={24} color={pal.color}/>
@@ -6870,40 +6889,10 @@ export default function SonoLane() {
             {/* Chats — friends' DMs, filtered by the "Find users…" search in
                 the shared TopBar (see laneUserSearch). Bigger avatars, one
                 real messaging-app-style row per friend. "You" (notifications)
-                and your AI pal are permanent rows at the top — not filtered
-                by search, always there like a real messaging app's Saved
-                Messages / assistant thread. */}
+                and your AI pal used to also have permanent rows up here —
+                they're pinned bubbles up top now instead (see the bubble
+                row above), so they don't appear twice. */}
             {lanesListTab==="chats" && (<>
-              {!laneUserSearch.trim() && (<>
-                <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{
-                  width:"100%",display:"flex",alignItems:"center",gap:12,
-                  padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
-                  background:(activeChan==="notifications"&&lanesView==="room")?"#3a3d42":"transparent",
-                }}>
-                  <div style={{position:"relative",flexShrink:0}}>
-                    <FriendAvatar fr={{photo:profilePhoto,color:OR,initials:myInitials}} size={54} fontSize={19}/>
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>You</div>
-                    <div style={{fontSize:12,color:"#8e9297",marginTop:1}}>{unreadNotifs>0 ? unreadNotifs+" new notification"+(unreadNotifs>1?"s":"") : "Notifications & activity"}</div>
-                  </div>
-                  {unreadNotifs>0 && <div style={{minWidth:20,height:20,borderRadius:10,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",padding:"0 5px",flexShrink:0}}>{unreadNotifs}</div>}
-                </button>
-                <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{
-                  width:"100%",display:"flex",alignItems:"center",gap:12,
-                  padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
-                  background:(activeChan==="sono"&&lanesView==="room")?"#3a3d42":"transparent",
-                }}>
-                  <div style={{width:54,height:54,borderRadius:"50%",background:pal.color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <CompassStar size={26} color={pal.color}/>
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{pal.name}</div>
-                    <div style={{fontSize:12,color:pal.color,marginTop:1}}>{pal.desc} · AI</div>
-                  </div>
-                </button>
-                <div style={{height:1,background:"#40444b",margin:"6px 4px 8px"}}/>
-              </>)}
               {friends.length===0 ? (
                 !laneUserSearch.trim() && (
                   <div style={{textAlign:"center",color:"#4f545c",padding:"30px 20px"}}>
@@ -8278,9 +8267,9 @@ export default function SonoLane() {
           {/* Right button — the hamburger menu everywhere, except: a back
               page, where it becomes that page's one main action (Save,
               +Add, …) if it has one, or disappears entirely if it doesn't;
-              and Lanes, where it's a 🔍 that swaps the centered title for
-              the search box above (and back to ✕ to close search and clear
-              it) instead of the menu. */}
+              and Lanes, where it's a SearchIcon that swaps the centered
+              title for the search box above (and back to ✕ to close
+              search and clear it) instead of the menu. */}
           {backPage ? (
             backPage.right && (
               <button onClick={backPage.right.onClick} title={backPage.right.title} style={backPage.right.label ? {padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0} : {width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -8291,7 +8280,7 @@ export default function SonoLane() {
             <button onClick={()=>{
               if(lanesSearchActive){ setLanesSearchActive(false); setLaneUserSearch(""); }
               else setLanesSearchActive(true);
-            }} title={lanesSearchActive?"Close search":"Search"} style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{lanesSearchActive?"✕":"🔍"}</button>
+            }} title={lanesSearchActive?"Close search":"Search"} style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{lanesSearchActive?"✕":<SearchIcon size={26} color={btnColor}/>}</button>
           ) : (
             <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>☰</button>
           )}
