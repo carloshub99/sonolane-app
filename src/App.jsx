@@ -325,6 +325,34 @@ function RouteMap({ route, height = 140, interactive = false, color = "#f97316" 
 // smaller, so normal use stays comfortably under the limit. Resolves the
 // original file as a fallback if canvas resizing isn't available for some
 // reason, so an upload never just silently fails.
+/* ── Username normalize/validate — shared by sign-up and Edit Profile so
+   the rule is defined once and can't drift between the two places it's
+   enforced. Liberal in what it accepts as you type (Postel's Law): leading
+   "@", spaces, capital letters, and stray punctuation all just get quietly
+   stripped/lowercased rather than rejected outright, so pasting "@Jordan
+   Cole!" while it's still being typed doesn't feel like an error — but what
+   actually gets stored/checked/saved is always the strict normalized form,
+   which is what the database's uniqueness constraint expects. */
+function normalizeUsername(raw) {
+  return (raw || "").trim().toLowerCase().replace(/^@+/, "").replace(/\s+/g, "").replace(/[^a-z0-9_.]/g, "");
+}
+function usernameError(u) {
+  if (!u) return null;
+  if (u.length < 3) return "At least 3 characters";
+  if (u.length > 20) return "20 characters max";
+  if (!/^[a-z0-9_.]+$/.test(u)) return "Letters, numbers, _ and . only";
+  return null;
+}
+// Suggests a starting-point username from a display name (Tesler's Law —
+// push the "what should I even pick" decision off the user by default,
+// they can still type over it). Never auto-fills the field; only ever used
+// as placeholder text so nobody's account silently gets a name they didn't
+// choose (Postel's Law cuts both ways — liberal on input, but never assume).
+function suggestUsername(name) {
+  const base = normalizeUsername((name || "").replace(/\s+/g, "_"));
+  return base || "yourname";
+}
+
 function readImageCompressed(file, maxDim = 1280, quality = 0.82) {
   return new Promise((resolve) => {
     if (!file) { resolve(null); return; }
@@ -975,38 +1003,76 @@ function GhostCard() {
 function AuthScreen() {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  // "idle" | "checking" | "available" | "taken" | "invalid" — drives the
+  // little inline status next to the username field. Showing "checking…"
+  // the instant typing pauses (before the network reply lands) is the
+  // Doherty Threshold in practice: the goal is under ~400ms to *some*
+  // feedback, not to the final answer, so the field never just sits there
+  // looking unresponsive while the real check is in flight.
+  const [usernameStatus, setUsernameStatus] = useState("idle");
   const [region, setRegion] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [claimedHandle, setClaimedHandle] = useState("");
   const inp = {width:"100%",padding:"12px 14px",borderRadius:10,background:"#f8f8f8",border:"1px solid #ebebeb",color:"#111",fontSize:16,boxSizing:"border-box",fontFamily:F,outline:"none"};
+
+  // Debounced availability check against the real profiles table — only
+  // meaningful in signup mode, only once the format itself is valid so we
+  // don't burn a network round-trip on every keystroke of an obviously
+  // incomplete username.
+  useEffect(() => {
+    if (mode !== "signup") return;
+    const u = normalizeUsername(username);
+    if (!u) { setUsernameStatus("idle"); return; }
+    if (usernameError(u)) { setUsernameStatus("invalid"); return; }
+    setUsernameStatus("checking");
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await supabase.from("profiles").select("id").ilike("handle", u).maybeSingle();
+        setUsernameStatus(data ? "taken" : "available");
+      } catch { setUsernameStatus("idle"); }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [username, mode]);
 
   const submit = async () => {
     setError("");
     if (mode === "signup" && !name.trim()) { setError("Enter your name."); return; }
+    const u = normalizeUsername(username);
+    if (mode === "signup" && !u) { setError("Choose a username."); return; }
+    if (mode === "signup" && usernameError(u)) { setError(usernameError(u)); return; }
+    if (mode === "signup" && usernameStatus === "taken") { setError("That username is already taken."); return; }
     if (!email.trim() || !password) { setError("Enter an email and password."); return; }
     if (password.length < 6) { setError("Password needs to be at least 6 characters."); return; }
     setBusy(true);
     try {
       if (mode === "signup") {
-        // name/region ride along as auth user metadata — the profiles-table
-        // trigger (see supabase/schema.sql) picks them up and pre-fills the
-        // new profile row, so Edit Profile isn't blank on first log-in.
+        // name/region/username ride along as auth user metadata — the
+        // profiles-table trigger (see supabase/schema.sql) picks them up
+        // and pre-fills the new profile row, so Edit Profile isn't blank
+        // on first log-in and the username is reserved from account #1.
         const { error: err } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { name: name.trim(), region: region.trim() } },
+          options: { data: { name: name.trim(), region: region.trim(), username: u } },
         });
         if (err) throw err;
+        setClaimedHandle(u);
         setCheckEmail(true);
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (err) throw err;
       }
     } catch (e) {
-      setError(e.message || "Something went wrong — try again.");
+      // A last-instant collision (two people claiming the same username at
+      // once) surfaces here as a database uniqueness error — give people a
+      // plain-English reason instead of a raw Postgres message.
+      const msg = e.message || "";
+      setError(/unique|duplicate/i.test(msg) ? "That username was just taken — try another." : (msg || "Something went wrong — try again."));
     } finally {
       setBusy(false);
     }
@@ -1018,11 +1084,16 @@ function AuthScreen() {
         <div style={{fontSize:46,marginBottom:16}}>📬</div>
         <div style={{fontSize:19,fontWeight:800,color:"#111",marginBottom:8}}>Check your email</div>
         <div style={{fontSize:15,color:"#666",maxWidth:280,lineHeight:1.6}}>We sent a confirmation link to <b>{email}</b>. Tap it, then come back and log in.</div>
+        {/* Peak-end rule — the last thing shown before people leave to check
+            their inbox is a small, positive confirmation of the identity
+            they just picked, not just a generic "we sent an email" beat. */}
+        {claimedHandle && <div style={{marginTop:14,padding:"8px 16px",borderRadius:20,background:OR+"12",color:OR,fontSize:14,fontWeight:800}}>✓ @{claimedHandle} is yours</div>}
         <button onClick={()=>{setCheckEmail(false);setMode("signin");}} style={{marginTop:20,padding:"10px 18px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>Back to log in</button>
       </div>
     );
   }
 
+  const uErr = usernameError(normalizeUsername(username));
   return (
     <div style={{width:"100%",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#fff",fontFamily:F,padding:24,paddingTop:"calc(24px + env(safe-area-inset-top, 0px))",paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))",boxSizing:"border-box"}}>
       <div style={{width:"100%",maxWidth:320}}>
@@ -1033,7 +1104,32 @@ function AuthScreen() {
         </div>
         {mode==="signup" && (
           <>
+            {/* Serial Position Effect — Name comes first (it's the field
+                everyone expects and gets right without thinking), Username
+                right after it while attention is still highest, since it's
+                the one with a validation state to get right; Region last,
+                lowest-stakes field, right before the effort shifts to
+                email/password. */}
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your name" style={{...inp,marginBottom:10}}/>
+            <div style={{position:"relative",marginBottom:2}}>
+              <input
+                value={username}
+                onChange={e=>setUsername(e.target.value)}
+                placeholder={"Username (e.g. "+suggestUsername(name)+")"}
+                autoCapitalize="none"
+                style={{...inp,paddingRight:34}}
+              />
+              {username.trim() && (
+                <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:15}}>
+                  {usernameStatus==="checking" && <span style={{color:"#bbb"}}>⋯</span>}
+                  {usernameStatus==="available" && <span style={{color:"#22c55e"}}>✓</span>}
+                  {(usernameStatus==="taken"||usernameStatus==="invalid") && <span style={{color:"#ef4444"}}>✕</span>}
+                </span>
+              )}
+            </div>
+            <div style={{fontSize:11,marginBottom:10,minHeight:14,color:usernameStatus==="taken"?"#ef4444":uErr?"#ef4444":usernameStatus==="available"?"#22c55e":"#999"}}>
+              {usernameStatus==="taken" ? "That username is taken" : uErr ? uErr : usernameStatus==="available" ? "Available — this is how people find you" : "This is separate from your name, and can't be changed by anyone but you"}
+            </div>
             <input value={region} onChange={e=>setRegion(e.target.value)} placeholder="Region (e.g. Los Angeles, CA)" style={{...inp,marginBottom:10}}/>
           </>
         )}
@@ -1144,11 +1240,21 @@ export default function SonoLane() {
   const carBannerPhotoRef = useRef(null);
   const carPrivatePhotoRef = useRef(null);
   const [userName,     setUserName]     = usePersistedState("sl_userName", "");
+  const [userHandle,   setUserHandle]   = usePersistedState("sl_userHandle", ""); // the account's real, unique username — distinct from the freely-changeable display name above; this is what accounts are found/saved by
   const [userBio,      setUserBio]      = usePersistedState("sl_userBio", "");
   const [userRegion,   setUserRegion]   = usePersistedState("sl_userRegion", ""); // e.g. "Los Angeles, CA" — collected at sign-up
   const [editMode,     setEditMode]     = useState(false);
+  const [editUsernameStatus, setEditUsernameStatus] = useState("idle"); // idle|checking|available|taken|invalid
+  const [editSaveError, setEditSaveError] = useState("");
+  // Lanes-related settings — lifted up here (out of CreatePanel) so the
+  // global Settings page (rendered from ProfilePanel, a different closure)
+  // can read and toggle them too, now that they live there instead of in
+  // their own separate Lanes Settings sheet.
+  const [showOnlineStatus, setShowOnlineStatus] = usePersistedState("sl_showOnlineStatus", true);
+  const [lanesNotifications, setLanesNotifications] = usePersistedState("sl_lanesNotifications", true);
   const [profilePhoto, setProfilePhoto] = usePersistedState("sl_profilePhoto", null); // base64 data URL
   const profilePhotoRef = useRef(null);
+  const garagePhotoRef = useRef(null); // Shared Garage's own profile-photo upload (Edit Garage sheet)
   const [carExteriorPhotos, setCarExteriorPhotos] = usePersistedState("sl_carExteriorPhotos", []); // [{id,url}] — up to 4 garage exterior shots
   const [carInteriorPhotos, setCarInteriorPhotos] = usePersistedState("sl_carInteriorPhotos", []); // [{id,url}] — up to 4 garage interior shots
   const carExteriorPhotoRef = useRef(null);
@@ -1240,6 +1346,7 @@ export default function SonoLane() {
       const { data: prof } = await supabase.from("profiles").select("*").eq("id", currentUserId).single();
       if (prof) {
         setUserName(prof.name || "");
+        setUserHandle(prof.handle || "");
         setUserBio(prof.bio || "");
         setUserRegion(prof.region || "");
         setProfilePhoto(prof.photo_url || null);
@@ -1259,11 +1366,40 @@ export default function SonoLane() {
     })();
   }, [currentUserId]);
 
-  // Persists name/bio/photo to your real profile row — no-op in local demo mode.
+  // Persists name/bio/photo/username to your real profile row — no-op in
+  // local demo mode. Username is normalized one more time right here, right
+  // before the write that actually matters (Postel's Law's other half: be
+  // liberal reading input, strict about what you ever actually store/send).
   const saveProfileToSupabase = async () => {
-    if (!isSupabaseConfigured || !currentUserId) return;
-    await supabase.from("profiles").update({ name: userName, bio: userBio, region: userRegion, photo_url: profilePhoto }).eq("id", currentUserId);
+    if (!isSupabaseConfigured || !currentUserId) return { error: null };
+    const handle = normalizeUsername(userHandle);
+    const { error } = await supabase.from("profiles").update({ name: userName, handle: handle || null, bio: userBio, region: userRegion, photo_url: profilePhoto }).eq("id", currentUserId);
+    return { error };
   };
+  // Live availability check used by Edit Profile's username field — mirrors
+  // the one in AuthScreen but excludes the signed-in user's own row, since
+  // "is @you available" should always say yes for you.
+  const checkUsernameAvailable = async (handle) => {
+    if (!isSupabaseConfigured || !currentUserId || !handle) return null;
+    const { data } = await supabase.from("profiles").select("id").ilike("handle", handle).neq("id", currentUserId).maybeSingle();
+    return !data;
+  };
+  // Debounced check as you edit your username on the Edit Profile page —
+  // same Doherty-Threshold "checking…" pattern as sign-up, gated to editMode
+  // so it never fires from the background hydration effect quietly
+  // resetting userHandle right after login.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !editMode) return;
+    const u = normalizeUsername(userHandle);
+    if (!u) { setEditUsernameStatus("idle"); return; }
+    if (usernameError(u)) { setEditUsernameStatus("invalid"); return; }
+    setEditUsernameStatus("checking");
+    const t = setTimeout(async () => {
+      const ok = await checkUsernameAvailable(u);
+      setEditUsernameStatus(ok===false ? "taken" : "available");
+    }, 450);
+    return () => clearTimeout(t);
+  }, [userHandle, editMode]);
   // Adds/removes a row in the real friends table — no-op in local demo mode
   // (each call site also updates the local `friends` array either way, so
   // the UI reacts the same in both modes).
@@ -1277,10 +1413,16 @@ export default function SonoLane() {
   };
   // Searches real signed-up users by name — the backend-mode replacement
   // for the local demo mode's SAMPLE_PEOPLE/followers search.
+  // Matches on name OR username — usernames are the real, unique lookup key
+  // (an exact/prefix match on "handle" always finds the right account, even
+  // if two people share the same display name), while the name match keeps
+  // the friendlier "search by what you actually remember about them"
+  // behavior people expect from every other app (Jakob's Law).
   const searchProfilesSupabase = async (query) => {
     if (!isSupabaseConfigured || !query.trim() || !currentUserId) return [];
+    const q = query.trim().replace(/^@+/, "");
     const { data } = await supabase.from("profiles").select("id,name,handle,initials,color,photo_url")
-      .ilike("name", "%"+query.trim()+"%").neq("id", currentUserId).limit(20);
+      .or("name.ilike.%"+q+"%,handle.ilike.%"+q+"%").neq("id", currentUserId).limit(20);
     return data || [];
   };
   // Sends a real 1:1 message row — the Lanes Direct Messages backend.
@@ -1552,6 +1694,14 @@ export default function SonoLane() {
   // list switches to "room"; the shared TopBar becomes that page's back
   // button (see BACK_PAGES-style handling in TopBar) to return to "list".
   const [lanesView,    setLanesView]    = useState("list");
+  // Set only when a Lanes room is opened FROM a Shared Garage page (its
+  // group chat, or a member's individual DM) — {garageId}. The room's back
+  // button checks this first: when set, back returns to that Shared Garage
+  // page instead of the plain Lanes chat list. Cleared the moment it's
+  // consumed (see backFromLanesRoom below), and defaults back to null on
+  // every other way of opening Lanes (see go()) so it never leaks into an
+  // unrelated chat opened afterward.
+  const [lanesRoomOrigin, setLanesRoomOrigin] = useState(null);
   const [laneMsgs,     setLaneMsgs]     = useState({}); // {laneId: [{id,text,user,initials,color,ts,isVoice,voiceSeconds}]}
   const [showCreateLane,setShowCreateLane]=useState(false);
   const [voiceChatActive, setVoiceChatActive] = useState(null); // chanId currently in voice
@@ -1571,6 +1721,9 @@ export default function SonoLane() {
   const [newSharedGarageName, setNewSharedGarageName] = useState("");
   const [newGarageInvitees, setNewGarageInvitees] = useState([]); // friend ids picked to invite when creating
   const [selSharedGarage, setSelSharedGarage] = useState(null); // id of the shared garage currently open
+  const [showEditGarage, setShowEditGarage] = useState(false); // Edit Shared Garage sheet — photo, name, bio, members
+  const [editGarageDraft, setEditGarageDraft] = useState({name:"",bio:"",photo:null});
+  const [garageMemberAction, setGarageMemberAction] = useState(null); // friend object — Call/Text action sheet opened by tapping a member's vehicle window
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [newVehicle, setNewVehicle] = useState({name:"",bio:""});
   const [shareCarId, setShareCarId] = useState(null); // which saved garage car is picked in the "Add/Change Vehicle" sheet — null = typing one manually
@@ -1756,16 +1909,18 @@ export default function SonoLane() {
   const scrollRef     = useRef(null);
   const swipeStartRef = useRef(null); // {x,y} — page-swipe gesture tracking (Lanes ↔ Home ↔ Discover)
   const swipeActiveRef = useRef(false); // true once the current drag has been confirmed as a horizontal carousel swipe (vs. a vertical scroll, tap, or a back-page swipe which stays instant/unanimated)
-  // Live drag state for the sliding carousel animation — swipeDX is the raw
-  // finger offset in px (updated continuously while dragging so the page
-  // visually follows the finger 1:1), swipeDir says which neighbor tab is
-  // being revealed ("next" = the tab to the right, "prev" = to the left),
-  // and swipeSettling turns a CSS transition on only for the release
-  // animation (snap to the neighbor, or spring back) — never while the
-  // finger is actually down, so the drag itself never feels laggy.
-  const [swipeDX, setSwipeDX] = useState(0);
+  // Live drag state for the sliding carousel animation. swipeDir (React
+  // state — changes only twice per gesture) says which neighbor tab is
+  // being revealed ("next" = the tab to the right, "prev" = to the left)
+  // and controls whether that neighbor panel is mounted at all. swipeDXRef
+  // (a plain ref, NOT state) is the raw live finger offset in px — it's
+  // painted straight onto the DOM via swipeWrapperRef on every move, so
+  // the drag tracks the finger at a full 60fps without forcing React to
+  // re-render whichever heavy panel is mounted on every pixel of movement.
   const [swipeDir, setSwipeDir] = useState(null);
-  const [swipeSettling, setSwipeSettling] = useState(false);
+  const swipeDXRef = useRef(0);
+  const swipeWrapperRef = useRef(null); // the 2x-wide sliding row — see the render below
+  const swipeContainerRef = useRef(null); // the swipeable content area — native (non-passive) touch listeners are attached to this below
   const voiceActions  = useRef({});   // number -> fn
   const voiceCounter  = useRef(11);   // page-level counter, starts at 11
   const setScroll = el => {
@@ -1812,7 +1967,7 @@ export default function SonoLane() {
   // setDashcamConsent(true) doesn't take effect until the next render, so
   // the `dashcamConsent` closed over here would otherwise still read false
   // for the rest of this same click handler.
-  const go = (p, { forceDashcamConsent, directions, lanesRoom } = {}) => {
+  const go = (p, { forceDashcamConsent, directions, lanesRoom, lanesGarageOrigin } = {}) => {
     // Exiting Drive mode while the dashcam is recording stops & saves the
     // clip — recording runs continuously for the whole drive regardless of
     // momentary speed, and only ends when Drive mode itself ends.
@@ -1833,6 +1988,11 @@ export default function SonoLane() {
     // into that chat's room instead.
     if(lanesRoom) setLanesView("room");
     else if(p!==panel && p==="create") setLanesView("list");
+    // A Lanes room only remembers "came from a Shared Garage" when THIS
+    // call explicitly says so — every other way of reaching Lanes (the tab
+    // itself, a plain "message this friend" button) clears it, so it can
+    // never leak into a later, unrelated chat.
+    if(p==="create") setLanesRoomOrigin(lanesGarageOrigin || null);
     setShowAgent(false); setMapInteractive(false);
     // Entering Drive mode always opens straight to Maps — carrying the
     // just-picked route's directions along if this call came from "Get
@@ -1883,10 +2043,43 @@ export default function SonoLane() {
   const cancelSharedGarage = () => { setSubPanel("garage"); setSelSharedGarage(null); };
   const openSharedGarageChat = () => {
     const g = sharedGarages.find(x=>x.id===selSharedGarage);
-    if(g){ setActiveChan(g.laneId); go("create", {lanesRoom:true}); }
+    if(g){ setActiveChan(g.laneId); go("create", {lanesRoom:true, lanesGarageOrigin:{garageId:g.id}}); }
   };
   const saveEditCar = () => { setCarSaved(true); setTimeout(()=>checkAchievements({carSaved:true}),200); setSubPanel("car"); };
-  const saveEditProfile = () => { setEditMode(false); saveProfileToSupabase(); back(); };
+  const saveEditProfile = async () => {
+    if (isSupabaseConfigured) {
+      const u = normalizeUsername(userHandle);
+      const fmtErr = u ? usernameError(u) : null;
+      if (fmtErr) { setEditSaveError(fmtErr); return; }
+      if (editUsernameStatus === "taken") { setEditSaveError("That username is taken."); return; }
+      if (editUsernameStatus === "checking") { setEditSaveError("Still checking that username — one more sec, then hit Save again."); return; }
+    }
+    setEditSaveError("");
+    setEditMode(false);
+    const { error } = await saveProfileToSupabase();
+    if (error) {
+      setEditSaveError(/unique|duplicate/i.test(error.message||"") ? "That username was just taken — try another." : "Couldn't save — try again.");
+      setEditMode(true);
+      return;
+    }
+    back();
+  };
+  // Returning from a Lanes room back to whichever Shared Garage it was
+  // opened from (see lanesRoomOrigin) instead of the plain chat list —
+  // used by both the shared TopBar's back arrow and the swipe-to-back
+  // fallback (runBack, below).
+  const backFromLanesRoom = () => {
+    if(lanesRoomOrigin){
+      const originGarageId = lanesRoomOrigin.garageId;
+      setLanesRoomOrigin(null);
+      setLanesView("list");
+      setSelSharedGarage(originGarageId);
+      go("profile"); // resets subPanel to "garage" by default — overridden right after, same pattern as the hamburger's Settings link
+      setTimeout(()=>setSubPanel("sharedgarage"), 100);
+    } else {
+      setLanesView("list");
+    }
+  };
 
   // ── Swipe carousel — Lanes ↔ Home ↔ Discover (Drive mode is not part of it) ──
   // Order matches the TopNav's actual left-to-right tab layout (Lanes | Home
@@ -1912,7 +2105,7 @@ export default function SonoLane() {
   const runBack = () => {
     if(panel==="discover" && viewRouteId){ setViewRouteId(null); return; }
     if(panel==="profile" && subPanel){ setSubPanel(null); setSelTrip(null); return; }
-    if(panel==="create" && lanesView==="room"){ setLanesView("list"); return; }
+    if(panel==="create" && lanesView==="room"){ backFromLanesRoom(); return; }
   };
   const onSwipeStart = e => {
     if(!CAROUSEL.includes(panel)) { swipeStartRef.current=null; return; }
@@ -1928,7 +2121,11 @@ export default function SonoLane() {
     }
     swipeStartRef.current = {x:t.clientX, y:t.clientY};
     swipeActiveRef.current = false;
-    setSwipeSettling(false);
+    swipeDXRef.current = 0;
+    // Cancel any settle animation still finishing from a previous gesture —
+    // otherwise a quick second swipe right after the first could fight the
+    // leftover transition and visibly stutter.
+    if(swipeWrapperRef.current) swipeWrapperRef.current.style.transition = "none";
   };
   // Live-tracks the finger/mouse while a gesture is in progress, so the
   // current page and its neighbor visibly slide together in real time,
@@ -1939,6 +2136,14 @@ export default function SonoLane() {
   // keeps the simpler instant swipe-to-go-back behavior from onSwipeEnd,
   // since animating "back out of a sub-page" would mean live-rendering two
   // states of the SAME panel at once rather than two different panels.
+  //
+  // The live drag position is tracked in a plain ref (swipeDXRef) and
+  // painted straight onto the DOM node, NOT through React state — driving
+  // a setState (and the re-render of whichever heavy panel is mounted) on
+  // every single pixel of finger movement is exactly what made this feel
+  // sticky/laggy on an actual phone. React only gets involved twice per
+  // gesture: once to mount the neighbor panel when the drag is first
+  // confirmed, and once to commit or discard it when the finger lifts.
   const onSwipeMove = e => {
     const start = swipeStartRef.current;
     if(!start || backAvailable) return;
@@ -1950,16 +2155,22 @@ export default function SonoLane() {
       // Not yet confirmed as a horizontal carousel drag — require a small
       // deliberate horizontal movement (clearly more horizontal than
       // vertical) before committing to it, so an ordinary vertical scroll
-      // never gets hijacked into a sideways page slide.
-      if(Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)*1.2) return;
+      // never gets hijacked into a sideways page slide. Kept small/lenient
+      // so the page starts following the finger almost immediately.
+      if(Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)*1.1) return;
       if(dx < 0 && idx >= CAROUSEL.length-1) return; // no next tab to reveal
       if(dx > 0 && idx <= 0) return;                 // no previous tab to reveal
       swipeActiveRef.current = true;
+      setSwipeDir(dx < 0 ? "next" : "prev"); // one React update — mounts the neighbor panel
     }
     const w = window.innerWidth || 390;
     const clamped = Math.max(-w, Math.min(w, dx));
-    setSwipeDX(clamped);
-    setSwipeDir(clamped < 0 ? "next" : clamped > 0 ? "prev" : null);
+    swipeDXRef.current = clamped;
+    const wrapperEl = swipeWrapperRef.current;
+    if(wrapperEl){
+      const dir = clamped < 0 ? "next" : "prev";
+      wrapperEl.style.transform = `translateX(${dir==="next" ? clamped : clamped-w}px)`;
+    }
   };
   const onSwipeEnd = e => {
     const start = swipeStartRef.current;
@@ -1970,24 +2181,31 @@ export default function SonoLane() {
 
     if(wasActive){
       // A live carousel drag was under way — commit to the neighbor once
-      // dragged far enough (over a third of the screen), otherwise spring
-      // back to the page we started on. Either way this is an ANIMATED
-      // settle (swipeSettling turns the CSS transition on), not an instant
-      // snap, so the motion started by the finger continues naturally.
+      // dragged far enough (under a third of the screen springs back), and
+      // either way ANIMATE the rest of the way with a real CSS transition
+      // (applied directly to the DOM node, same as the drag itself) so the
+      // motion the finger started continues naturally instead of snapping.
       const idx = CAROUSEL.indexOf(panel);
       const w = window.innerWidth || 390;
-      const commit = Math.abs(swipeDX) > w*0.35;
-      setSwipeSettling(true);
-      if(commit && swipeDX<0 && idx<CAROUSEL.length-1){
-        setSwipeDX(-w);
-        setTimeout(()=>{ go(CAROUSEL[idx+1]); setSwipeDX(0); setSwipeDir(null); setSwipeSettling(false); }, 220);
-      } else if(commit && swipeDX>0 && idx>0){
-        setSwipeDX(w);
-        setTimeout(()=>{ go(CAROUSEL[idx-1]); setSwipeDX(0); setSwipeDir(null); setSwipeSettling(false); }, 220);
-      } else {
-        setSwipeDX(0);
-        setTimeout(()=>{ setSwipeDir(null); setSwipeSettling(false); }, 220);
-      }
+      const dx = swipeDXRef.current;
+      const commit = Math.abs(dx) > w*0.32;
+      const wrapperEl = swipeWrapperRef.current;
+      const dir = dx < 0 ? "next" : "prev";
+      const settleTo = (target, after) => {
+        if(wrapperEl){
+          wrapperEl.style.transition = "transform 0.24s cubic-bezier(0.22,1,0.36,1)";
+          wrapperEl.style.transform = `translateX(${dir==="next" ? target : target-w}px)`;
+        }
+        setTimeout(()=>{
+          if(wrapperEl) wrapperEl.style.transition = "none";
+          swipeDXRef.current = 0;
+          setSwipeDir(null);
+          after && after();
+        }, 240);
+      };
+      if(commit && dx<0 && idx<CAROUSEL.length-1) settleTo(-w, ()=>go(CAROUSEL[idx+1]));
+      else if(commit && dx>0 && idx>0) settleTo(w, ()=>go(CAROUSEL[idx-1]));
+      else settleTo(0);
       return;
     }
 
@@ -2003,6 +2221,37 @@ export default function SonoLane() {
     if(dx < 0 && idx < CAROUSEL.length-1) go(CAROUSEL[idx+1]);      // swipe left → move right (Lanes→Home, Home→Discover)
     else if(dx > 0 && idx > 0) go(CAROUSEL[idx-1]);                  // swipe right → move left (Discover→Home, Home→Lanes)
   };
+  // Native (non-passive) touch listeners on the swipe container — React
+  // attaches onTouchMove as a PASSIVE listener by default, which silently
+  // ignores preventDefault(). Without being able to call it, the browser's
+  // own scroll/rubber-band handling kept fighting an in-progress drag on
+  // real touchscreens (the reported "gets stuck / won't swipe all the way"
+  // — Playwright's synthetic mouse events never hit this, which is why it
+  // wasn't caught earlier). Refs mirror the latest handlers so this effect
+  // can attach once, on mount, and still always call the current version.
+  const onSwipeStartLatest = useRef(onSwipeStart); onSwipeStartLatest.current = onSwipeStart;
+  const onSwipeMoveLatest  = useRef(onSwipeMove);  onSwipeMoveLatest.current  = onSwipeMove;
+  const onSwipeEndLatest   = useRef(onSwipeEnd);   onSwipeEndLatest.current   = onSwipeEnd;
+  useEffect(() => {
+    const el = swipeContainerRef.current;
+    if(!el) return;
+    const ts = e => onSwipeStartLatest.current(e);
+    const tm = e => {
+      onSwipeMoveLatest.current(e);
+      if(swipeActiveRef.current && e.cancelable) e.preventDefault();
+    };
+    const te = e => onSwipeEndLatest.current(e);
+    el.addEventListener("touchstart", ts, {passive:true});
+    el.addEventListener("touchmove", tm, {passive:false});
+    el.addEventListener("touchend", te, {passive:true});
+    el.addEventListener("touchcancel", te, {passive:true});
+    return () => {
+      el.removeEventListener("touchstart", ts);
+      el.removeEventListener("touchmove", tm);
+      el.removeEventListener("touchend", te);
+      el.removeEventListener("touchcancel", te);
+    };
+  }, []);
 
   /* voice */
   useEffect(()=>{
@@ -3417,58 +3666,56 @@ export default function SonoLane() {
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           {/* Own header removed — the shared TopBar shows back/Group Chat
               while this page is open (see <TopBar/>). */}
-          <div style={{padding:"10px 14px 0",flexShrink:0,fontSize:16,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {g.name}</div>
-          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 7px"}}>
+          <div style={{padding:"10px 14px 0",flexShrink:0,display:"flex",alignItems:"center",gap:8}}>
+            <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              {g.photo ? <img src={g.photo} alt="" style={{width:22,height:22,borderRadius:"50%",objectFit:"cover",verticalAlign:"middle",marginRight:6}}/> : "🚗 "}
+              {g.name}
+            </div>
+            <button onClick={()=>{setEditGarageDraft({name:g.name,bio:g.bio||"",photo:g.photo||null});setShowEditGarage(true);}} title="Edit garage" style={{width:30,height:30,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+          </div>
+          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 7px"}}>
             <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
+            {g.bio && g.bio.trim() && <div style={{fontSize:13,color:"#111",lineHeight:1.5,marginBottom:14}}>{g.bio}</div>}
 
-            {/* Your vehicle — shows the real avatar (photo or CarSVG) from
-                whichever of your saved garage cars you shared here. */}
-            {myVehicle ? (
-              <div style={{...CARD,marginBottom:10,border:"1.5px solid "+OR+"33"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <VehicleAvatar v={myVehicle} size={40}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{myVehicle.name} <span style={{fontSize:11,fontWeight:700,color:OR}}>· You</span></div>
-                    <div style={{fontSize:12,color:"#111",marginTop:2}}>{myVehicle.bio}</div>
-                  </div>
-                  <button onClick={()=>{setShareCarId(myVehicle.sourceCarId||null);setNewVehicle({name:myVehicle.name,bio:myVehicle.bio});setShowAddVehicle(true);}} title="Change vehicle" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
-                  <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,vehicles:x.vehicles.filter(v=>v.id!==myVehicle.id)}:x))} title="Remove your vehicle" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+            {/* Car avatar window grid — same visual language as the MY CARS
+                grid on the Profile/Garage page: a bordered rounded tile per
+                person with a circular avatar window, name, and status line. */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
+              {/* Your vehicle tile */}
+              {myVehicle ? (
+                <div style={{position:"relative"}}>
+                  <button onClick={()=>{setShareCarId(myVehicle.sourceCarId||null);setNewVehicle({name:myVehicle.name,bio:myVehicle.bio});setShowAddVehicle(true);}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"1.5px solid "+OR+"44",background:"#fff9f5",cursor:"pointer",fontFamily:F}}>
+                    <VehicleAvatar v={myVehicle} size={72}/>
+                    <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:8,textAlign:"center",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{myVehicle.name}</div>
+                    <div style={{fontSize:11,color:OR,fontWeight:700,marginTop:2}}>· You</div>
+                  </button>
+                  <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,vehicles:x.vehicles.filter(v=>v.id!==myVehicle.id)}:x))} title="Remove your vehicle" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"#fff",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
                 </div>
-              </div>
-            ) : (
-              <button onClick={()=>{setShareCarId(null);setNewVehicle({name:"",bio:""});setShowAddVehicle(true);}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:14,borderRadius:14,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F,marginBottom:10,textAlign:"left"}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#ccc",flexShrink:0}}>＋</div>
-                <div>
-                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Share a Car From Your Garage</div>
-                  <div style={{fontSize:11,color:"#111"}}>Pick one of your saved car avatars, or type one in</div>
-                </div>
-              </button>
-            )}
+              ) : (
+                <button onClick={()=>{setShareCarId(null);setNewVehicle({name:"",bio:""});setShowAddVehicle(true);}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
+                  <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,color:"#ccc"}}>＋</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#111",marginTop:8,textAlign:"center"}}>Share Your Car</div>
+                  <div style={{fontSize:10,color:"#111",marginTop:2,textAlign:"center"}}>· You</div>
+                </button>
+              )}
 
-            {/* Member vehicles */}
-            {members.map(fr=>{
-              const v = g.vehicles.find(x=>x.ownerId===fr.id);
-              return (
-                <div key={fr.id} style={{...CARD,marginBottom:10}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:v?10:0}}>
-                    {v ? <VehicleAvatar v={v} size={40}/> : <FriendAvatar fr={fr} size={40} fontSize={14}/>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{fr.name}</div>
-                      <div style={{fontSize:12,color:"#111"}}>{v ? v.name : "Invited · waiting to add their vehicle…"}</div>
-                    </div>
-                  </div>
-                  {v && <div style={{fontSize:12,color:"#111",marginBottom:10}}>{v.bio}</div>}
-                  <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>setCallingFriend({friend:fr,status:"ringing",secs:0})} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
-                    <button onClick={()=>{setActiveChan(fr.id);go("create",{lanesRoom:true});}} style={{flex:1,padding:"8px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
-                  </div>
-                </div>
-              );
-            })}
+              {/* Member tiles — tapping opens a Call/Text action sheet
+                  instead of always-visible inline buttons. */}
+              {members.map(fr=>{
+                const v = g.vehicles.find(x=>x.ownerId===fr.id);
+                return (
+                  <button key={fr.id} onClick={()=>setGarageMemberAction(fr)} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                    {v ? <VehicleAvatar v={v} size={72}/> : <FriendAvatar fr={fr} size={72} fontSize={26}/>}
+                    <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:8,textAlign:"center",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v ? v.name : fr.name}</div>
+                    <div style={{fontSize:11,color:"#111",marginTop:2,textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{v ? fr.name : "Invited · pending"}</div>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Invite more friends */}
             {invitableFriends.length>0 && (
-              <div style={{marginTop:8}}>
+              <div style={{marginTop:18}}>
                 <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>INVITE MORE FRIENDS</div>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {invitableFriends.map(fr=>(
@@ -3489,6 +3736,74 @@ export default function SonoLane() {
               </div>
             )}
           </div>
+
+          {/* Member action sheet — tap a member's tile to Call or Text them.
+              Text opens the Lanes room with lanesGarageOrigin set so the
+              back button from that room returns here, not the Lanes list. */}
+          {garageMemberAction && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setGarageMemberAction(null)}>
+              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,paddingBottom:26}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                  <FriendAvatar fr={garageMemberAction} size={44} fontSize={16}/>
+                  <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{garageMemberAction.name}</div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setCallingFriend({friend:garageMemberAction,status:"ringing",secs:0});setGarageMemberAction(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
+                  <button onClick={()=>{const fr=garageMemberAction;setGarageMemberAction(null);setActiveChan(fr.id);go("create",{lanesRoom:true,lanesGarageOrigin:{garageId:g.id}});}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Garage sheet — photo, name, bio, and members (remove). */}
+          {showEditGarage && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEditGarage(false)}>
+              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Edit Garage</div>
+
+                <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
+                  <button onClick={()=>garagePhotoRef.current?.click()} style={{width:80,height:80,borderRadius:"50%",background:editGarageDraft.photo?"transparent":"#f3f3f3",border:"1.5px solid #ebebeb",cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                    {editGarageDraft.photo ? <img src={editGarageDraft.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:24,color:"#ccc"}}>🚗</span>}
+                  </button>
+                  <input ref={garagePhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,800,0.85).then(url=>{if(url)setEditGarageDraft(d=>({...d,photo:url}));});e.target.value="";}}/>
+                </div>
+                <div style={{textAlign:"center",marginBottom:16}}>
+                  <button onClick={()=>garagePhotoRef.current?.click()} style={{padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>{editGarageDraft.photo?"Replace Photo":"Upload Photo"}</button>
+                  {editGarageDraft.photo && <button onClick={()=>setEditGarageDraft(d=>({...d,photo:null}))} style={{marginLeft:8,padding:"6px 14px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
+                </div>
+
+                <input value={editGarageDraft.name} onChange={e=>setEditGarageDraft(d=>({...d,name:e.target.value}))} placeholder="Garage name" style={{...INP,marginBottom:8}}/>
+                <textarea value={editGarageDraft.bio} onChange={e=>setEditGarageDraft(d=>({...d,bio:e.target.value.slice(0,140)}))} placeholder="Short bio — what this garage/crew is about" maxLength={140} style={{...INP,minHeight:70,resize:"vertical",marginBottom:4}}/>
+                <div style={{fontSize:10,color:"#bbb",textAlign:"right",marginBottom:12}}>{editGarageDraft.bio.length}/140</div>
+
+                {members.length>0 && (
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MEMBERS</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {members.map(fr=>(
+                        <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
+                          <FriendAvatar fr={fr} size={30} fontSize={11}/>
+                          <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                          <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:x.memberIds.filter(id=>id!==fr.id),vehicles:x.vehicles.filter(v=>v.ownerId!==fr.id)}:x))} title="Remove member" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{
+                    if(!editGarageDraft.name.trim())return;
+                    setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,name:editGarageDraft.name.trim(),bio:editGarageDraft.bio.trim(),photo:editGarageDraft.photo}:x));
+                    setShowEditGarage(false);
+                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
+                  <button onClick={()=>setShowEditGarage(false)} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showAddVehicle && (() => {
             // Every saved car in your garage (the active one + parked ones from
@@ -4649,13 +4964,39 @@ export default function SonoLane() {
             </div>
           </div>
 
-          {/* Name, region & bio */}
+          {/* Name, username, region & bio — Serial Position Effect: Name
+              first (highest-frequency, zero-validation field), Username
+              right after while attention's still highest since it's the
+              one with a live checked/taken state to notice, Region/Bio
+              after that once the important decision is already made. */}
           <div style={SEC}>NAME</div>
           <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name" style={{...INP,marginBottom:10}}/>
+
+          <div style={SEC}>USERNAME</div>
+          <div style={{fontSize:12,color:"#111",marginBottom:8,lineHeight:1.5}}>Separate from your name — this is what your account is actually found and saved by, and only you can change it.</div>
+          <div style={{position:"relative",marginBottom:4}}>
+            <input value={userHandle} onChange={e=>setUserHandle(e.target.value)} placeholder={"@"+suggestUsername(userName)} autoCapitalize="none" style={{...INP,paddingRight:34}}/>
+            {userHandle.trim() && (
+              <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:15}}>
+                {editUsernameStatus==="checking" && <span style={{color:"#bbb"}}>⋯</span>}
+                {editUsernameStatus==="available" && <span style={{color:"#22c55e"}}>✓</span>}
+                {(editUsernameStatus==="taken"||editUsernameStatus==="invalid") && <span style={{color:"#ef4444"}}>✕</span>}
+              </span>
+            )}
+          </div>
+          <div style={{fontSize:11,marginBottom:10,color:editUsernameStatus==="taken"?"#ef4444":editUsernameStatus==="invalid"?"#ef4444":editUsernameStatus==="available"?"#22c55e":"#999"}}>
+            {editUsernameStatus==="taken" ? "That username is taken" : editUsernameStatus==="invalid" ? (usernameError(normalizeUsername(userHandle))||"Letters, numbers, _ and . only") : editUsernameStatus==="available" ? "Available" : "3–20 characters, letters/numbers/_ /."}
+          </div>
+          {editSaveError && <div style={{fontSize:13,color:"#ef4444",marginBottom:10,lineHeight:1.5}}>{editSaveError}</div>}
+
           <div style={SEC}>REGION</div>
           <input value={userRegion} onChange={e=>setUserRegion(e.target.value)} placeholder="Region (e.g. Los Angeles, CA)" style={{...INP,marginBottom:10}}/>
           <div style={SEC}>BIO</div>
-          <input value={userBio} onChange={e=>setUserBio(e.target.value)} placeholder="Short bio" style={{...INP,marginBottom:14}}/>
+          <input value={userBio} onChange={e=>setUserBio(e.target.value.slice(0,150))} placeholder="Short bio" maxLength={150} style={{...INP,marginBottom:4}}/>
+          {/* Parkinson's Law — an unbounded bio field invites rambling; a
+              visible cap (with a live count, not just a silent maxLength)
+              keeps it a bio instead of a blog post. */}
+          <div style={{fontSize:10,color:"#bbb",textAlign:"right",marginBottom:10}}>{userBio.length}/150</div>
 
           {/* Top 3 Friends — pick who shows up in your TOP 3 row on Profile
               and gets the Top 3 perks (Live Location Sharing). Tapping a
@@ -4847,6 +5188,35 @@ export default function SonoLane() {
             </div>
           </div>
 
+          {/* Lanes — used to live in its own separate "Lanes Settings" sheet
+              (reached only from a gear icon in the chat list's user bar);
+              moved here so every setting in the app lives in the one place
+              people already expect to find settings (Jakob's Law), instead
+              of Lanes having its own hidden second Settings page. */}
+          <div style={SEC}>LANES</div>
+          <div style={{...CARD,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
+              <div style={{flex:1,paddingRight:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Show online status</div>
+                <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Let others see the "● Online" indicator next to your name in Lanes.</div>
+              </div>
+              <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+                <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+              </button>
+            </div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
+              <div style={{flex:1,paddingRight:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Lanes notifications</div>
+                <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Get badge alerts for new messages and activity in Lanes.</div>
+              </div>
+              <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+                <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+              </button>
+            </div>
+            <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>📌 Pinning chats</div>
+            <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>Tap the pin icon next to any lane or direct message in the Lanes list to keep it at the top.</div>
+          </div>
+
           <div style={SEC}>STATS</div>
           <div style={CARD}>
             {[["⭐",pts,"Points"],["event",events.length,"Events"],["road",routes.length,"Routes"],["👥",friends.length,"Friends"],["📹",clips.length,"Clips"]].map(([ic,v,l])=>(
@@ -5027,6 +5397,11 @@ export default function SonoLane() {
     // one-time setup items.
     const _OBJECTIVES = [
       { id:"name",    label:"Add name & bio",       done:!!(userName&&userBio),     icon:"person", pts:20  },
+      // Zeigarnik Effect — an unclaimed username is exactly the kind of
+      // small, visibly-incomplete task that nags at people until it's
+      // checked off, which is the whole mechanism this Profile Completion
+      // card already runs on for the other three objectives.
+      { id:"handle",  label:"Choose a username",    done:!usernameError(normalizeUsername(userHandle)) && !!normalizeUsername(userHandle), icon:"person", pts:10 },
       { id:"photo",   label:"Set profile photo",    done:!!profilePhoto,             icon:"camera", pts:15  },
       { id:"car",     label:"Create car avatar",    done:!!carSaved,                 icon:"car",    pts:30  },
     ];
@@ -5378,21 +5753,6 @@ export default function SonoLane() {
           {subPanel==="history" && <div style={{margin:"14px -14px 0"}}>{historySection}</div>}
           {subPanel==="radiostations" && <div style={{margin:"14px -14px 0"}}>{radiostationsSection}</div>}
           {subPanel==="settings" && <div style={{margin:"14px -14px 0"}}>{settingsSection}</div>}
-
-          {/* Rewards Program — full width banner at bottom */}
-          <VN action={()=>setSubPanel("rewards")} style={{
-            width:"100%",display:"flex",alignItems:"center",gap:14,flexShrink:0,
-            padding:"16px 18px",borderRadius:16,marginTop:10,
-            background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
-            border:"1.5px solid #e94560",cursor:"pointer",textAlign:"left",fontFamily:F,
-          }}>
-            <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🏆</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>SonoLane Rewards</div>
-              <div style={{fontSize:12,color:"#111",lineHeight:1.4}}>Earn points driving. Unlock perks & exclusive features.</div>
-            </div>
-            <div style={{fontSize:20,color:"#e94560",flexShrink:0}}>›</div>
-          </VN>
         </div>
       </div>
     );
@@ -6056,13 +6416,12 @@ export default function SonoLane() {
   const CreatePanel = useStablePanel(() => {
     const unreadNotifs = notifications.filter(n=>!n.read).length;
     const curFriend = friends.find(f=>f.id===activeChan);
-    // Lanes settings sheet (replaces the old mic/voice-command button in the
-    // user bar) — display of your own online status, muting the 🔔
-    // notifications badge for Lanes activity, and which chats are pinned.
-    const [showLanesSettings, setShowLanesSettings] = useState(false);
-    const [showOnlineStatus, setShowOnlineStatus] = usePersistedState("sl_showOnlineStatus", true);
-    const [lanesNotifications, setLanesNotifications] = usePersistedState("sl_lanesNotifications", true);
     const [pinnedChans, setPinnedChans] = usePersistedState("sl_pinnedChans", []);
+    // Which section pill is showing on the chat list — "chats" (your
+    // friends' DMs) is the default/main view, matching a normal messaging
+    // app inbox; Lanes and Notifications are one tap away instead of
+    // always being stacked below in their own always-visible sections.
+    const [lanesListTab, setLanesListTab] = useState("chats");
     const togglePin = (id) => setPinnedChans(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]);
     const sortPinned = (list) => {
       const pinned = list.filter(x=>pinnedChans.includes(x.id));
@@ -6309,19 +6668,6 @@ export default function SonoLane() {
 
     const allMsgs = activeChan==="notes"||activeChan==="notifications"||activeChan==="sono" ? [] : (friendMsgs[activeChan]||laneMsgs[activeChan]||[]);
 
-    const SideBtn = ({id, icon, label, badge, sub, color}) => (
-      <button onClick={()=>{setActiveChan(id);setLanesView("room");}} style={{
-        width:"100%",display:"flex",alignItems:"center",gap:6,
-        padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-        background:activeChan===id?"#42464d":"transparent",marginBottom:1,
-      }}>
-        <span style={{fontSize:13,color:color||"#8e9297",flexShrink:0}}>{icon}</span>
-        <span style={{flex:1,fontSize:14,fontWeight:activeChan===id?600:400,color:activeChan===id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
-        {badge>0 && <div style={{minWidth:16,height:16,borderRadius:8,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",padding:"0 3px"}}>{badge}</div>}
-        {sub && !badge && <span style={{fontSize:10,color:"#5b5e66"}}>{sub}</span>}
-      </button>
-    );
-
     return (
       <div style={{flex:1,display:"flex",flexDirection:"row",overflow:"hidden",background:"#36393f",position:"relative"}}>
 
@@ -6340,140 +6686,164 @@ export default function SonoLane() {
             <div style={{width:8,height:8,borderRadius:"50%",background:"#23a55a",flexShrink:0}}/>
           </div>
 
-          <div style={{flex:1,overflowY:"auto",padding:"6px 6px"}}>
-
-            {/* Personal section */}
-            <div style={{padding:"8px 6px 3px"}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Personal</span>
-            </div>
-            <SideBtn id="notifications" icon="🔔" label="notifications" badge={lanesNotifications?unreadNotifs:0}/>
-            <SideBtn id="notes" icon="#" label="notes" sub="you"/>
-            <SideBtn id="sono" icon="#" label={"Sono AI · "+pal.name} color={pal.color}/>
-
-
-            {/* Public Lanes — a live network of public proximity chats,
-                anybody can create one and anybody nearby can see or join it.
-                Filtered to the discovery radius, like the freeway CB channels. */}
-            <div style={{padding:"10px 6px 3px"}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
-              <div style={{fontSize:10,color:"#5b5e66",marginTop:1}}>{radiusActive ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
-            </div>
-            {publicLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
-            {publicLanes.map(lane=>(
-              <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
-                width:"100%",display:"flex",alignItems:"center",gap:6,
-                padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                background:activeChan===lane.id?"#42464d":"transparent",marginBottom:1,
-              }}>
-                <span style={{fontSize:11}}>🌐</span>
-                <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
-                {!lane.host && <span style={{fontSize:9,color:"#5b5e66"}}>you</span>}
-              </button>
-            ))}
-
-            {/* My Lanes */}
-            <div style={{padding:"10px 6px 3px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>My Lanes</span>
-              <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#4f545c",border:"none",cursor:"pointer",color:"#8e9297",fontSize:13,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
-            </div>
-            {sidebarCustomLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
-            {sortPinned(sidebarCustomLanes).map(lane=>(
-              <div key={lane.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
-                <button onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
-                  flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,
-                  padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                  background:activeChan===lane.id?"#42464d":"transparent",
-                }}>
-                  <span style={{fontSize:12,color:lane.color||"#8e9297"}}>#</span>
-                  <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
-                  <span style={{fontSize:10,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
-                </button>
-                <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(lane.id)?OR:"#4f545c",padding:0}}>📌</button>
+          {/* Quick-access bubbles — Your Note / Sono AI / New Lane, story-
+              bubble style (like a messaging app's "Your note" bubble)
+              instead of full list rows, so the main list below is all
+              real chats. */}
+          <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0}}>
+            <button onClick={()=>{setActiveChan("notes");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px solid "+(activeChan==="notes"&&lanesView==="room"?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,position:"relative"}}>
+                📝
+                <div style={{position:"absolute",bottom:-2,right:-2,width:18,height:18,borderRadius:"50%",background:OR,border:"2px solid #2f3136",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",fontWeight:700}}>+</div>
               </div>
-            ))}
+              <span style={{fontSize:10,color:"#8e9297",fontWeight:600}}>Your note</span>
+            </button>
+            <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:pal.color+"22",border:"2px solid "+(activeChan==="sono"&&lanesView==="room"?pal.color:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <CompassStar size={24} color={pal.color}/>
+              </div>
+              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{pal.name}</span>
+            </button>
+            <button onClick={()=>setShowCreateLane(true)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px dashed #4f545c",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#8e9297"}}>＋</div>
+              <span style={{fontSize:10,color:"#8e9297",fontWeight:600}}>New Lane</span>
+            </button>
 
-            {/* Direct Messages — filtered by the "Find users…" search in the
-                shared TopBar (see laneUserSearch) so typing there narrows
-                this list down to matching friends. */}
-            {friends.length>0&&<>
+            {/* Thin divider — groups "open something" bubbles (note/Sono/
+                New Lane, all things you jump straight into) apart from
+                "start a bigger thing" shortcuts below (Law of Proximity:
+                the gap itself tells you these two are different kinds of
+                actions, no label needed). */}
+            <div style={{width:1,alignSelf:"stretch",background:"#40444b",flexShrink:0,margin:"6px 2px"}}/>
+
+            {/* Create Shared Garage / Create Radio Channel — same dashed-
+                circle "start something new" look as New Lane (Law of
+                Similarity: dashed border = create, filled = open), so both
+                creation flows are reachable from chat without a trip to
+                Profile first. */}
+            <button onClick={()=>{go("profile");setTimeout(()=>setShowCreateSharedGarage(true),100);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px dashed #4f545c",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#8e9297"}}>🚗</div>
+              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,textAlign:"center",lineHeight:1.15}}>Shared<br/>Garage</span>
+            </button>
+            <button onClick={()=>{go("profile");setTimeout(()=>{setSubPanel("radiostations");setShowReg(true);},100);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px dashed #4f545c",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#8e9297"}}>📻</div>
+              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,textAlign:"center",lineHeight:1.15}}>Radio<br/>Channel</span>
+            </button>
+          </div>
+
+          {/* Section pills — Chats (your friends, the main list) / Lanes
+              (public + your own) / Notifications — a toggle row instead of
+              always-stacked section headers. Chats opens by default so
+              your personal DMs are what you see first, like a normal
+              messaging inbox. */}
+          <div style={{display:"flex",gap:8,padding:"2px 14px 12px",flexShrink:0,overflowX:"auto"}}>
+            {[["chats","Chats"],["lanes","Lanes"],["notifs","Notifications"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setLanesListTab(id)} style={{
+                padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:F,
+                fontSize:13,fontWeight:700,whiteSpace:"nowrap",flexShrink:0,
+                background:lanesListTab===id?"#fff":"#40444b",
+                color:lanesListTab===id?"#111":"#dcddde",
+              }}>{label}{id==="notifs"&&lanesNotifications&&unreadNotifs>0?" · "+unreadNotifs:""}</button>
+            ))}
+          </div>
+
+          <div style={{flex:1,overflowY:"auto",padding:"0 8px 8px"}}>
+
+            {/* Chats — friends' DMs, filtered by the "Find users…" search in
+                the shared TopBar (see laneUserSearch). Bigger avatars, one
+                real messaging-app-style row per friend. */}
+            {lanesListTab==="chats" && (
+              friends.length===0 ? (
+                <div style={{textAlign:"center",color:"#4f545c",padding:"46px 20px"}}>
+                  <div style={{fontSize:38,marginBottom:8}}>💬</div>
+                  <div style={{fontSize:14,fontWeight:700,color:"#8e9297"}}>No chats yet</div>
+                  <div style={{fontSize:12,marginTop:4,lineHeight:1.6}}>Add some friends to start messaging them here.</div>
+                </div>
+              ) : (<>
+                {laneUserSearch.trim() && friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())).length===0 && (
+                  <div style={{fontSize:12,color:"#4f545c",padding:"16px 10px",fontStyle:"italic",textAlign:"center"}}>No users match "{laneUserSearch}".</div>
+                )}
+                {sortPinned(laneUserSearch.trim() ? friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())) : friends).map(fr=>(
+                  <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2}}>
+                    <button onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{
+                      flex:1,minWidth:0,display:"flex",alignItems:"center",gap:12,
+                      padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
+                      background:(activeChan===fr.id&&lanesView==="room")?"#3a3d42":"transparent",
+                    }}>
+                      <div style={{position:"relative",flexShrink:0}}>
+                        <FriendAvatar fr={fr} size={54} fontSize={19}/>
+                        <div style={{position:"absolute",bottom:1,right:1,width:13,height:13,borderRadius:"50%",background:"#23a55a",border:"2.5px solid #2f3136"}}/>
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:15,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</div>
+                        <div style={{fontSize:12,color:"#8e9297",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pinnedChans.includes(fr.id)?"📌 Pinned · Active now":"Active now"}</div>
+                      </div>
+                    </button>
+                    <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:26,height:26,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:13,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
+                  </div>
+                ))}
+              </>)
+            )}
+
+            {/* Lanes — Public Lanes (a live network of public proximity
+                chats, anybody can create one and anybody nearby can see or
+                join it, filtered to the discovery radius like the freeway
+                CB channels) plus your own private/friends lanes. */}
+            {lanesListTab==="lanes" && (<>
               <div style={{padding:"10px 6px 3px"}}>
-                <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Direct Messages</span>
+                <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
+                <div style={{fontSize:10,color:"#5b5e66",marginTop:1}}>{radiusActive ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
               </div>
-              {laneUserSearch.trim() && friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())).length===0 && (
-                <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No users match "{laneUserSearch}".</div>
-              )}
-              {sortPinned(laneUserSearch.trim() ? friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())) : friends).map(fr=>(
-                <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
-                  <button onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{
-                    flex:1,minWidth:0,display:"flex",alignItems:"center",gap:7,
-                    padding:"4px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                    background:activeChan===fr.id?"#42464d":"transparent",
+              {publicLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
+              {publicLanes.map(lane=>(
+                <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
+                  width:"100%",display:"flex",alignItems:"center",gap:6,
+                  padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
+                  background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent",marginBottom:1,
+                }}>
+                  <span style={{fontSize:11}}>🌐</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                  {!lane.host && <span style={{fontSize:9,color:"#5b5e66"}}>you</span>}
+                </button>
+              ))}
+
+              <div style={{padding:"14px 6px 3px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>My Lanes</span>
+                <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#4f545c",border:"none",cursor:"pointer",color:"#8e9297",fontSize:13,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
+              </div>
+              {sidebarCustomLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
+              {sortPinned(sidebarCustomLanes).map(lane=>(
+                <div key={lane.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
+                  <button onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
+                    flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,
+                    padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
+                    background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent",
                   }}>
-                    <div style={{position:"relative",flexShrink:0}}>
-                      <FriendAvatar fr={fr} size={22} fontSize={8}/>
-                      <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #2f3136"}}/>
-                    </div>
-                    <span style={{flex:1,fontSize:13,fontWeight:activeChan===fr.id?600:400,color:activeChan===fr.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</span>
+                    <span style={{fontSize:12,color:lane.color||"#8e9297"}}>#</span>
+                    <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                    <span style={{fontSize:10,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
                   </button>
-                  <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
+                  <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(lane.id)?OR:"#4f545c",padding:0}}>📌</button>
                 </div>
               ))}
-            </>}
+            </>)}
 
-          </div>
+            {/* Notifications — a single row into the same notifications
+                feed as before (activeChan==="notifications"), just reached
+                through its own pill instead of a stacked "Personal" list. */}
+            {lanesListTab==="notifs" && (
+              <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"10px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",background:(activeChan==="notifications"&&lanesView==="room")?"#3a3d42":"transparent",marginTop:6}}>
+                <div style={{width:44,height:44,borderRadius:"50%",background:"#faa61a22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🔔</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Notifications</div>
+                  <div style={{fontSize:12,color:"#8e9297",marginTop:1}}>SonoLane activity</div>
+                </div>
+                {lanesNotifications && unreadNotifs>0 && <div style={{minWidth:20,height:20,borderRadius:10,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",padding:"0 5px",flexShrink:0}}>{unreadNotifs}</div>}
+              </button>
+            )}
 
-          {/* User bar */}
-          <div style={{padding:"5px 8px",background:"#292b2f",display:"flex",alignItems:"center",gap:6,flexShrink:0,borderTop:"1px solid #202225"}}>
-            <div style={{position:"relative",flexShrink:0}}>
-              {profilePhoto
-                ? (<img src={profilePhoto} alt="" style={{width:26,height:26,borderRadius:"50%",objectFit:"cover"}}/>)
-                : (<div style={{width:26,height:26,borderRadius:"50%",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><DefaultAvatar size={26} color="#111"/></div>)}
-              <div style={{position:"absolute",bottom:-1,right:-1,width:7,height:7,borderRadius:"50%",background:"#23a55a",border:"1.5px solid #292b2f"}}/>
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName||"You"}</div>
-              {showOnlineStatus && <div style={{fontSize:9,color:"#72767d"}}>● Online</div>}
-            </div>
-            <button onClick={()=>setShowLanesSettings(true)} title="Lanes settings" style={{width:20,height:20,borderRadius:4,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#8e9297"}}>⚙️</button>
           </div>
         </div>
-        )}
-
-        {/* Lanes settings sheet */}
-        {showLanesSettings && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:800,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowLanesSettings(false)}>
-            <div style={{background:"#2f3136",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-              <div style={{width:32,height:3,background:"#4f545c",borderRadius:2,margin:"12px auto 0",flexShrink:0}}/>
-              <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>⚙️ Lanes Settings</div>
-                <button onClick={()=>setShowLanesSettings(false)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#40444b",color:"#dcddde",fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
-              </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 7px",background:"#36393f"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#2f3136",marginBottom:10}}>
-                  <div style={{flex:1,paddingRight:10}}>
-                    <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>Show online status</div>
-                    <div style={{fontSize:12,color:"#8e9297",marginTop:2}}>Let others see the "● Online" indicator next to your name.</div>
-                  </div>
-                  <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#4f545c",position:"relative",flexShrink:0,padding:0}}>
-                    <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
-                  </button>
-                </div>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 12px",borderRadius:12,background:"#2f3136",marginBottom:10}}>
-                  <div style={{flex:1,paddingRight:10}}>
-                    <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>Lanes notifications</div>
-                    <div style={{fontSize:12,color:"#8e9297",marginTop:2}}>Get badge alerts for new messages and activity in Lanes.</div>
-                  </div>
-                  <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#4f545c",position:"relative",flexShrink:0,padding:0}}>
-                    <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
-                  </button>
-                </div>
-                <div style={{padding:"11px 12px",borderRadius:12,background:"#2f3136"}}>
-                  <div style={{fontSize:14,fontWeight:700,color:"#fff",marginBottom:2}}>📌 Pinning chats</div>
-                  <div style={{fontSize:12,color:"#8e9297"}}>Tap the pin icon next to any lane or direct message in the sidebar list to keep it at the top.</div>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* ── Chat room — its own full page, opened by tapping a chat in the
@@ -6714,10 +7084,11 @@ export default function SonoLane() {
                 </div>
               ) : (
               <div style={{display:"flex",alignItems:"center",gap:6,opacity:laneLocked?0.6:1}}>
-                {/* Back to the chat list — the list is now its own full page
-                    (see lanesView), so this is a second, always-reachable
-                    way back besides the shared TopBar's back arrow above. */}
-                <button onClick={()=>setLanesView("list")} title="Back to chats" style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>
+                {/* A second, always-reachable way back besides the shared
+                    TopBar's back arrow above — same destination either way
+                    (see backFromLanesRoom): the Shared Garage page this
+                    chat was opened from, or the plain chat list. */}
+                <button onClick={backFromLanesRoom} title="Back" style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>
                   ☰
                 </button>
 
@@ -7698,7 +8069,7 @@ export default function SonoLane() {
     // No title/right action here since the chat room's own header (name,
     // online status, etc.) already renders as page content underneath.
     const backPage = panel==="profile" ? BACK_PAGES[subPanel]
-      : (onLanes && lanesView==="room") ? { onBack: ()=>setLanesView("list") }
+      : (onLanes && lanesView==="room") ? { onBack: backFromLanesRoom }
       : null;
     const dark = onLanes || !!backPage?.dark;
     const btnBg = dark ? "#2f3136" : "#f3f3f3";
@@ -7917,15 +8288,14 @@ export default function SonoLane() {
         const w = typeof window!=="undefined" ? window.innerWidth : 390;
         return (
           <div
-            style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative"}}
-            onTouchStart={onSwipeStart} onTouchMove={onSwipeMove} onTouchEnd={onSwipeEnd}
+            ref={swipeContainerRef}
+            style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative",touchAction:"pan-y"}}
             onMouseDown={onSwipeStart} onMouseMove={onSwipeMove} onMouseUp={onSwipeEnd}
           >
             {NeighborPanel ? (
-              <div style={{
-                position:"absolute", top:0, left:0, bottom:0, display:"flex", width:w*2,
-                transform:`translateX(${swipeDir==="next" ? swipeDX : swipeDX-w}px)`,
-                transition: swipeSettling ? "transform 0.22s ease" : "none",
+              <div ref={swipeWrapperRef} style={{
+                position:"absolute", top:0, left:0, bottom:0, display:"flex", width:w*2, willChange:"transform",
+                transform:`translateX(${swipeDir==="next" ? swipeDXRef.current : swipeDXRef.current-w}px)`,
               }}>
                 <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
                   {swipeDir==="next" ? <ActivePanel/> : <NeighborPanel/>}
@@ -8088,6 +8458,27 @@ export default function SonoLane() {
                   </div>
                   );
                 })}
+
+                {/* SonoLane Rewards — moved here from the bottom of the
+                    Profile home screen so it sits with the rest of the
+                    points/achievements story (Law of Proximity: related
+                    "earn stuff by driving" content grouped in one place)
+                    instead of competing for attention on the main Profile
+                    tab, which now stays focused on the car/stats/tools it's
+                    actually for (Occam's Razor). */}
+                <VN action={()=>{setWidgetAction(null);go("profile");setTimeout(()=>setSubPanel("rewards"),100);}} style={{
+                  width:"100%",display:"flex",alignItems:"center",gap:14,flexShrink:0,
+                  padding:"16px 18px",borderRadius:16,marginTop:20,
+                  background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
+                  border:"1.5px solid #e94560",cursor:"pointer",textAlign:"left",fontFamily:F,
+                }}>
+                  <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🏆</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>SonoLane Rewards</div>
+                    <div style={{fontSize:12,color:"#111",lineHeight:1.4}}>Earn points driving. Unlock perks & exclusive features.</div>
+                  </div>
+                  <div style={{fontSize:20,color:"#e94560",flexShrink:0}}>›</div>
+                </VN>
               </div>
             </>}
             {widgetAction==="friends" && <>
