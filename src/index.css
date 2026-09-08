@@ -1,1 +1,29 @@
 html, body, #root { margin:0; padding:0; height:100%; }
+
+/* iOS Safari specifically (not Chromium — this is why it only showed up on
+   a real iPhone and never in this project's headless test suite) has its
+   own native touch gesture recognizers that can claim a horizontal drag
+   before our own swipe carousel (swipeContainerRef in App.jsx) ever sees a
+   full touchmove/touchend sequence for it:
+   - touching an <img> and dragging can start Safari's built-in "drag/save
+     this image" gesture instead of a page swipe;
+   - a slow-starting drag over ordinary text can start native text
+     selection instead;
+   - overscroll-behavior-x defaults to allowing the screen-edge swipe to
+     compete with our own "swipe right to go back" gesture, which uses the
+     exact same starting motion.
+   Turning all three off app-wide (it's a touch-driven app, not a document
+   people select text out of — inputs/textareas are excluded below so
+   typing still works normally) removes those competing recognizers so our
+   own touch handlers reliably get the whole gesture. */
+html, body {
+  overscroll-behavior-x: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+img { -webkit-user-drag: none; -webkit-touch-callout: none; }
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
