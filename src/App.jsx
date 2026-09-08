@@ -191,9 +191,32 @@ const kvDB = (() => {
 function usePersistedIDBState(key, initial) {
   const [value, setValue] = useState(initial);
   const loadedRef = useRef(false);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  // True while the latest value hasn't been confirmed written to IndexedDB
+  // yet — see the flush effect below.
+  const pendingRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // A "flush" copy left behind by the safety net below takes priority
+      // over whatever's already in IndexedDB — its existence means the app
+      // was closed before the real IndexedDB write for this key confirmed,
+      // so it's the most recent value that actually exists anywhere (see
+      // "made a car avatar with an uploaded picture, closed the app, and
+      // it's not there anymore" — this is exactly that race).
+      const flushKey = key + "__flush";
+      const flushRaw = memStore.getItem(flushKey);
+      if (flushRaw !== null) {
+        try {
+          const v = JSON.parse(flushRaw);
+          if (!cancelled) setValue(v);
+          kvDB.set(key, v);
+          memStore.removeItem(flushKey);
+          loadedRef.current = true;
+          return;
+        } catch { /* corrupt flush copy — fall through to the normal load below */ }
+      }
       let v = await kvDB.get(key);
       if (v === undefined) {
         const raw = memStore.getItem(key);
@@ -217,8 +240,33 @@ function usePersistedIDBState(key, initial) {
     // mount with `initial` and overwrites the real saved value with a blank
     // one a split second before the load resolves.
     if (!loadedRef.current) return;
-    kvDB.set(key, value);
+    pendingRef.current = true;
+    kvDB.set(key, value).finally(() => { pendingRef.current = false; });
   }, [value]);
+  // Safety net for closing/refreshing right after a change, before the
+  // IndexedDB write for it has actually landed. That write is async (open a
+  // connection, start a transaction, wait for it to commit) — there's a
+  // real, if narrow, window where the app can go away before it lands, and
+  // the change quietly reverts on the next load. localStorage writes are
+  // synchronous, so on the way out (tab hidden or actually closing) this
+  // drops the latest value there too as a last-resort copy; the load logic
+  // above picks it up ahead of whatever IndexedDB has and finishes the real
+  // save. It only fires while a write is genuinely still in flight, so this
+  // doesn't turn into a second permanent copy of every photo sitting in
+  // localStorage.
+  useEffect(() => {
+    const flush = () => {
+      if (!pendingRef.current) return;
+      try { memStore.setItem(key + "__flush", JSON.stringify(valueRef.current)); } catch { /* best effort */ }
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [key]);
   return [value, setValue];
 }
 
@@ -1437,12 +1485,32 @@ export default function SonoLane() {
       setMyCars(list => list.filter(c=>c.id!==id));
     }
   };
+  // Publish your currently active/displayed car's look (body style, color,
+  // mods) onto your real profile row, so it shows up correctly on your Top
+  // 3 Friends' Top3Friend page for THEM — see the friends fetch above,
+  // which reads these same columns back for each friend. Previously friends
+  // had no real car data to show at all, so that page fell back to a
+  // random-looking deterministic car derived from their id. No-op in local
+  // demo mode (no real accounts to publish this to).
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    supabase.from("profiles").update({
+      car_body_style: carBodyStyle, car_color: carColor, car_mods: carMods,
+    }).eq("id", currentUserId);
+  }, [currentUserId, carBodyStyle, carColor, carMods]);
   // Persisted (used to be plain useState, so adding a friend never survived
   // closing the app — the same bug as "following" not saving, below).
   const [friends,      setFriends]      = usePersistedState("sl_friends", []);
   const [showAddFriend,setShowAddFriend]= useState(false);
-  const [newFriend,    setNewFriend]    = useState({name:"",handle:""});
   const [selFriend,    setSelFriend]    = useState(null);
+  // Friends-tab search (now lives in the shared TopBar itself — see
+  // panel==="profile" && subPanel==="friends" there — so it's driven from
+  // the top level like feedSearch/evSearch are for Discover) and the Add
+  // Friend sheet's own search — both top-level (not inside ProfilePanel) so
+  // the sheet can be opened from anywhere via the + Quick Create menu, not
+  // only from the Friends page itself.
+  const [friendSearch, setFriendSearch] = useState("");
+  const [addFriendSearch, setAddFriendSearch] = useState("");
 
   // ── Real-backend data (Supabase) ─────────────────────────────────────
   // Hydrate your profile + friends from real tables once signed in. In
@@ -1462,7 +1530,7 @@ export default function SonoLane() {
       }
       const { data: rows } = await supabase
         .from("friends")
-        .select("friend_id, created_at, profiles:friend_id(id, name, handle, initials, color, photo_url)")
+        .select("friend_id, created_at, profiles:friend_id(id, name, handle, initials, color, photo_url, car_body_style, car_color, car_mods)")
         .eq("owner_id", currentUserId)
         .order("created_at", { ascending: true });
       if (rows) {
@@ -1470,6 +1538,14 @@ export default function SonoLane() {
           id: r.profiles.id, name: r.profiles.name || "Unnamed", handle: r.profiles.handle || "",
           initials: r.profiles.initials || "??", color: r.profiles.color || "#f97316",
           photo: r.profiles.photo_url || null,
+          // Their actual displayed car (Top 3 Friend page's car window) —
+          // falls back to the deterministic friendCarStyle() look only when
+          // they haven't got real synced car data yet (e.g. a friend who
+          // hasn't customized a car, or local demo mode's simulated
+          // friends, which never have a real row to fetch this from).
+          carBodyStyle: r.profiles.car_body_style || null,
+          carColor: r.profiles.car_color || null,
+          carMods: r.profiles.car_mods || null,
         })));
       }
     })();
@@ -1534,6 +1610,17 @@ export default function SonoLane() {
       .or("name.ilike.%"+q+"%,handle.ilike.%"+q+"%").neq("id", currentUserId).limit(20);
     return data || [];
   };
+  // Real-backend mode: results of searching actual signed-up users by name
+  // OR username (debounced), used by the Add Friend sheet instead of the
+  // local demo directory below. Search-only now — there's no more "add
+  // manually" fallback, so this is the one and only way to add a friend.
+  const [supaFriendResults, setSupaFriendResults] = useState([]);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    if (!addFriendSearch.trim()) { setSupaFriendResults([]); return; }
+    const t = setTimeout(() => { searchProfilesSupabase(addFriendSearch).then(setSupaFriendResults); }, 250);
+    return () => clearTimeout(t);
+  }, [addFriendSearch]);
   // Sends a real 1:1 message row — the Lanes Direct Messages backend.
   // Returns the inserted row's real id so the caller can reconcile it with
   // the optimistic local copy (see sendChanMsg) — otherwise the next poll
@@ -1608,6 +1695,58 @@ export default function SonoLane() {
       // batch, but never touch your own local ones (everything not tagged
       // with the "sb_" id prefix).
       setEvents(prev => [...mapped, ...prev.filter(e => !String(e.id).startsWith("sb_"))]);
+    })();
+  }, [currentUserId]);
+
+  // Route posts (Discover > Routes feed) — same idea as events just above:
+  // posting a route now saves a real row so it shows up on EVERY signed-in
+  // user's Route feed, not just your own device. Local demo mode (no
+  // Supabase project) keeps route posts device-local like everything else
+  // here. "My Routes" personal library entries (the "routes" state, distinct
+  // from these feed posts) stay local-only for now — only the shared
+  // community feed needed a real backend.
+  const createRoutePostSupabase = async (post) => {
+    if (!isSupabaseConfigured || !currentUserId) return null;
+    const { data } = await supabase.from("route_posts").insert({
+      author_id: currentUserId, author_name: userName || "You",
+      title: post.title, type: post.type, body: post.body || "",
+      distance: post.distance || "", stops: post.stops || [],
+      highlights: post.highlights || "", photos: post.photos || [],
+      from_saved: !!post.fromSaved, saved_route_name: post.savedRouteName || "",
+      likes: post.likes || 0,
+    }).select("id").single();
+    return data ? data.id : null;
+  };
+  const updateRoutePostSupabase = async (sbId, post) => {
+    if (!isSupabaseConfigured || !currentUserId || !sbId) return;
+    await supabase.from("route_posts").update({
+      title: post.title, type: post.type, body: post.body || "",
+      distance: post.distance || "", stops: post.stops || [],
+      highlights: post.highlights || "", photos: post.photos || [],
+    }).eq("id", sbId).eq("author_id", currentUserId);
+  };
+  const deleteRoutePostSupabase = async (sbId) => {
+    if (!isSupabaseConfigured || !currentUserId || !sbId) return;
+    await supabase.from("route_posts").delete().eq("id", sbId).eq("author_id", currentUserId);
+  };
+  // Loads every OTHER signed-in user's route posts for the shared Route
+  // feed. Your own stay purely local (already there the instant you post
+  // them, no round trip needed) — this only ever fetches posts you didn't
+  // author. Same "sb_" id-prefix pattern as the events fetch above, so a
+  // refresh never clobbers your own local posts.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    (async () => {
+      const { data } = await supabase.from("route_posts").select("*")
+        .neq("author_id", currentUserId).order("created_at", { ascending: false }).limit(300);
+      if (!data) return;
+      const mapped = data.map(r => ({
+        id: "sb_"+r.id, sbId: r.id, title: r.title, type: r.type, body: r.body || "",
+        distance: r.distance || "", stops: r.stops || [], highlights: r.highlights || "",
+        photos: r.photos || [], fromSaved: !!r.from_saved, savedRouteName: r.saved_route_name || "",
+        likes: r.likes || 0, authorId: r.author_id, authorName: r.author_name || "Driver",
+      }));
+      setPosts(prev => [...mapped, ...prev.filter(p => !String(p.id).startsWith("sb_"))]);
     })();
   }, [currentUserId]);
 
@@ -1689,15 +1828,39 @@ export default function SonoLane() {
   const [playingClip,  setPlayingClip]  = useState(null);
   const [selCalDate,   setSelCalDate]   = useState(null);
   const [posts,        setPosts]        = usePersistedIDBState("sl_posts", []);
-  // One-time seed: drop the 10 San Diego route posts into the feed the first
-  // time this runs, regardless of what's already in posts (so it still
-  // happens even though "posts" already had a persisted, possibly-empty,
-  // value from before this feature existed). Never repeats once seeded.
+  // One-time seed: drop the 10 San Diego route posts into the feed. In real
+  // Supabase mode these are posted as real rows owned by the actual @bebe
+  // account (see the userHandle check below) — so every other signed-in
+  // account just fetches them from the shared Route feed like any other
+  // real post (via the route_posts sync above), instead of every single
+  // account that ever signs up getting its own local phantom copy that
+  // only looks like its own 10 posts on that one device. Local demo mode
+  // (no Supabase project, e.g. this Claude Artifact preview) has no real
+  // accounts to attribute this to, so it keeps the old local-only seed.
   useEffect(() => {
+    if (isSupabaseConfigured) {
+      if (!currentUserId || normalizeUsername(userHandle) !== "bebe") return;
+      if (memStore.getItem("sl_sdRoutesSeeded")) return;
+      memStore.setItem("sl_sdRoutesSeeded", "1");
+      (async () => {
+        // Already posted from another device/session? Don't double-post —
+        // checked by title against the first seed route rather than a
+        // separate flag, since the flag above is only ever this device's.
+        const { data: already } = await supabase.from("route_posts").select("id")
+          .eq("author_id", currentUserId).eq("title", SD_ROUTE_POSTS[0].title).maybeSingle();
+        if (already) return;
+        setPosts(p => [...SD_ROUTE_POSTS, ...p]);
+        for (const post of SD_ROUTE_POSTS) {
+          const sbId = await createRoutePostSupabase(post);
+          if (sbId) setPosts(p => p.map(x => x.id===post.id ? {...x, sbId} : x));
+        }
+      })();
+      return;
+    }
     if (memStore.getItem("sl_sdRoutesSeeded")) return;
     memStore.setItem("sl_sdRoutesSeeded", "1");
     setPosts(p => [...SD_ROUTE_POSTS, ...p]);
-  }, []);
+  }, [currentUserId, userHandle]);
   const [showPost,     setShowPost]     = useState(false);
   const [newPost,      setNewPost]      = useState({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
   const [postPhotos,   setPostPhotos]   = useState([]);
@@ -1724,13 +1887,31 @@ export default function SonoLane() {
   // search box in the TopBar, like before.
   const [lanesSearchActive, setLanesSearchActive] = useState(false);
   const [events,       setEvents]       = usePersistedIDBState("sl_events", []);
-  // One-time seed: drop the 10 San Diego events into the feed the first time
-  // this runs, same pattern as the route posts seed above. Never repeats.
+  // One-time seed: drop the 10 San Diego events into the feed — same
+  // real-account-owned pattern as the route posts seed above (only ever
+  // posted as the real @bebe account in Supabase mode, everyone else just
+  // fetches them from the shared Events feed). Never repeats once seeded.
   useEffect(() => {
+    if (isSupabaseConfigured) {
+      if (!currentUserId || normalizeUsername(userHandle) !== "bebe") return;
+      if (memStore.getItem("sl_sdEventsSeeded")) return;
+      memStore.setItem("sl_sdEventsSeeded", "1");
+      (async () => {
+        const { data: already } = await supabase.from("events").select("id")
+          .eq("author_id", currentUserId).eq("title", SD_EVENTS[0].title).maybeSingle();
+        if (already) return;
+        setEvents(p => [...SD_EVENTS, ...p]);
+        for (const ev of SD_EVENTS) {
+          const sbId = await createEventSupabase(ev);
+          if (sbId) setEvents(p => p.map(x => x.id===ev.id ? {...x, sbId} : x));
+        }
+      })();
+      return;
+    }
     if (memStore.getItem("sl_sdEventsSeeded")) return;
     memStore.setItem("sl_sdEventsSeeded", "1");
     setEvents(p => [...SD_EVENTS, ...p]);
-  }, []);
+  }, [currentUserId, userHandle]);
   const [showEvent,    setShowEvent]    = useState(false);
   const [newEvent,     setNewEvent]     = useState({title:"",type:"car meet",desc:"",address:"",date:""});
   const [eventPhotos,  setEventPhotos]  = useState([]);
@@ -1745,17 +1926,25 @@ export default function SonoLane() {
   const [routes,       setRoutes]       = usePersistedState("sl_routes", []);
   // One-time seed: the 10 San Diego routes also count as routes you've
   // actually created (not just posted to the feed), so "My Routes" and your
-  // Stats show 10 created routes. Same never-repeats pattern as the events
-  // and route-post seeds above.
+  // Stats show 10 created routes. There's no separate Supabase table for
+  // the personal "My Routes" library (only the shared feed needed one —
+  // see route_posts above), so this stays a local seed even in real
+  // Supabase mode — but gated to the real @bebe account only, same as the
+  // feed-post and events seeds above, so every other account that signs up
+  // doesn't get its own phantom "My Routes" list of 10 routes it never
+  // actually created. Runs once per device (harmless if @bebe signs into
+  // more than one — same 10 routes, not duplicate Supabase rows, since none
+  // of this reaches the backend).
   // NOTE: this used to share the "sl_sdRoutesSeeded" flag with the feed-post
   // seed above — since both effects run on mount, the posts seed always set
   // that flag first, so this one always saw it already set and never ran,
   // and "My Routes" stayed empty. Given its own flag so it actually fires.
   useEffect(() => {
+    if (isSupabaseConfigured && normalizeUsername(userHandle) !== "bebe") return;
     if (memStore.getItem("sl_sdMyRoutesSeeded")) return;
     memStore.setItem("sl_sdMyRoutesSeeded", "1");
     setRoutes(p => [...SD_ROUTES, ...p]);
-  }, []);
+  }, [userHandle]);
   const [savedFromFeed,setSavedFromFeed]= usePersistedState("sl_savedFromFeed", []); // routes saved from feed posts
   const [savedEventIds,setSavedEventIds]= usePersistedState("sl_savedEventIds", []); // ids of other people's events you've RSVP'd to — shown in My Events as "Saved"
   const [newRoute,     setNewRoute]     = useState({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
@@ -1993,7 +2182,29 @@ export default function SonoLane() {
   // directly, so turning this on immediately overrides any mile setting.
   const [globalDiscovery, setGlobalDiscovery] = usePersistedState("sl_globalDiscovery", false);
   const radiusActive = !globalDiscovery && appRadius;
-  const [radiusColor,  setRadiusColor]  = usePersistedState("sl_radiusColor", OR); // color of the Discovery Radius bar, changeable from Edit Profile
+  // Live drag value for the discovery-radius slider, committed to the real
+  // appRadius state only on release. Kept up here at the top level (not
+  // inside ProfilePanel) so both Edit Profile's own Discovery Radius section
+  // AND the standalone RadiusPage overlay below (opened from Discover
+  // Routes/Events/Music, i.e. from OUTSIDE Profile entirely) can share the
+  // same slider state instead of needing two disconnected copies.
+  const [radiusDraft, setRadiusDraft] = useState(appRadius ?? RADIUS_MAX);
+  const commitRadius = () => setAppRadius(radiusDraft>=RADIUS_MAX ? null : radiusDraft);
+  // Quick "Discovery Radius" overlay — opened via the "Change"/"Widen your
+  // radius" links on Discover Routes, Discover Events, and the Music/CB
+  // Radio sheet. Deliberately NOT routed through Profile's subPanel/
+  // BACK_PAGES system: those links used to jump into full Edit Profile (or,
+  // earlier still, a `subPanel==="radius"` page reached by first switching
+  // to the Profile tab), and either way its Back button then had to choose
+  // between "back to Profile" and "back to wherever you actually were" —
+  // whichever it picked was wrong for the other case. Rendering this as a
+  // plain overlay on top of whatever panel is already showing means opening
+  // it never navigates away at all, so closing it (its own back button)
+  // naturally reveals Discover Routes/Events/Music exactly as they were,
+  // with no navigation stack to get wrong. Edit Profile keeps its own
+  // separate (identical-looking) Discovery Radius section for editing it
+  // from inside Profile.
+  const [showRadiusPage, setShowRadiusPage] = useState(false);
   const [startDriveStyle, setStartDriveStyle] = usePersistedState("sl_startDriveStyle", "flag"); // "flag" | "solid" | "outline" — changeable from Edit Profile
   const [startDriveColor, setStartDriveColor] = usePersistedState("sl_startDriveColor", "#000000"); // accent color for the Start Drive button
   const [widgetAction, setWidgetAction] = useState(null); // 'weather'|'music'|'points'|'friends'
@@ -2145,13 +2356,20 @@ export default function SonoLane() {
     } else {
       setRoutes(rs=>{const nr=[{id:Date.now(),...newRoute,stops:cleanStops,color:C[rs.length%C.length]},...rs]; setTimeout(()=>checkAchievements({routes:nr}),200); return nr;});
       if(newRoute.public){
-        setPosts(p=>[{
+        const post = {
           id: Date.now()+1, title: newRoute.title, type: newRoute.type, body: newRoute.bio,
           distance: newRoute.distance, stops: cleanStops, highlights: "", photos: [],
           fromSaved: true, savedRouteName: newRoute.title, likes: 0,
           authorId: "me", authorName: userName||"You",
-        },...p]);
+        };
+        setPosts(p=>[post,...p]);
         setNotifications(n=>[{id:Date.now()+2,icon:"🗺️",text:"Your route \""+newRoute.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
+        // Same real-row reconciliation as the Route Post sheet's submitPost
+        // — makes this reach every other signed-in user's feed too.
+        createRoutePostSupabase(post).then(sbId => {
+          if(!sbId) return;
+          setPosts(p=>p.map(x=>x.id===post.id?{...x,sbId}:x));
+        });
       }
     }
     setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
@@ -3108,13 +3326,8 @@ export default function SonoLane() {
   const ProfilePanel = useStablePanel(() => {
     // `back` is now defined at the SonoLane() top level (near `go`) so the
     // shared TopBar can call it too — see the back-button actions block.
-
-    // Live drag value for the discovery-radius slider, committed to the real
-    // appRadius state only on release — the whole panel remounts whenever any
-    // top-level state changes, so committing on every pixel of drag would
-    // interrupt the gesture; this keeps dragging smooth.
-    const [radiusDraft, setRadiusDraft] = useState(appRadius ?? RADIUS_MAX);
-    const commitRadius = () => setAppRadius(radiusDraft>=RADIUS_MAX ? null : radiusDraft);
+    // `radiusDraft`/`commitRadius` similarly live at the SonoLane() top
+    // level now (shared with the standalone RadiusPage overlay) — see there.
 
     // Profile Completion card — collapsed by default (top 3 next-up objectives);
     // expands to show every objective (done and not) with its point value.
@@ -3140,13 +3353,10 @@ export default function SonoLane() {
     // so this is a deliberate extra tap rather than an instant ✕.
     const [confirmDeleteCar, setConfirmDeleteCar] = useState(null);
 
-    // Friends tab — search box filters your existing friends by name; a
-    // separate search inside the "Add a Friend" sheet looks people up (by
-    // name) across the sample community directory + your followers, so you
-    // can add someone directly from the results instead of typing them in
-    // by hand.
-    const [friendSearch, setFriendSearch] = useState("");
-    const [addFriendSearch, setAddFriendSearch] = useState("");
+    // friendSearch/addFriendSearch/supaFriendResults now live at the
+    // SonoLane() top level (near showAddFriend) — the Add Friend sheet is a
+    // global overlay now, reachable from the + Quick Create menu on any
+    // Profile subPanel, not only from the Friends page itself.
     // Special Top 3 Friend page — a combined walkie-talkie + text chat box
     // for whichever Top 3 friend you tapped (see subPanel==="top3friend").
     const [top3ChatText, setTop3ChatText] = useState("");
@@ -3161,15 +3371,6 @@ export default function SonoLane() {
       audio.play().catch(()=>{});
       setTop3PlayingId(msg.id);
     };
-    // Real-backend mode: results of searching actual signed-up users by
-    // name (debounced), used instead of the local demo directory below.
-    const [supaFriendResults, setSupaFriendResults] = useState([]);
-    useEffect(() => {
-      if (!isSupabaseConfigured) return;
-      if (!addFriendSearch.trim()) { setSupaFriendResults([]); return; }
-      const t = setTimeout(() => { searchProfilesSupabase(addFriendSearch).then(setSupaFriendResults); }, 250);
-      return () => clearTimeout(t);
-    }, [addFriendSearch]);
     // Simulated call overlay — { friend, status:"ringing"|"live", secs } —
     // status flips to "live" a beat after opening and a running timer ticks
     // while it's up, mirroring how the rest of the app fakes real-time
@@ -3589,7 +3790,7 @@ export default function SonoLane() {
                   )}
                   <div style={{display:"flex",gap:6}}>
                     <button onClick={()=>startRouteDirections(r)} style={{flex:1,padding:"7px",borderRadius:8,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭 Get Directions</button>
-                    <button onClick={()=>setPosts(p=>p.filter(x=>x.id!==r.id))} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:12,color:"#111",cursor:"pointer"}}>✕</button>
+                    <button onClick={()=>{if(r.sbId)deleteRoutePostSupabase(r.sbId);setPosts(p=>p.filter(x=>x.id!==r.id));}} style={{padding:"7px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ebebeb",fontSize:12,color:"#111",cursor:"pointer"}}>✕</button>
                   </div>
                 </div>
               ))}
@@ -4143,8 +4344,6 @@ export default function SonoLane() {
                 {icKind:"profile",ic:"video",  label:"Dashcam Clips",val:clips.length,unit:"recorded"},
                 {icKind:"profile",ic:"star",   label:"Star Points",val:pts,unit:"earned"},
                 {icKind:"profile",ic:"trophy", pc:"#f5a623",         label:"Driver Level",val:"Lv "+Math.floor(pts/200),unit:"rank"},
-                {icKind:"dpad",   ic:"event",  dc:DPAD_COLORS.event, label:"Events",val:events.length,unit:"attended"},
-                {icKind:"profile",ic:"people", label:"Friends",val:friends.length,unit:"connected"},
               ].map(s=>(
                 <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",padding:"12px 14px"}}>
                   <div style={{marginBottom:6}}>{s.icKind==="dpad" ? <DPadIcon id={s.ic} color={s.dc} size={20}/> : <ProfileIcon id={s.ic} size={20} color={s.pc||"#8a8f98"}/>}</div>
@@ -4874,10 +5073,15 @@ export default function SonoLane() {
                 <div style={{fontSize:12,color:"#8a8f98"}}>@{fr.handle}</div>
               </div>
             </div>
-            {/* Car avatar window */}
+            {/* Car avatar window — their actual displayed car (synced from
+                their real profile, see the friends fetch + the car-publish
+                effect above), not a random look-alike. Falls back to the
+                old deterministic style only when there's no real synced car
+                data yet (a friend who hasn't customized a car, or local
+                demo mode's simulated friends, which never have one). */}
             <div style={{background:"#1c1f27",borderRadius:16,border:"1px solid #262933",padding:"16px",marginBottom:14,display:"flex",flexDirection:"column",alignItems:"center"}}>
               <div style={{fontSize:10,fontWeight:700,letterSpacing:1.2,color:"#8a8f98",alignSelf:"flex-start",marginBottom:8}}>🚗 {firstName.toUpperCase()}'S CAR</div>
-              <CarSVG color={fr.color} mods={{}} size={120} styleId={friendCarStyle(fr)}/>
+              <CarSVG color={fr.carColor||fr.color} mods={fr.carMods||{}} size={120} styleId={fr.carBodyStyle||friendCarStyle(fr)}/>
             </div>
 
             {/* Share Live Location — the Top 3 Friend perk */}
@@ -4932,25 +5136,13 @@ export default function SonoLane() {
 
     if(subPanel==="friends") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {/* Own header removed — the shared TopBar shows back/+ Add while
-            this page is open (see <TopBar/>). */}
-        <div style={{padding:"10px 14px 0",fontSize:16,fontWeight:800,color:"#111",flexShrink:0}}>👥 Friends</div>
+        {/* Own header removed — the shared TopBar shows back + a search box
+            (no title, no + Add button) while this page is open — see the
+            panel==="profile" && subPanel==="friends" case in <TopBar/>.
+            This page is now just the plain list of all friends; no Top 3
+            bubble row here anymore (Top 3 is still picked from Edit Profile,
+            and shown on the Profile home dashboard itself). */}
         <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"16px 14px 24px"}}>
-          <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:14}}>TOP 3 FRIENDS</div>
-          <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:24}}>
-            {[0,1,2].map(i=>{
-              const fr=friends[i];
-              return (
-                <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-                  <button onClick={()=>fr?setSelFriend(selFriend?.id===fr.id?null:fr):setShowAddFriend(true)}
-                    style={{width:72,height:72,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?(selFriend?.id===fr.id?"3px solid "+OR:"2px solid "+fr.color+"44"):"2px dashed #ddd",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?26:28,color:fr?"#fff":"#ccc",fontWeight:800,fontFamily:F,overflow:"hidden",padding:0}}>
-                    {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
-                  </button>
-                  <div style={{fontSize:12,fontWeight:fr?700:400,color:fr?"#111":"#bbb"}}>{fr?fr.name:"Open slot"}</div>
-                </div>
-              );
-            })}
-          </div>
           {selFriend && (() => {
             const isTop3 = friends.slice(0,3).some(f=>f.id===selFriend.id);
             const locOn = locationSharing.includes(selFriend.id);
@@ -5000,9 +5192,6 @@ export default function SonoLane() {
               </div>
             );
           })()}
-          {friends.length>0 && (
-            <input value={friendSearch} onChange={e=>setFriendSearch(e.target.value)} placeholder="🔍 Search your friends by name" style={{...INP,marginBottom:14}}/>
-          )}
           {friends.length===0 && <div style={{textAlign:"center",color:"#111",fontSize:13,paddingTop:8}}>Add friends to share drives.</div>}
           {friends.length>0 && (() => {
             const q=friendSearch.trim().toLowerCase();
@@ -5027,67 +5216,9 @@ export default function SonoLane() {
             );
           })()}
         </div>
-        {showAddFriend && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowAddFriend(false);setAddFriendSearch("");}}>
-            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-              <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Add a Friend</div>
-              <input value={addFriendSearch} onChange={e=>setAddFriendSearch(e.target.value)} placeholder="🔍 Search people by name" style={{...INP,marginBottom:12}}/>
-              {addFriendSearch.trim() && (() => {
-                const q=addFriendSearch.trim().toLowerCase();
-                const results = isSupabaseConfigured
-                  ? supaFriendResults.filter(p=>!friends.some(f=>f.id===p.id))
-                  : (()=>{const dir=[...SAMPLE_PEOPLE,...followersList].filter((p,i,arr)=>arr.findIndex(x=>x.id===p.id)===i); return dir.filter(p=>p.name.toLowerCase().includes(q) && !friends.some(f=>f.id===p.id));})();
-                return (
-                  <div style={{marginBottom:16}}>
-                    {results.length===0 && <div style={{fontSize:13,color:"#8a8f98",padding:"6px 0 14px"}}>No one found matching "{addFriendSearch}"{isSupabaseConfigured?" — they may not have signed up yet.":"."}</div>}
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {results.map(p=>(
-                        <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px"}}>
-                          <button onClick={()=>{setViewedProfile({...p, photo:p.photo_url});setShowAddFriend(false);}} style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0,background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",padding:0}}>
-                            <FriendAvatar fr={{...p, photo:p.photo_url}} size={36} fontSize={13}/>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{p.name||"Unnamed"}</div>
-                              <div style={{fontSize:11,color:"#8a8f98"}}>@{p.handle||"—"}</div>
-                            </div>
-                          </button>
-                          <button onClick={()=>{
-                            const friendObj = {...p, photo:p.photo_url};
-                            addFriendSupabase(p.id);
-                            sendNotificationSupabase(p.id, "🤝", (userName||"Someone")+" added you as a friend.");
-                            setFriends(f=>{const nf=[...f,friendObj]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
-                            setNotifications(n=>[{id:Date.now(),icon:"🤝",text:(p.name||"Your friend")+" was added to your friends.",ts:"now",read:false},...n]);
-                            setAddFriendSearch("");setShowAddFriend(false);
-                          }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-              {isSupabaseConfigured ? (
-                <div style={{fontSize:12,color:"#8a8f98",textAlign:"center",padding:"4px 0 6px"}}>Don't see them? They'll show up here once they sign up for SonoLane too.</div>
-              ) : (<>
-              <div style={{fontSize:11,fontWeight:700,letterSpacing:1,color:"#8a8f98",marginBottom:10}}>OR ADD MANUALLY</div>
-              <input value={newFriend.name} onChange={e=>setNewFriend(f=>({...f,name:e.target.value}))} placeholder="Name *" style={{...INP,marginBottom:8}}/>
-              <input value={newFriend.handle} onChange={e=>setNewFriend(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,marginBottom:14}}/>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{
-                  if(!newFriend.name.trim())return;
-                  const C=["#6366f1","#f97316","#22c55e","#a855f7","#ec4899","#14b8a6"];
-                  const ini=newFriend.name.trim().split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-                  setFriends(f=>{const nf=[...f,{id:Date.now(),name:newFriend.name,handle:newFriend.handle||newFriend.name.toLowerCase(),initials:ini,color:C[f.length%C.length]}]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
-                  setNewFriend({name:"",handle:""});setShowAddFriend(false);setAddFriendSearch("");
-                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Add</button>
-                <button onClick={()=>{setShowAddFriend(false);setAddFriendSearch("");}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
-              </div>
-              </>)}
-              {isSupabaseConfigured && (
-                <button onClick={()=>{setShowAddFriend(false);setAddFriendSearch("");}} style={{width:"100%",padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Close</button>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Add Friend sheet is now a global overlay (see AddFriendModal near
+            RadiusPage/MusicModal) — opened via showAddFriend from here or
+            from the + Quick Create menu on any Profile subPanel. */}
         <CallOverlay/>
         <WalkieTalkieSheet/>
         <ProfileViewSheet/>
@@ -5201,14 +5332,46 @@ export default function SonoLane() {
             </>)}
           </div>
 
-          {/* Discovery Radius bar color — the radius value/controls
-              themselves are only ever edited from the Discovery Radius
-              card's own Edit page. */}
-          <div style={SEC}>DISCOVERY RADIUS COLOR</div>
-          <div style={{...CARD,marginBottom:14,display:"flex",gap:10,flexWrap:"wrap"}}>
-            {[OR,"#6366f1","#22c55e","#a855f7","#ec4899","#14b8a6","#f59e0b","#ef4444"].map(c=>(
-              <button key={c} onClick={()=>setRadiusColor(c)} title={c} style={{width:32,height:32,borderRadius:"50%",background:c,border:radiusColor===c?"3px solid #111":"3px solid transparent",boxShadow:"0 0 0 1.5px #ebebeb",cursor:"pointer",padding:0}}/>
-            ))}
+          {/* Discovery Radius — moved here from its own separate page (used
+              to be reached via an "Edit"/"Change" link scattered across
+              Profile, Discover Routes/Events, and the Music sheet, each of
+              which then landed you on a standalone Discovery Radius page —
+              now every one of those links just opens Edit Profile, right
+              here, and its own back button correctly returns to the
+              Profile page instead of wherever you started from). Color
+              customization removed — the radius bar/slider is always the
+              app's own orange now. */}
+          <div style={SEC}>DISCOVERY RADIUS</div>
+          <div style={{...CARD,marginBottom:14}}>
+            <div style={{fontSize:12,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
+              <span style={{fontSize:11,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
+            </div>
+            <input
+              type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
+              value={radiusDraft}
+              onChange={e=>setRadiusDraft(Number(e.target.value))}
+              onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
+              style={{width:"100%",accentColor:OR,height:20,cursor:"pointer"}}
+            />
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#111",marginBottom:12}}>
+              <span>{RADIUS_MIN} mi</span>
+              <span>100+ mi</span>
+            </div>
+            {/* Global Discovery — like Instagram, every public post is
+                visible to everyone regardless of location. Overrides the
+                mile radius above entirely while on, without losing the
+                mile setting for when it's turned back off. */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:12,borderTop:"1px solid #ebebeb"}}>
+              <div style={{flex:1,paddingRight:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>🌎 Global Discovery</div>
+                <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>See any public route or event around the world, like Instagram — ignores the mile radius above while on.</div>
+              </div>
+              <button onClick={()=>setGlobalDiscovery(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:globalDiscovery?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+                <div style={{position:"absolute",top:2,left:globalDiscovery?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+              </button>
+            </div>
           </div>
 
           {/* Start Drive button — style + accent color */}
@@ -5248,51 +5411,6 @@ export default function SonoLane() {
             ))}
           </div>
 
-        </div>
-      </div>
-    );
-
-    /* radius sub — the ONLY place Discovery Radius can be edited now, opened
-       only via the Edit button on the Discovery Radius card in Profile. */
-    if(subPanel==="radius") return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {/* Own header removed — the shared TopBar shows the back button
-            while this page is open (see <TopBar/>). */}
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-          <div style={{...CARD,marginBottom:14}}>
-            <div style={{fontSize:13,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
-            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
-              <span style={{fontSize:22,fontWeight:900,color:radiusColor}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
-              <span style={{fontSize:12,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
-            </div>
-            <input
-              type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
-              value={radiusDraft}
-              onChange={e=>setRadiusDraft(Number(e.target.value))}
-              onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
-              style={{width:"100%",accentColor:radiusColor,height:20,cursor:"pointer"}}
-            />
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#111"}}>
-              <span>{RADIUS_MIN} mi</span>
-              <span>100+ mi</span>
-            </div>
-          </div>
-
-          {/* Global Discovery — like Instagram, every public post is visible
-              to everyone regardless of location. Overrides the mile radius
-              above entirely while on, without losing the mile setting for
-              when it's turned back off. */}
-          <div style={{...CARD}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{flex:1,paddingRight:10}}>
-                <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:3}}>🌎 Global Discovery</div>
-                <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>See any public route or event around the world, like Instagram — ignores the mile radius above while on.</div>
-              </div>
-              <button onClick={()=>setGlobalDiscovery(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:globalDiscovery?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
-                <div style={{position:"absolute",top:2,left:globalDiscovery?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -5702,10 +5820,12 @@ export default function SonoLane() {
           </button>
         </div>
 
-        {/* ── Stats bar — Pts / Following / Followers ── */}
-        <div style={{display:"flex",background:"#f8f8f8",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+        {/* ── Stats bar — Pts / Following / Followers. Plain, no grid lines
+             or grey plate behind it — just the three numbers sitting on the
+             page background, like the rest of the header. ── */}
+        <div style={{display:"flex",flexShrink:0}}>
           {[["star",pts,"Pts","points"],["people",following.length,"Following","following"],["people",followersList.length,"Followers","followerslist"]].map(([ic,v,l,sp])=>(
-            <button key={l} onClick={()=>sp==="points"?setWidgetAction("points"):setSubPanel(sp)} style={{flex:1,padding:"9px 4px",textAlign:"center",borderRight:"1px solid #ebebeb",background:"none",border:"none",borderRightWidth:1,borderRightStyle:"solid",borderRightColor:"#ebebeb",cursor:"pointer",fontFamily:F}}>
+            <button key={l} onClick={()=>sp==="points"?setWidgetAction("points"):setSubPanel(sp)} style={{flex:1,padding:"9px 4px",textAlign:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
               <div style={{display:"flex",justifyContent:"center"}}>{ic==="road"?<DPadIcon id="road" color={DPAD_COLORS.road} size={15}/>:<ProfileIcon id={ic} size={15} color="#8a8f98"/>}</div>
               <div style={{fontSize:14,fontWeight:800,color:"#111",marginTop:2}}>{v}</div>
               <div style={{fontSize:10,color:"#111"}}>{l}</div>
@@ -5716,18 +5836,9 @@ export default function SonoLane() {
         {/* ── Tile grid ── */}
         <div style={{padding:"14px 14px 7px",display:"flex",flexDirection:"column"}}>
 
-          {/* ── Discovery radius — just the bar + distance here; the full
-              explanation and controls live on the Edit page (tap Edit). ── */}
-          <div style={{flexShrink:0,background:"#fff",borderRadius:16,border:"1px solid #ebebeb",padding:"14px",marginBottom:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{fontSize:14,fontWeight:800,color:"#111"}}>Discovery Radius</div>
-              <button onClick={()=>setSubPanel("radius")} style={{background:"none",border:"none",color:OR,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,padding:0}}>Edit</button>
-            </div>
-            <div style={{fontSize:20,fontWeight:900,color:radiusColor,marginBottom:6}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</div>
-            <div style={{height:6,borderRadius:3,background:"#f0f0f0",overflow:"hidden"}}>
-              <div style={{height:"100%",borderRadius:3,background:radiusColor,width:(Math.min(100,Math.max(0,(radiusDraft-RADIUS_MIN)/(RADIUS_MAX-RADIUS_MIN)*100)))+"%"}}/>
-            </div>
-          </div>
+          {/* Discovery Radius card removed from the Profile home dashboard
+              — it's still fully editable from Edit Profile (tap ✎), just no
+              longer duplicated as its own summary card up here too. */}
 
           {/* ── Profile completion + objectives — dismissible like a notification ── */}
           {!objectivesDismissed && (
@@ -5816,23 +5927,25 @@ export default function SonoLane() {
           </button>
           {/* ── Top 3 Friends — full-bleed row spanning edge to edge, replaces
                the standalone Friends tile. Filled slots jump straight to that
-               friend in Friends; empty slots open Friends to add one. ── */}
-          <div style={{display:"flex",margin:"0 -14px 12px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb"}}>
+               friend in Friends; empty slots open Friends to add one. No grid
+               lines between slots — just the bubbles on the page background.
+               Bubbles are double the old size (84px vs 42px) per request. ── */}
+          <div style={{display:"flex",margin:"0 -14px 12px"}}>
             {[0,1,2].map(i=>{
               // The AI Co-Pilot can take up the first Top 3 slot — tapping it
               // starts a live voice call instead of opening the Friends tab.
               if(aiInTop3 && i===0){
                 return (
-                  <button key="ai" onClick={startAiCall} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:"1px solid #ebebeb",cursor:"pointer",fontFamily:F}}>
-                    <div style={{width:42,height:42,borderRadius:"50%",background:pal.color+"22",border:"1.5px solid "+pal.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={20} color={pal.color}/></div>
+                  <button key="ai" onClick={startAiCall} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
+                    <div style={{width:84,height:84,borderRadius:"50%",background:pal.color+"22",border:"1.5px solid "+pal.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={40} color={pal.color}/></div>
                     <div style={{fontSize:12,fontWeight:700,color:"#111",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pal.name}</div>
                   </button>
                 );
               }
               const fr=friends[aiInTop3?i-1:i];
               return (
-                <button key={i} onClick={()=>{if(fr){setSelFriend(fr);setSubPanel("top3friend");}else{setShowTop3Chooser(true);}}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",borderRight:i<2?"1px solid #ebebeb":"none",cursor:"pointer",fontFamily:F}}>
-                  <div style={{width:42,height:42,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?17:20,color:fr?"#fff":"#ccc",fontWeight:800,overflow:"hidden"}}>
+                <button key={i} onClick={()=>{if(fr){setSelFriend(fr);setSubPanel("top3friend");}else{setShowTop3Chooser(true);}}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 6px",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
+                  <div style={{width:84,height:84,borderRadius:"50%",background:fr?.photo?"transparent":(fr?fr.color:"#f3f3f3"),border:fr?"none":"2px dashed #ddd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:fr?34:40,color:fr?"#fff":"#ccc",fontWeight:800,overflow:"hidden"}}>
                     {fr?.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (fr?fr.initials:"＋")}
                   </div>
                   <div style={{fontSize:12,fontWeight:fr?700:400,color:fr?"#111":"#bbb",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr?fr.name:"Add Friend"}</div>
@@ -5987,10 +6100,21 @@ export default function SonoLane() {
       };
       if(editingPostId){
         setPosts(p=>p.map(x=>x.id===editingPostId?{...x,...postData}:x));
+        // Already reached the shared feed (has a real Supabase row)? Keep
+        // that row in sync too, so everyone else's copy updates as well.
+        const existing = posts.find(x=>x.id===editingPostId);
+        if(existing?.sbId) updateRoutePostSupabase(existing.sbId, postData);
       } else {
         const post = { id: Date.now(), ...postData, likes: 0, authorId: "me", authorName: userName||"You" };
         setPosts(p=>[post,...p]);
         setNotifications(n=>[{id:Date.now(),icon:"🗺️",text:"Your route \""+post.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
+        // Save a real row too, so it shows up on EVERY signed-in user's
+        // Route feed — not just this device. Reconciled onto the local copy
+        // by id once the insert resolves, so a later edit/delete finds it.
+        createRoutePostSupabase(post).then(sbId => {
+          if(!sbId) return;
+          setPosts(p=>p.map(x=>x.id===post.id?{...x,sbId}:x));
+        });
       }
       resetPostForm();
       setShowPost(false);
@@ -6023,7 +6147,7 @@ export default function SonoLane() {
         {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
           <span style={{fontSize:11,color:"#111"}}>📍</span>
           <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
-          <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
+          <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
         </div>}
       </div>
 
@@ -6039,7 +6163,7 @@ export default function SonoLane() {
           <div style={{textAlign:"center",padding:"30px 20px",color:"#111"}}>
             <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><ProfileIcon id="road" size={34} color="#ddd"/></div>
             <div style={{fontSize:14,color:"#111",marginBottom:4}}>No routes within {appRadius} mi.</div>
-            <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
+            <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
           </div>
         )}
         {filtered.length===0 && !(feedCats.length===1 && feedCats[0]==="Following") && !(radiusActive && posts.length>0) && <><GhostPost/><GhostPost/><GhostPost/></>}
@@ -6391,7 +6515,7 @@ export default function SonoLane() {
           {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
             <span style={{fontSize:11,color:"#111"}}>📍</span>
             <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
-            <button onClick={()=>{go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
+            <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
           </div>}
         </div>
 
@@ -6414,7 +6538,7 @@ export default function SonoLane() {
             <div style={{textAlign:"center",padding:"40px 20px",color:"#111"}}>
               <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><DPadIcon id="event" color="#ddd" size={34}/></div>
               <div style={{fontSize:14,color:"#111",marginBottom:4}}>No events within {appRadius} mi.</div>
-              <button onClick={()=>{go("profile");setSubPanel("edit");}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
+              <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{fontSize:12,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Widen your radius →</button>
             </div>
           )}
           {filtered.length===0 && events.length>0 && !(evFilters.length===1 && evFilters[0]==="Following") && !(radiusActive && !evSearch) && (
@@ -7784,6 +7908,108 @@ export default function SonoLane() {
 
 
   /* ── MODALS ── */
+  // Standalone Discovery Radius overlay — see the showRadiusPage comment up
+  // near appRadius/globalDiscovery for why this exists as its own thing
+  // instead of routing through Profile. It renders on top of whatever panel
+  // is already showing (Discover Routes, Discover Events, the Music sheet)
+  // and its own back arrow just closes the overlay, so the page underneath
+  // is exactly where the user left it.
+  const RadiusPage = useStablePanel(() => {
+    if (!showRadiusPage) return null;
+    return (
+      <div style={{position:"fixed",inset:0,background:"#fff",zIndex:750,display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
+          <button onClick={()=>setShowRadiusPage(false)} title="Back" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:"#111",fontSize:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+          <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111",textAlign:"center",marginRight:44}}>Discovery Radius</div>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
+          <div style={{...CARD,marginBottom:14}}>
+            <div style={{fontSize:12,color:"#111",marginBottom:12,lineHeight:1.5}}>Only show route posts, events, and CB lanes within this distance of you.</div>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:20,fontWeight:900,color:OR}}>{radiusDraft>=RADIUS_MAX ? "100+ mi" : radiusDraft+" mi"}</span>
+              <span style={{fontSize:11,color:"#111"}}>{radiusDraft>=RADIUS_MAX ? "no limit" : "within "+radiusDraft+" miles"}</span>
+            </div>
+            <input
+              type="range" min={RADIUS_MIN} max={RADIUS_MAX} step={5}
+              value={radiusDraft}
+              onChange={e=>setRadiusDraft(Number(e.target.value))}
+              onMouseUp={commitRadius} onTouchEnd={commitRadius} onKeyUp={commitRadius}
+              style={{width:"100%",accentColor:OR,height:20,cursor:"pointer"}}
+            />
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#111",marginBottom:12}}>
+              <span>{RADIUS_MIN} mi</span>
+              <span>100+ mi</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:12,borderTop:"1px solid #ebebeb"}}>
+              <div style={{flex:1,paddingRight:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>🌎 Global Discovery</div>
+                <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>See any public route or event around the world, like Instagram — ignores the mile radius above while on.</div>
+              </div>
+              <button onClick={()=>setGlobalDiscovery(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:globalDiscovery?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+                <div style={{position:"absolute",top:2,left:globalDiscovery?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  });
+
+  // Add Friend sheet — search-only now (the old "or add manually" fallback
+  // is gone; the only way to add someone is finding them by name/username in
+  // the results below). Rendered as a global overlay so it can be opened
+  // from the + Quick Create menu on Profile home (or any other Profile
+  // subPanel that still shows +), not only from the Friends page itself
+  // (which no longer has its own + Add button at all).
+  const AddFriendModal = useStablePanel(() => {
+    if (!showAddFriend) return null;
+    const closeSheet = () => { setShowAddFriend(false); setAddFriendSearch(""); };
+    const q = addFriendSearch.trim().toLowerCase();
+    const results = !q ? [] : isSupabaseConfigured
+      ? supaFriendResults.filter(p=>!friends.some(f=>f.id===p.id))
+      : (()=>{const dir=[...SAMPLE_PEOPLE,...followersList].filter((p,i,arr)=>arr.findIndex(x=>x.id===p.id)===i); return dir.filter(p=>(p.name.toLowerCase().includes(q) || (p.handle||"").toLowerCase().includes(q)) && !friends.some(f=>f.id===p.id));})();
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeSheet}>
+        <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+          <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Add a Friend</div>
+          <input autoFocus value={addFriendSearch} onChange={e=>setAddFriendSearch(e.target.value)} placeholder="🔍 Search by name or username" style={{...INP,marginBottom:12}}/>
+          {q && (
+            <div style={{marginBottom:16}}>
+              {results.length===0 && <div style={{fontSize:13,color:"#8a8f98",padding:"6px 0 14px"}}>No one found matching "{addFriendSearch}"{isSupabaseConfigured?" — they may not have signed up yet.":"."}</div>}
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {results.map(p=>(
+                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px"}}>
+                    <button onClick={()=>{setViewedProfile({...p, photo:p.photo_url});closeSheet();}} style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0,background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",padding:0}}>
+                      <FriendAvatar fr={{...p, photo:p.photo_url}} size={36} fontSize={13}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{p.name||"Unnamed"}</div>
+                        <div style={{fontSize:11,color:"#8a8f98"}}>@{p.handle||"—"}</div>
+                      </div>
+                    </button>
+                    <button onClick={()=>{
+                      const friendObj = {...p, photo:p.photo_url};
+                      addFriendSupabase(p.id);
+                      sendNotificationSupabase(p.id, "🤝", (userName||"Someone")+" added you as a friend.");
+                      setFriends(f=>{const nf=[...f,friendObj]; setTimeout(()=>checkAchievements({friends:nf}),200); return nf;});
+                      setNotifications(n=>[{id:Date.now(),icon:"🤝",text:(p.name||"Your friend")+" was added to your friends.",ts:"now",read:false},...n]);
+                      closeSheet();
+                    }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>+ Add</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {!q && <div style={{fontSize:12,color:"#8a8f98",textAlign:"center",padding:"4px 0 14px"}}>Start typing a name or username to find people.</div>}
+          {isSupabaseConfigured && (
+            <div style={{fontSize:12,color:"#8a8f98",textAlign:"center",padding:"4px 0 6px"}}>Don't see them? They'll show up here once they sign up for SonoLane too.</div>
+          )}
+          <button onClick={closeSheet} style={{width:"100%",padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Close</button>
+        </div>
+      </div>
+    );
+  });
+
   const MusicModal = useStablePanel(() => {
     // Hooks always run first, unconditionally — this used to "if (!showMusic)
     // return null" BEFORE the useState/useEffect calls below, which breaks
@@ -7895,7 +8121,7 @@ export default function SonoLane() {
                 </button>
               );
             })}
-            {radiusActive && <div style={{fontSize:11,color:"#444",textAlign:"center",paddingTop:4}}>Radius: {appRadius} mi · <button onClick={()=>{setShowMusic(false);go("profile");setTimeout(()=>setSubPanel("radius"),100);}} style={{background:"none",border:"none",color:OR,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change</button></div>}
+            {radiusActive && <div style={{fontSize:11,color:"#444",textAlign:"center",paddingTop:4}}>Radius: {appRadius} mi · <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{background:"none",border:"none",color:OR,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Change</button></div>}
           </div>
         )}
 
@@ -8213,10 +8439,9 @@ export default function SonoLane() {
     sharedgarage: { onBack: cancelSharedGarage, right: {label:"💬 Chat", onClick:openSharedGarageChat} },
     following:    { onBack: back, title:"Following" },
     followerslist:{ onBack: back, title:"Followers" },
-    friends:      { onBack: back, title:"Friends", right: {label:"+ Add", onClick:()=>setShowAddFriend(true)} },
+    friends:      { onBack: back }, // no title/right — the TopBar puts a search box here instead (see panel==="profile" case below), and the + Add button is gone (adding now happens via the + Quick Create menu).
     edit:         { onBack: back, title:"Edit Profile", right: {label:"Save", onClick:saveEditProfile} },
     settings:     { onBack: back, title:"⚙️ Settings" },
-    radius:       { onBack: back, title:"Discovery Radius" },
     rewards:      { onBack: back, title:"🏆 Rewards", dark:true },
     top3friend:   { onBack: ()=>setSubPanel("garage"), dark:true },
   };
@@ -8258,7 +8483,19 @@ export default function SonoLane() {
               default, swapped for the actual search box while search is
               active (see the 🔍/✕ button on the right). */}
           {backPage ? (
-            backPage.title && <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:dark?"#fff":"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{backPage.title}</div>
+            panel==="profile" && subPanel==="friends" ? (
+              // Friends page: search box front-and-center instead of a
+              // title — this page is just the plain list of all friends, so
+              // finding one in it is the one thing worth top billing here.
+              <input
+                value={friendSearch}
+                onChange={e=>setFriendSearch(e.target.value)}
+                placeholder="Search your friends…"
+                style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
+              />
+            ) : (
+              backPage.title && <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:dark?"#fff":"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{backPage.title}</div>
+            )
           ) : panel==="discover" ? (
             <input
               value={discoverTab==="routes" ? feedSearch : evSearch}
@@ -8343,6 +8580,20 @@ export default function SonoLane() {
                 <button onClick={()=>{setShowQuickCreate(false);resetEventForm();setShowEvent(true);}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                   <DPadIcon id="event" color={DPAD_COLORS.event} size={20}/>
                   <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Create Event</div>
+                </button>
+              )}
+
+              {/* Add Friend — available from the + Quick Create menu on
+                  Profile home and any other Profile subPanel that still
+                  shows the + button (i.e. one without its own back arrow —
+                  see BACK_PAGES). The Friends page itself now has a back
+                  arrow + search box in the TopBar instead of +, same as
+                  Edit Profile/Settings/etc.; going Back from Friends lands
+                  on Profile home, where + (and this option) is available. */}
+              {panel==="profile" && (
+                <button onClick={()=>{setShowQuickCreate(false);setShowAddFriend(true);}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                  <span style={{fontSize:20,width:20,textAlign:"center",flexShrink:0}}>🤝</span>
+                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Add Friend</div>
                 </button>
               )}
 
@@ -8796,6 +9047,8 @@ export default function SonoLane() {
           </div>
         </div>
       )}
+      <RadiusPage/>
+      <AddFriendModal/>
       <MusicModal/>
       <WidgetPicker/>
 
