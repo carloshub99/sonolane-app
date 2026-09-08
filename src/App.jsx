@@ -1722,12 +1722,6 @@ export default function SonoLane() {
   // to the title. Discover (Routes/Events) went back to always showing its
   // search box in the TopBar, like before.
   const [lanesSearchActive, setLanesSearchActive] = useState(false);
-  // Where the car detail page was opened from — the hero avatar at the top
-  // of the profile, or a car tile inside My Garage — so its back button (now
-  // the shared TopBar's back button) can return you to wherever you actually
-  // came from instead of always one place. Lifted up so both ProfilePanel
-  // and TopBar can read/set it.
-  const [carDetailFrom, setCarDetailFrom] = useState("profile");
   const [events,       setEvents]       = usePersistedIDBState("sl_events", []);
   // One-time seed: drop the 10 San Diego events into the feed the first time
   // this runs, same pattern as the route posts seed above. Never repeats.
@@ -2131,7 +2125,11 @@ export default function SonoLane() {
   // the page is open, instead of the page drawing its own separate header
   // row underneath. Keeping one definition of each action shared between
   // TopBar and the page body avoids the two drifting out of sync. ──
-  const back = () => { setSubPanel(null); setSelTrip(null); };
+  // Lands back on the Garage tab, never on nothing — the Profile
+  // icon-toggle row always has one tab open now (Garage by default), so
+  // "back" out of a full sub-page (Following, Edit Profile, Discovery
+  // Radius, …) shouldn't leave the row collapsed with none of them active.
+  const back = () => { setSubPanel("garage"); setSelTrip(null); };
   const cancelCreateRoute = () => {
     setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
     setEditingRouteId(null);
@@ -2223,7 +2221,12 @@ export default function SonoLane() {
   const backAvailable = (panel==="profile" && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="discover" && !!viewRouteId) || (panel==="create" && lanesView==="room");
   const runBack = () => {
     if(panel==="discover" && viewRouteId){ setViewRouteId(null); return; }
-    if(panel==="profile" && subPanel){ setSubPanel(null); setSelTrip(null); return; }
+    // Reuse the exact same onBack each sub-page's own ← button in the
+    // TopBar uses (see BACK_PAGES below) instead of a separate blanket
+    // "clear subPanel" — otherwise swipe-back and tap-back could disagree
+    // about where a page returns to (e.g. Car Details always returns to
+    // the Garage tab either way, never to a blank collapsed Profile).
+    if(panel==="profile" && subPanel){ (BACK_PAGES[subPanel]?.onBack || (()=>setSubPanel("garage")))(); setSelTrip(null); return; }
     if(panel==="create" && lanesView==="room"){ backFromLanesRoom(); return; }
   };
   const onSwipeStart = e => {
@@ -3728,7 +3731,7 @@ export default function SonoLane() {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             {/* Active car — reads the live carName/carColor/etc. fields, same as every other screen that shows "your car". */}
             <div style={{position:"relative"}}>
-              <button onClick={()=>{setCarDetailFrom("garage");setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+              <button onClick={()=>setSubPanel("car")} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
                 <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
                   {carAvatarMode==="photo" && carAvatarPhoto
                     ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
@@ -3742,7 +3745,7 @@ export default function SonoLane() {
             {/* Other saved cars — tap to make one active and open its details. */}
             {myCars.map(car=>(
               <div key={car.id} style={{position:"relative"}}>
-                <button onClick={()=>{switchToCar(car.id);setCarDetailFrom("garage");setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:car.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:car.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                <button onClick={()=>{switchToCar(car.id);setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:car.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:car.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
                   <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
                     {car.avatarMode==="photo" && car.avatarPhoto
                       ? <img src={car.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
@@ -3756,7 +3759,7 @@ export default function SonoLane() {
             ))}
             {/* Add another car — up to MAX_CARS total. */}
             {(1+myCars.length) < MAX_CARS && (
-              <button onClick={()=>{addNewCar();setCarDetailFrom("garage");setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
+              <button onClick={()=>{addNewCar();setSubPanel("car");}} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
                 <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,flexShrink:0,fontSize:30,color:"#ccc"}}>＋</div>
                 <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center"}}>Add Another Car</div>
                 <div style={{fontSize:11,color:"#111",marginTop:2}}>{MAX_CARS-1-myCars.length} slot{MAX_CARS-1-myCars.length===1?"":"s"} left</div>
@@ -5595,7 +5598,7 @@ export default function SonoLane() {
              Uses the same banner (custom photo or preset) set on the car
              detail page, so any banner edit shows up here immediately. ── */}
         <div style={{margin:"14px 16px 0",borderRadius:18,overflow:"hidden",background:carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css,flexShrink:0}}>
-          <button onClick={()=>{setCarDetailFrom("profile");setSubPanel("car");}} style={{width:"100%",padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
+          <button onClick={()=>setSubPanel("car")} style={{width:"100%",padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
             {carAvatarMode==="photo" && carAvatarPhoto
               ? <img src={carAvatarPhoto} alt="" style={{width:104,height:104,borderRadius:16,objectFit:"cover",border:"2px solid rgba(255,255,255,0.85)",boxShadow:"0 6px 20px rgba(0,0,0,0.4)"}}/>
               : <CarSVG color={carColor} mods={carMods} size={140} styleId={carBodyStyle}/>}
@@ -5870,8 +5873,11 @@ export default function SonoLane() {
               {id:"radiostations", label:"Radio",    icon:<span style={{fontSize:20}}>📻</span>},
             ].map(t=>{
               const active = subPanel===t.id;
+              // Tapping the already-active tab is a no-op now, not a close —
+              // one of these five is always open, same as a normal tab bar
+              // (nothing to collapse back to once Garage opens by default).
               return (
-                <button key={t.id} onClick={()=>setSubPanel(active?null:t.id)} style={{
+                <button key={t.id} onClick={()=>setSubPanel(t.id)} style={{
                   flex:"1 0 auto",minWidth:52,display:"flex",flexDirection:"column",alignItems:"center",gap:5,
                   padding:"10px 4px 8px",background:active?OR+"10":"none",border:"none",
                   borderBottom:"2px solid "+(active?OR:"transparent"),cursor:"pointer",fontFamily:F,
@@ -8188,7 +8194,7 @@ export default function SonoLane() {
   // than the page drawing a second header row underneath. `back`/`onBack`
   // handlers were hoisted up next to `go()` for exactly this reason.
   const BACK_PAGES = {
-    car:          { onBack: ()=>setSubPanel(carDetailFrom==="garage"?"garage":null), right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
+    car:          { onBack: ()=>setSubPanel("garage"), right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
     editcar:      { onBack: ()=>setSubPanel("car"), title:"Edit Car", right: {label:"Save", onClick:saveEditCar} },
     createroute:  { onBack: cancelCreateRoute, title: editingRouteId?"Edit Route":"Create Route", right: {label:"Save", onClick:saveCreateRoute} },
     sharedgarage: { onBack: cancelSharedGarage, right: {label:"💬 Chat", onClick:openSharedGarageChat} },
@@ -8198,7 +8204,7 @@ export default function SonoLane() {
     edit:         { onBack: back, title:"Edit Profile", right: {label:"Save", onClick:saveEditProfile} },
     radius:       { onBack: back, title:"Discovery Radius" },
     rewards:      { onBack: back, title:"🏆 Rewards", dark:true },
-    top3friend:   { onBack: ()=>setSubPanel(null), dark:true },
+    top3friend:   { onBack: ()=>setSubPanel("garage"), dark:true },
   };
   const TopBar = () => {
     const onLanes = panel==="create";
