@@ -2558,10 +2558,27 @@ export default function SonoLane() {
     // row) could falsely read as "scrollable" on a real device and quietly
     // cancel the swipe before it ever started — never reproduced against
     // Chromium, which doesn't round the same way.
+    //
+    // Also ignore touches starting inside a position:fixed overlay (any
+    // bottom sheet, confirm dialog, the person-profile/call/walkie-talkie
+    // full-screen takeovers, the route-detail view, etc). Every one of
+    // these is rendered as a normal DOM descendant of this same swipe
+    // container (CSS "fixed" only changes where it's painted, not where it
+    // sits in the tree), so without this check a drag that starts on one
+    // of them still bubbles up and gets read as a tab-carousel gesture —
+    // which then slides the ENTIRE underlying tab out from under the still-
+    // open overlay and tears it down mid-gesture. That's the real cause
+    // behind reports of swiping "crashing" the page: it wasn't the swipe
+    // itself, it was an open sheet getting unmounted out from under a live
+    // touch sequence. The route-detail view is the one deliberate
+    // exception — it's also position:fixed, but backAvailable already
+    // gives it its own correct swipe-to-go-back handling below, so only
+    // skip when THAT isn't already the case.
     let el = e.target;
-    while(el && el.getAttribute){
+    while(el && el.getAttribute && el !== swipeContainerRef.current){
       const cs = window.getComputedStyle(el);
       if((cs.overflowX==="auto"||cs.overflowX==="scroll") && el.scrollWidth > el.clientWidth + 8){ swipeStartRef.current=null; return; }
+      if(cs.position==="fixed" && !backAvailable){ swipeStartRef.current=null; return; }
       el = el.parentElement;
     }
     swipeStartRef.current = {x:t.clientX, y:t.clientY};
