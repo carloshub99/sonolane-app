@@ -229,7 +229,23 @@ function usePersistedIDBState(key, initial) {
         }
       }
       if (cancelled) return;
-      if (v !== undefined) setValue(v);
+      if (v !== undefined) {
+        setValue(v);
+      } else {
+        // Nothing was ever saved for this key — but some OTHER effect (e.g.
+        // a one-time seed effect that runs on the same mount, like the
+        // Route feed's sample-posts seed) may have already called setValue
+        // in the window before this load resolved. The write-effect below
+        // ignores every write that happens before loadedRef.current flips
+        // true (by design, so it can't stomp a real saved value with
+        // `initial` — see its own comment), which meant a same-mount seed
+        // like that was applied to `value` for this one session but never
+        // actually reached IndexedDB, then silently vanished on the very
+        // next load/refresh (the seed's own "already seeded" flag then
+        // blocks it from ever running again). Persist whatever `value`
+        // already is right now so that first-mount write isn't lost.
+        kvDB.set(key, valueRef.current);
+      }
       loadedRef.current = true;
     })();
     return () => { cancelled = true; };
@@ -2569,6 +2585,47 @@ export default function SonoLane() {
     if(idx===-1) return;
     if(dx < 0 && idx < CAROUSEL.length-1) go(CAROUSEL[idx+1]);      // swipe left → move right (Lanes→Home, Home→Discover)
     else if(dx > 0 && idx > 0) go(CAROUSEL[idx-1]);                  // swipe right → move left (Discover→Home, Home→Lanes)
+  };
+  // Tapping a TopNav tab used to just call go(id) directly — an instant
+  // hard cut with no motion at all, the one gap in the carousel's own
+  // fluid-feeling swipe. This drives the exact same sliding wrapper a real
+  // swipe does (mount the neighbor tab, animate the row across, then
+  // commit the panel switch) so a tap and a swipe to the same tab look and
+  // feel identical — same easing/duration as the drag-release settle above
+  // (spatial consistency: one motion language for "switch tabs", not two).
+  const tabSlideTimeoutRef = useRef(null);
+  const slideToTab = (targetId) => {
+    const idx = CAROUSEL.indexOf(panel);
+    const targetIdx = CAROUSEL.indexOf(targetId);
+    if(idx===-1 || targetIdx===-1 || targetId===panel){ go(targetId); return; }
+    // A tap can land while a previous tap's slide is still animating —
+    // cancel its pending commit so two overlapping calls to go() can never
+    // race, and let this new animation restart cleanly from the neutral
+    // (idle-equivalent) position rather than leaving a stuck transition.
+    if(tabSlideTimeoutRef.current){ clearTimeout(tabSlideTimeoutRef.current); tabSlideTimeoutRef.current = null; }
+    const dir = targetIdx > idx ? "next" : "prev";
+    const w = window.innerWidth || 390;
+    const wrapperEl0 = swipeWrapperRef.current;
+    if(wrapperEl0) wrapperEl0.style.transition = "none";
+    swipeDXRef.current = 0;
+    setSwipeDir(dir); // mounts the neighbor (target) panel, starting at the same position idle looks like
+    // Wait a frame so the browser actually paints that starting position
+    // before switching on the transition — otherwise the two style writes
+    // can collapse into one and the slide never plays.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const wrapperEl = swipeWrapperRef.current;
+      if(wrapperEl){
+        wrapperEl.style.transition = "transform 0.24s cubic-bezier(0.22,1,0.36,1)";
+        wrapperEl.style.transform = `translateX(${dir==="next" ? -w : 0}px)`;
+      }
+      tabSlideTimeoutRef.current = setTimeout(() => {
+        if(wrapperEl) wrapperEl.style.transition = "none";
+        swipeDXRef.current = 0;
+        setSwipeDir(null);
+        tabSlideTimeoutRef.current = null;
+        go(targetId);
+      }, 240);
+    }));
   };
   // Native (non-passive) touch listeners on the swipe container — React
   // attaches onTouchMove as a PASSIVE listener by default, which silently
@@ -5992,10 +6049,10 @@ export default function SonoLane() {
           <div style={{display:"flex",margin:"0 -14px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb",overflowX:"auto"}}>
             {[
               {id:"garage",        label:"Garage",   icon:<GarageDoorIcon size={22} color={subPanel==="garage"?OR:(carSaved?OR:"#8a8f98")}/>},
+              {id:"radiostations", label:"Radio",    icon:<span style={{fontSize:20}}>📻</span>},
               {id:"routes",        label:"Routes",   icon:<DPadIcon id="road" color={subPanel==="routes"?OR:DPAD_COLORS.road} size={22}/>},
               {id:"myevents",      label:"Events",   icon:<DPadIcon id="event" color={subPanel==="myevents"?OR:DPAD_COLORS.event} size={22}/>},
               {id:"history",       label:"History",  icon:<ProfileIcon id="history" size={22} color={subPanel==="history"?OR:"#8a8f98"}/>},
-              {id:"radiostations", label:"Radio",    icon:<span style={{fontSize:20}}>📻</span>},
             ].map(t=>{
               const active = subPanel===t.id;
               // Tapping the already-active tab is a no-op now, not a close —
@@ -8408,7 +8465,7 @@ export default function SonoLane() {
         const active = panel===it.id;
         const color = active ? DPAD_COLORS[it.iconId] : (onLanes?"#72767d":"#9a9a9a");
         return (
-          <button key={it.id} onClick={()=>go(it.id)} title={it.label} style={{
+          <button key={it.id} onClick={()=>slideToTab(it.id)} title={it.label} style={{
             flex:1,display:"flex",alignItems:"center",justifyContent:"center",
             padding:"4px",border:"none",background:"transparent",cursor:"pointer",fontFamily:F,
           }}>
