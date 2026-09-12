@@ -1596,9 +1596,26 @@ export default function SonoLane() {
   // exist on the real profiles table.
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserId) return;
+    // Split into two calls on purpose. Postgres/PostgREST rejects an
+    // update's ENTIRE payload if even one referenced column doesn't exist
+    // on the table — so back when this was one combined .update() call,
+    // a still-missing car_avatar_mode/car_avatar_photo column silently
+    // blocked car_body_style/car_color/car_mods from saving too, even
+    // though those three had columns all along. Splitting them means a
+    // missing column only ever blocks the field that actually needs it.
+    // The .then(...) just logs a clear one-time hint to the console
+    // instead of failing completely silently — nothing user-facing, since
+    // a console warning is the most this fire-and-forget sync can do.
     supabase.from("profiles").update({
-      car_body_style: carBodyStyle, car_color: carColor, car_mods: carMods,
-      car_avatar_mode: carAvatarMode, car_avatar_photo: carAvatarPhoto}).eq("id", currentUserId);
+      car_body_style: carBodyStyle, car_color: carColor, car_mods: carMods
+    }).eq("id", currentUserId).then(({error}) => {
+      if (error) console.warn("[SonoLane] car_body_style/car_color/car_mods didn't save to profiles:", error.message);
+    });
+    supabase.from("profiles").update({
+      car_avatar_mode: carAvatarMode, car_avatar_photo: carAvatarPhoto
+    }).eq("id", currentUserId).then(({error}) => {
+      if (error) console.warn("[SonoLane] car_avatar_mode/car_avatar_photo didn't save — these columns likely don't exist yet on your Supabase profiles table. Run the SQL in SONOLANE_DB_SETUP.sql to add them:", error.message);
+    });
   }, [currentUserId, carBodyStyle, carColor, carMods, carAvatarMode, carAvatarPhoto]);
   // Persisted (used to be plain useState, so adding a friend never survived
   // closing the app — the same bug as "following" not saving, below).
@@ -1669,6 +1686,35 @@ export default function SonoLane() {
           carColor: r.profiles.car_color || null,
           carMods: r.profiles.car_mods || null})));
       }
+      // Following/Followers — real rows in the "following" table now
+      // (owner_id → followed_id), mirroring the friends table just above.
+      // This is what "following doesn't save when I sign out and back in"
+      // actually was: `following` had never had any backend table at all
+      // (pure local storage), and `followersList` was permanently hardcoded
+      // demo data — see SONOLANE_DB_SETUP.sql for the table this hydrates
+      // from. Local demo mode keeps using plain local state either way.
+      const { data: followRows } = await supabase
+        .from("following")
+        .select("followed_id, created_at, profiles:followed_id(id, name, handle, initials, color, photo_url)")
+        .eq("owner_id", currentUserId)
+        .order("created_at", { ascending: true });
+      if (followRows) {
+        setFollowing(followRows.filter(r=>r.profiles).map(r => ({
+          id: r.profiles.id, name: r.profiles.name || "Unnamed", handle: r.profiles.handle || "",
+          initials: r.profiles.initials || "??", color: r.profiles.color || "#f97316",
+          photo: r.profiles.photo_url || null})));
+      }
+      const { data: followerRows } = await supabase
+        .from("following")
+        .select("owner_id, created_at, profiles:owner_id(id, name, handle, initials, color, photo_url)")
+        .eq("followed_id", currentUserId)
+        .order("created_at", { ascending: true });
+      if (followerRows) {
+        setFollowersList(followerRows.filter(r=>r.profiles).map(r => ({
+          id: r.profiles.id, name: r.profiles.name || "Unnamed", handle: r.profiles.handle || "",
+          initials: r.profiles.initials || "??", color: r.profiles.color || "#f97316",
+          photo: r.profiles.photo_url || null})));
+      }
     })();
   }, [currentUserId]);
 
@@ -1716,6 +1762,18 @@ export default function SonoLane() {
   const removeFriendSupabase = async (friendId) => {
     if (!isSupabaseConfigured || !currentUserId) return;
     await supabase.from("friends").delete().eq("owner_id", currentUserId).eq("friend_id", friendId);
+  };
+  // Adds/removes a row in the real "following" table — same shape as
+  // addFriendSupabase/removeFriendSupabase just above. No-op in local demo
+  // mode; every call site below also updates the local `following` array
+  // either way so the UI reacts the same in both modes.
+  const followUserSupabase = async (followedId) => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    await supabase.from("following").insert({ owner_id: currentUserId, followed_id: followedId });
+  };
+  const unfollowUserSupabase = async (followedId) => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    await supabase.from("following").delete().eq("owner_id", currentUserId).eq("followed_id", followedId);
   };
   // Searches real signed-up users by name — the backend-mode replacement
   // for the local demo mode's SAMPLE_PEOPLE/followers search.
@@ -2180,6 +2238,11 @@ export default function SonoLane() {
   // list switches to "room"; the shared TopBar becomes that page's back
   // button (see BACK_PAGES-style handling in TopBar) to return to "list".
   const [lanesView,    setLanesView]    = useState("list");
+  // Which section pill is showing on the Lanes chat list/tab strip — lifted
+  // up to the top level (used to live inside CreatePanel alone) so the
+  // shared swipe handler can also cycle through it, the same way it cycles
+  // Routes/Events/Radio on Discover (see onSwipeEnd + LANES_TABS below).
+  const [lanesListTab, setLanesListTab] = useState("chats");
   // Set only when a Lanes room is opened FROM a Shared Garage page (its
   // group chat, or a member's individual DM) — {garageId}. The room's back
   // button checks this first: when set, back returns to that Shared Garage
@@ -2607,13 +2670,11 @@ export default function SonoLane() {
     }
   };
 
-  // ── Swipe — Routes ↔ Events ↔ SonoLane Radio only; Lanes/Profile are tap-
-  // only now (no more swiping directly between the main bottom-bar tabs).
-  // SWIPE_PANELS gates which panels even look at a horizontal drag at all —
-  // it still has to include Lanes/Profile too, just so swipe-to-go-back out
-  // of a sub-page (Edit Profile, a Lanes room, …) keeps working there; the
-  // actual tab-switching logic in onSwipeEnd below only fires for
-  // "routes"/"events" (and the SonoLane Radio sheet), never Lanes/Profile.
+  // ── Swipe — Discover (Routes ↔ Events ↔ Radio) and Lanes (Sono ↔ You ↔
+  // Chats ↔ Lanes) both cycle left / open Settings right (see onSwipeEnd
+  // below). Profile/Garage stay tap-only; SWIPE_PANELS still has to include
+  // them too, just so swipe-to-go-back out of an actual sub-page (Edit
+  // Profile, Car Details, …) keeps working there.
   const SWIPE_PANELS = ["routes","events","radio","create","profile","garage"];
   // subPanel is dual-purpose on Profile — these 3 values are just which
   // "My Stuff" icon-toggle section is expanded INLINE on the Profile home
@@ -2632,7 +2693,11 @@ export default function SonoLane() {
   // right should trigger THAT back action instead of the carousel's
   // "previous tab" — otherwise swiping right to go back a page instead
   // jumped all the way to the Lanes chat tab.
-  const backAvailable = ((panel==="profile"||panel==="garage") && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="routes" && !!viewRouteId) || (panel==="create" && lanesView==="room");
+  // Lanes' own room-to-list "back" no longer lives here — swiping inside
+  // Lanes now means the same thing it means on Discover (cycle tabs / open
+  // Settings, see LANES_TABS + onSwipeEnd below); the ← button in the
+  // TopBar is still there for the tap-to-go-back case.
+  const backAvailable = ((panel==="profile"||panel==="garage") && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="routes" && !!viewRouteId);
   const runBack = () => {
     if(panel==="routes" && viewRouteId){ setViewRouteId(null); return; }
     // Reuse the exact same onBack each sub-page's own ← button in the
@@ -2641,7 +2706,32 @@ export default function SonoLane() {
     // about where a page returns to (e.g. Car Details always returns to
     // Garage's main view either way, never to a blank collapsed Profile).
     if((panel==="profile"||panel==="garage") && subPanel){ (BACK_PAGES[subPanel]?.onBack || (()=>setSubPanel(panel==="garage"?null:"routes")))(); setSelTrip(null); return; }
-    if(panel==="create" && lanesView==="room"){ backFromLanesRoom(); return; }
+  };
+  // The fixed, ordered set of Lanes "tabs" swipe-left cycles through — Sono
+  // AI and Notifications are always-there rooms, Chats/Lanes are the two
+  // list sections (see the bubble/tab strip in CreatePanel). An individual
+  // friend DM or a specific lane room isn't part of this fixed cycle (there
+  // could be dozens of those) — swiping left from one of those just starts
+  // the cycle over from Sono, same as landing on Lanes fresh would.
+  const LANES_TABS = ["sono","notifications","chats","lanes"];
+  const curLanesTab = () => {
+    if(lanesView==="room"){
+      if(activeChan==="sono") return "sono";
+      if(activeChan==="notifications") return "notifications";
+      return null; // an individual DM/lane room — not one of the fixed tabs
+    }
+    return lanesListTab==="lanes" ? "lanes" : "chats";
+  };
+  const goLanesTab = (tab) => {
+    if(tab==="sono"){ setLanesView("room"); setActiveChan("sono"); }
+    else if(tab==="notifications"){ setLanesView("room"); setActiveChan("notifications"); }
+    else { setLanesListTab(tab); setLanesView("list"); }
+  };
+  const cycleLanesTab = (dir) => {
+    const cur = curLanesTab();
+    const i = cur ? LANES_TABS.indexOf(cur) : -1;
+    const next = LANES_TABS[(i + dir + LANES_TABS.length) % LANES_TABS.length];
+    goLanesTab(next);
   };
   const onSwipeStart = e => {
     if(!SWIPE_PANELS.includes(panel)) { swipeStartRef.current=null; return; }
@@ -2714,23 +2804,26 @@ export default function SonoLane() {
     if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)*1.4) return; // require a deliberate horizontal drag
     if(dx > 0 && backAvailable) { runBack(); return; }               // swipe right → back out of this sub-page, not to another tab
     if(backAvailable) return;                                         // a back page is open — leave the page-swipe alone
-    // Routes ↔ Events ↔ SonoLane Radio — the only swipeable sequence left.
-    // Lanes and Profile (the other two bottom-bar tabs) are tap-only now.
-    // Radio is a real page in this same sequence now (see RadioPanel), not
-    // a pop-up sheet — swipe right off it goes back to Events, swipe left
-    // does nothing (no page after it).
-    if(panel==="routes"){
-      if(dx < 0){ vibrate(); go("events"); }                          // swipe left → Events
-      else if(dx > 0){ vibrate(); setShowSettingsDrawer(true); }       // swipe right → Settings drawer
+    // One shared gesture contract for both swipeable "tab strip" pages —
+    // Discover (Routes|Events|Radio) and Lanes (Sono|You|Chats|Lanes):
+    // swipe left always cycles forward to the next tab (wrapping back to
+    // the first), swipe right always opens the left-side Settings drawer,
+    // no matter which tab you're currently on. Profile/Garage stay tap-
+    // only, same as before.
+    if(panel==="routes" || panel==="events" || panel==="radio"){
+      if(dx < 0){
+        vibrate();
+        const order = ["routes","events","radio"];
+        go(order[(order.indexOf(panel) + 1) % order.length]);
+      } else {
+        vibrate();
+        setShowSettingsDrawer(true);
+      }
       return;
     }
-    if(panel==="events"){
-      if(dx < 0){ vibrate(); go("radio"); }                            // swipe left → Radio
-      else if(dx > 0){ vibrate(); go("routes"); }                      // swipe right → back to Routes
-      return;
-    }
-    if(panel==="radio"){
-      if(dx > 0){ vibrate(); go("events"); }                           // swipe right → back to Events
+    if(panel==="create"){
+      if(dx < 0){ vibrate(); cycleLanesTab(1); }
+      else { vibrate(); setShowSettingsDrawer(true); }
       return;
     }
   };
@@ -3717,8 +3810,8 @@ export default function SonoLane() {
               {!isMe && (
                 <div style={{display:"flex",gap:8,width:"100%",maxWidth:280}}>
                   <button onClick={()=>{
-                    if(isF){setFollowing(f=>f.filter(x=>x.id!==person.id));}
-                    else{setFollowing(f=>[...f,person]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+person.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
+                    if(isF){setFollowing(f=>f.filter(x=>x.id!==person.id));unfollowUserSupabase(person.id);}
+                    else{setFollowing(f=>[...f,person]);followUserSupabase(person.id);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+person.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
                   }} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
                     {isF?"✓ Following":"+ Follow"}
                   </button>
@@ -3982,8 +4075,8 @@ export default function SonoLane() {
             </button>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <button onClick={()=>{
-                if(isF){setFollowing(f=>f.filter(x=>x.id!==quickUser.id));}
-                else{setFollowing(f=>[...f,quickUser]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+quickUser.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
+                if(isF){setFollowing(f=>f.filter(x=>x.id!==quickUser.id));unfollowUserSupabase(quickUser.id);}
+                else{setFollowing(f=>[...f,quickUser]);followUserSupabase(quickUser.id);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+quickUser.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
               }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
                 {isF?"✓ Following":"+ Follow"}
               </button>
@@ -4241,7 +4334,7 @@ export default function SonoLane() {
                 <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{person.name}</div>
                 <div style={{fontSize:12,color:"#111"}}>@{person.handle}</div>
               </div>
-              <span onClick={e=>{e.stopPropagation();setFollowing(f=>f.filter(x=>x.id!==person.id));}} style={{padding:"5px 10px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:F,background:"#5865f2",color:"#fff"}}>✓ Following</span>
+              <span onClick={e=>{e.stopPropagation();setFollowing(f=>f.filter(x=>x.id!==person.id));unfollowUserSupabase(person.id);}} style={{padding:"5px 10px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:F,background:"#5865f2",color:"#fff"}}>✓ Following</span>
             </button>
           ))}
         </div>
@@ -4283,8 +4376,8 @@ export default function SonoLane() {
                 </div>
                 <span onClick={e=>{
                   e.stopPropagation();
-                  if(isF){setFollowing(f=>f.filter(x=>x.id!==person.id));}
-                  else{setFollowing(f=>[...f,person]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+person.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
+                  if(isF){setFollowing(f=>f.filter(x=>x.id!==person.id));unfollowUserSupabase(person.id);}
+                  else{setFollowing(f=>[...f,person]);followUserSupabase(person.id);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+person.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
                 }} style={{padding:"5px 10px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:F,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
                   {isF?"✓ Following":"Follow back"}
                 </span>
@@ -4410,8 +4503,8 @@ export default function SonoLane() {
                   <button onClick={()=>{setActiveChan(selFriend.id);go("create",{lanesRoom:true});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
                   <button onClick={()=>{
                     const isF=following.some(f=>f.id===selFriend.id);
-                    if(isF){setFollowing(f=>f.filter(x=>x.id!==selFriend.id));}
-                    else{setFollowing(f=>[...f,selFriend]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+selFriend.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
+                    if(isF){setFollowing(f=>f.filter(x=>x.id!==selFriend.id));unfollowUserSupabase(selFriend.id);}
+                    else{setFollowing(f=>[...f,selFriend]);followUserSupabase(selFriend.id);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+selFriend.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
                   }} style={{flex:1,padding:"10px",borderRadius:10,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,border:"none",background:following.some(f=>f.id===selFriend.id)?"#5865f2":"#f3f3f3",color:following.some(f=>f.id===selFriend.id)?"#fff":"#555"}}>
                     {following.some(f=>f.id===selFriend.id)?"✓ Following":"+ Follow"}
                   </button>
@@ -4447,14 +4540,24 @@ export default function SonoLane() {
                 {list.length===0 && <div style={{textAlign:"center",color:"#8a8f98",fontSize:13,padding:"8px 0"}}>No friends match "{friendSearch}".</div>}
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {list.map(fr=>(
-                    <button key={fr.id} onClick={()=>setSelFriend(selFriend?.id===fr.id?null:fr)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,border:selFriend?.id===fr.id?"1.5px solid "+OR:"1px solid #ebebeb",background:selFriend?.id===fr.id?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                      <FriendAvatar fr={fr} size={34} fontSize={12}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
-                        <div style={{fontSize:11,color:"#8a8f98"}}>@{fr.handle}</div>
-                      </div>
-                      {friends.slice(0,3).some(x=>x.id===fr.id) && <span style={{fontSize:10,fontWeight:700,color:OR}}>⭐ TOP 3</span>}
-                    </button>
+                    // Two separate tap targets on one row now — tapping the
+                    // avatar/name opens the full profile (ProfileViewSheet),
+                    // same as everywhere else a name shows in the app, so
+                    // Follow/Add Friend/message are always one tap away
+                    // instead of hidden behind the quick-actions expand;
+                    // the chevron on the right still opens THAT expand
+                    // (Walkie/Text/Follow shortcuts + Top 3 perks below).
+                    <div key={fr.id} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 4px 3px 10px",borderRadius:10,border:selFriend?.id===fr.id?"1.5px solid "+OR:"1px solid #ebebeb",background:selFriend?.id===fr.id?OR+"08":"#fff"}}>
+                      <button onClick={()=>setViewedProfile(fr)} title={"View "+fr.name+"'s profile"} style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0,padding:"6px 0",background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                        <FriendAvatar fr={fr} size={34} fontSize={12}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                          <div style={{fontSize:11,color:"#8a8f98"}}>@{fr.handle}</div>
+                        </div>
+                        {friends.slice(0,3).some(x=>x.id===fr.id) && <span style={{fontSize:10,fontWeight:700,color:OR,flexShrink:0}}>⭐ TOP 3</span>}
+                      </button>
+                      <button onClick={()=>setSelFriend(selFriend?.id===fr.id?null:fr)} title={selFriend?.id===fr.id?"Close quick actions":"Quick actions"} style={{width:34,height:34,borderRadius:"50%",background:"none",border:"none",color:"#8a8f98",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transform:selFriend?.id===fr.id?"rotate(90deg)":"none",transition:"transform .15s"}}>›</button>
+                    </div>
                   ))}
                 </div>
               </>
@@ -6918,11 +7021,10 @@ export default function SonoLane() {
     // photo (see the old notes-lane bubble this replaced).
     const myInitials = userName ? userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "ME";
     const [pinnedChans, setPinnedChans] = usePersistedState("sl_pinnedChans", []);
-    // Which section pill is showing on the chat list — "chats" (your
-    // friends' DMs) is the default/main view, matching a normal messaging
-    // app inbox; Lanes and Notifications are one tap away instead of
-    // always being stacked below in their own always-visible sections.
-    const [lanesListTab, setLanesListTab] = useState("chats");
+    // lanesListTab/setLanesListTab now live at the top level (see near
+    // activeChan/lanesView above) so the shared swipe handler can drive
+    // them too — "chats" (your friends' DMs) is still the default/main
+    // view, matching a normal messaging app inbox.
     const togglePin = (id) => setPinnedChans(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]);
     const sortPinned = (list) => {
       const pinned = list.filter(x=>pinnedChans.includes(x.id));
@@ -6952,6 +7054,29 @@ export default function SonoLane() {
     // circle instead of a text bar. The keyboard icon in its corner switches
     // to typing; switching lanes resets back to voice by default.
     const [chatInputMode, setChatInputMode] = useState("voice"); // "voice" | "text"
+    // Sono's own composer (see the "Ask Sono…" bar below) has two SEPARATE
+    // voice features, on purpose: the 🎤 mic just dictates into the text
+    // box (one-shot speech-to-text, real SpeechRecognition), while the blue
+    // circle starts an actual live spoken back-and-forth with the AI —
+    // reusing the exact same startAiCall()/aiCallOpen overlay already built
+    // for the Top 3 Friends "call your Co-Pilot" feature, since it already
+    // writes every turn into aiChat, the same store this room reads. Only
+    // the AI chat gets either of these — every other chat here (a friend
+    // DM, a lane, notes) stays a plain text box.
+    const [sonoListening, setSonoListening] = useState(false);
+    const sonoRecogRef = useRef(null);
+    const toggleSonoDictation = () => {
+      const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+      if(!SR) return;
+      if(sonoListening){ try{ sonoRecogRef.current?.stop(); }catch{} setSonoListening(false); return; }
+      const r = new SR();
+      r.continuous = false; r.interimResults = true;
+      r.onresult = e => { setChanInput(Array.from(e.results).map(x=>x[0].transcript).join(" ")); };
+      r.onend = () => setSonoListening(false);
+      r.onerror = () => setSonoListening(false);
+      sonoRecogRef.current = r;
+      try{ r.start(); setSonoListening(true); }catch{ setSonoListening(false); }
+    };
     // Real voice-message recording for the lane walkie-talkie button — tap
     // once to start, tap again while recording to pause (so you can listen
     // back to what's captured so far), tap again while paused to keep
@@ -7176,47 +7301,32 @@ export default function SonoLane() {
     // "You", or any pinned individual jumps straight into that room.
     // SonoLane Radio's pill was removed entirely — Radio is its own real
     // page now (see RadioPanel), reachable from Discover/Profile instead.
+    // Sono/You/Chats/Lanes used to be the first four bubbles in this rail —
+    // they're the real toggle-tab strip at the app-shell level now (see
+    // LANES_TABS/goLanesTab + the strip rendered right under <TopBar/>),
+    // matching Routes|Events|Radio's own strip. This rail is just your
+    // pinned quick-access shortcuts (specific friends/lanes) now, and only
+    // shows at all once you've pinned something.
     const bubbleRail = (
-      <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0,background:"#2f3136",borderBottom:"1px solid #26282c"}}>
-        <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-          <div style={{width:52,height:52,borderRadius:"50%",background:pal.color+"22",border:"2px solid "+(activeChan==="sono"&&lanesView==="room"?pal.color:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <CompassStar size={24} color={pal.color}/>
-          </div>
-          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{pal.name}</span>
-        </button>
-        <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-          <div style={{position:"relative"}}>
-            <FriendAvatar fr={{photo:profilePhoto,color:OR,initials:myInitials}} size={52} fontSize={19} style={{border:"2px solid "+(activeChan==="notifications"&&lanesView==="room"?OR:"#4f545c")}}/>
-            {unreadNotifs>0 && <div style={{position:"absolute",top:-2,right:-2,minWidth:18,height:18,borderRadius:9,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 4px",border:"2px solid #2f3136",boxSizing:"border-box"}}>{unreadNotifs}</div>}
-          </div>
-          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>You</span>
-        </button>
-        <button onClick={()=>{vibrate();setLanesListTab("chats");setLanesView("list");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-          <div style={{width:52,height:52,borderRadius:"50%",background:(lanesView==="list"&&lanesListTab==="chats")?OR+"22":"#40444b",border:"2px solid "+((lanesView==="list"&&lanesListTab==="chats")?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💬</div>
-          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>Chats</span>
-        </button>
-        <button onClick={()=>{vibrate();setLanesListTab("lanes");setLanesView("list");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-          <div style={{width:52,height:52,borderRadius:"50%",background:(lanesView==="list"&&lanesListTab==="lanes")?OR+"22":"#40444b",border:"2px solid "+((lanesView==="list"&&lanesListTab==="lanes")?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#8e9297",fontWeight:700}}>#</div>
-          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>Lanes</span>
-        </button>
+      <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
         {friends.filter(fr=>pinnedChans.includes(fr.id)).map(fr=>(
           <button key={fr.id} onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-            <FriendAvatar fr={fr} size={52} fontSize={19} style={{border:"2px solid "+(activeChan===fr.id&&lanesView==="room"?OR:"#4f545c")}}/>
-            <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{fr.name.split(" ")[0]}</span>
+            <FriendAvatar fr={fr} size={52} fontSize={19} style={{border:"2px solid "+(activeChan===fr.id&&lanesView==="room"?OR:"#8a8f98")}}/>
+            <span style={{fontSize:10,color:"#8a8f98",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{fr.name.split(" ")[0]}</span>
           </button>
         ))}
         {sidebarCustomLanes.filter(lane=>pinnedChans.includes(lane.id)).map(lane=>(
           <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-            <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px solid "+(activeChan===lane.id&&lanesView==="room"?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:lane.color||"#8e9297",fontWeight:700}}>#</div>
-            <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{lane.name}</span>
+            <div style={{width:52,height:52,borderRadius:"50%",background:"#f3f3f3",border:"2px solid "+(activeChan===lane.id&&lanesView==="room"?OR:"#8a8f98"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:lane.color||"#8a8f98",fontWeight:700}}>#</div>
+            <span style={{fontSize:10,color:"#8a8f98",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{lane.name}</span>
           </button>
         ))}
       </div>
     );
 
     return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#36393f",position:"relative"}}>
-        {bubbleRail}
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#fff",position:"relative"}}>
+        {pinnedChans.length>0 && bubbleRail}
 
         {/* ── Chat list — the browse view for Chats/Lanes, reached by
             tapping those bubbles above instead of being the Lanes tab's
@@ -7224,7 +7334,7 @@ export default function SonoLane() {
             "room"; the shared TopBar becomes that room's back button to
             return here. ── */}
         {lanesView==="list" && (
-        <div style={{width:"100%",flex:1,background:"#2f3136",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{width:"100%",flex:1,background:"#fff",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{flex:1,overflowY:"auto",padding:"8px 8px 8px"}}>
 
             {/* Chats — friends' DMs, filtered by the "Find users…" search in
@@ -7236,32 +7346,32 @@ export default function SonoLane() {
             {lanesListTab==="chats" && (<>
               {friends.length===0 ? (
                 !laneUserSearch.trim() && (
-                  <div style={{textAlign:"center",color:"#4f545c",padding:"30px 20px"}}>
+                  <div style={{textAlign:"center",color:"#8a8f98",padding:"30px 20px"}}>
                     <div style={{fontSize:30,marginBottom:8}}>💬</div>
-                    <div style={{fontSize:14,fontWeight:700,color:"#8e9297"}}>No friend chats yet</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#8a8f98"}}>No friend chats yet</div>
                     <div style={{fontSize:12,marginTop:4,lineHeight:1.6}}>Add some friends to start messaging them here.</div>
                   </div>
                 )
               ) : (<>
                 {laneUserSearch.trim() && friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())).length===0 && (
-                  <div style={{fontSize:12,color:"#4f545c",padding:"16px 10px",fontStyle:"italic",textAlign:"center"}}>No users match "{laneUserSearch}".</div>
+                  <div style={{fontSize:12,color:"#8a8f98",padding:"16px 10px",fontStyle:"italic",textAlign:"center"}}>No users match "{laneUserSearch}".</div>
                 )}
                 {sortPinned(laneUserSearch.trim() ? friends.filter(f=>f.name.toLowerCase().includes(laneUserSearch.trim().toLowerCase())) : friends).map(fr=>(
                   <div key={fr.id} style={{display:"flex",alignItems:"center",gap:2}}>
                     <button onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{
                       flex:1,minWidth:0,display:"flex",alignItems:"center",gap:12,
                       padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
-                      background:(activeChan===fr.id&&lanesView==="room")?"#3a3d42":"transparent"}}>
+                      background:(activeChan===fr.id&&lanesView==="room")?"#f5f5f5":"transparent"}}>
                       <div style={{position:"relative",flexShrink:0}}>
                         <FriendAvatar fr={fr} size={54} fontSize={19}/>
-                        <div style={{position:"absolute",bottom:1,right:1,width:13,height:13,borderRadius:"50%",background:"#23a55a",border:"2.5px solid #2f3136"}}/>
+                        <div style={{position:"absolute",bottom:1,right:1,width:13,height:13,borderRadius:"50%",background:"#23a55a",border:"2.5px solid #fff"}}/>
                       </div>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:15,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</div>
-                        <div style={{fontSize:12,color:"#8e9297",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pinnedChans.includes(fr.id)?"📌 Pinned · Active now":"Active now"}</div>
+                        <div style={{fontSize:15,fontWeight:700,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fr.name}</div>
+                        <div style={{fontSize:12,color:"#8a8f98",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pinnedChans.includes(fr.id)?"📌 Pinned · Active now":"Active now"}</div>
                       </div>
                     </button>
-                    <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:26,height:26,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:13,color:pinnedChans.includes(fr.id)?OR:"#4f545c",padding:0}}>📌</button>
+                    <button onClick={()=>togglePin(fr.id)} title={pinnedChans.includes(fr.id)?"Unpin":"Pin to top"} style={{width:26,height:26,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:13,color:pinnedChans.includes(fr.id)?OR:"#8a8f98",padding:0}}>📌</button>
                   </div>
                 ))}
               </>)}
@@ -7273,37 +7383,37 @@ export default function SonoLane() {
                 CB channels) plus your own private/friends lanes. */}
             {lanesListTab==="lanes" && (<>
               <div style={{padding:"10px 6px 3px"}}>
-                <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
+                <span style={{fontSize:10,fontWeight:700,color:"#8a8f98",letterSpacing:0.8,textTransform:"uppercase"}}>Public Lanes</span>
                 <div style={{fontSize:10,color:"#5b5e66",marginTop:1}}>{radiusActive ? "Live · within "+appRadius+" mi" : "Live · everywhere"}</div>
               </div>
-              {publicLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
+              {publicLanes.length===0 && <div style={{fontSize:11,color:"#8a8f98",padding:"2px 7px 4px",fontStyle:"italic"}}>None nearby right now.</div>}
               {publicLanes.map(lane=>(
                 <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
                   width:"100%",display:"flex",alignItems:"center",gap:6,
                   padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                  background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent",marginBottom:1}}>
+                  background:(activeChan===lane.id&&lanesView==="room")?"#f5f5f5":"transparent",marginBottom:1}}>
                   <span style={{fontSize:11}}>🌐</span>
-                  <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#111":"#8a8f98",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
                   {!lane.host && <span style={{fontSize:9,color:"#5b5e66"}}>you</span>}
                 </button>
               ))}
 
               <div style={{padding:"14px 6px 3px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span style={{fontSize:10,fontWeight:700,color:"#8e9297",letterSpacing:0.8,textTransform:"uppercase"}}>My Lanes</span>
-                <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#4f545c",border:"none",cursor:"pointer",color:"#8e9297",fontSize:13,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
+                <span style={{fontSize:10,fontWeight:700,color:"#8a8f98",letterSpacing:0.8,textTransform:"uppercase"}}>My Lanes</span>
+                <button onClick={()=>setShowCreateLane(true)} style={{width:14,height:14,borderRadius:3,background:"#f3f3f3",border:"none",cursor:"pointer",color:"#8a8f98",fontSize:13,lineHeight:"14px",textAlign:"center",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
               </div>
-              {sidebarCustomLanes.length===0 && <div style={{fontSize:11,color:"#4f545c",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
+              {sidebarCustomLanes.length===0 && <div style={{fontSize:11,color:"#8a8f98",padding:"2px 7px 4px",fontStyle:"italic"}}>No lanes yet. Tap ＋ to create one.</div>}
               {sortPinned(sidebarCustomLanes).map(lane=>(
                 <div key={lane.id} style={{display:"flex",alignItems:"center",gap:2,marginBottom:1}}>
                   <button onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
                     flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,
                     padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                    background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent"}}>
-                    <span style={{fontSize:12,color:lane.color||"#8e9297"}}>#</span>
-                    <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
+                    background:(activeChan===lane.id&&lanesView==="room")?"#f5f5f5":"transparent"}}>
+                    <span style={{fontSize:12,color:lane.color||"#8a8f98"}}>#</span>
+                    <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#111":"#8a8f98",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
                     <span style={{fontSize:10,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
                   </button>
-                  <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(lane.id)?OR:"#4f545c",padding:0}}>📌</button>
+                  <button onClick={()=>togglePin(lane.id)} title={pinnedChans.includes(lane.id)?"Unpin":"Pin to top"} style={{width:16,height:16,flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:pinnedChans.includes(lane.id)?OR:"#8a8f98",padding:0}}>📌</button>
                 </div>
               ))}
             </>)}
@@ -7321,25 +7431,25 @@ export default function SonoLane() {
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",width:"100%"}}>
 
           {/* Header */}
-          <div style={{padding:"9px 14px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:8,background:"#36393f"}}>
+          <div style={{padding:"9px 14px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",gap:8,background:"#fff"}}>
             {curCityLane ? (
               <>
-                <WalkieTalkieIcon size={16} color="#fff"/>
+                <WalkieTalkieIcon size={16} color="#111"/>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{curCityLane.name}</div>
-                  <div style={{fontSize:11,color:"#72767d"}}>{curCityLane.desc} · Freeway Lane</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{curCityLane.name}</div>
+                  <div style={{fontSize:11,color:"#8a8f98"}}>{curCityLane.desc} · Freeway Lane</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:3,background:curCityLane.id===currentFreewayId?"#23a55a22":"#66666622",borderRadius:20,padding:"3px 8px",flexShrink:0}}>
                   <div style={{width:5,height:5,borderRadius:"50%",background:curCityLane.id===currentFreewayId?"#23a55a":"#666"}}/>
-                  <span style={{fontSize:10,color:curCityLane.id===currentFreewayId?"#23a55a":"#8e9297",fontWeight:700}}>{curCityLane.id===currentFreewayId?"On this freeway":"View only"}</span>
+                  <span style={{fontSize:10,color:curCityLane.id===currentFreewayId?"#23a55a":"#8a8f98",fontWeight:700}}>{curCityLane.id===currentFreewayId?"On this freeway":"View only"}</span>
                 </div>
               </>
             ) : curCustomLane ? (
               <>
-                <span style={{fontSize:14,color:"#8e9297"}}>#</span>
+                <span style={{fontSize:14,color:"#8a8f98"}}>#</span>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>#{curCustomLane.name}</div>
-                  <div style={{fontSize:11,color:"#72767d"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#111"}}>#{curCustomLane.name}</div>
+                  <div style={{fontSize:11,color:"#8a8f98"}}>
                     {curCustomLane.garageId ? "🚗 Shared Garage Chat"
                       : curCustomLane.host ? "🌐 Public Lane · Hosted by "+curCustomLane.host
                       : curCustomLane.visibility==="public" ? "🌐 Public Lane · Anyone can join"
@@ -7348,9 +7458,9 @@ export default function SonoLane() {
                 </div>
               </>
             ) : activeChan==="notes" ? (
-              <><span style={{color:"#8e9297",fontSize:15}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>notes</div><div style={{fontSize:11,color:"#72767d"}}>Your personal notes</div></div></>
+              <><span style={{color:"#8a8f98",fontSize:15}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>notes</div><div style={{fontSize:11,color:"#8a8f98"}}>Your personal notes</div></div></>
             ) : activeChan==="notifications" ? (
-              <><span style={{fontSize:16}}>🔔</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>notifications</div><div style={{fontSize:11,color:"#72767d"}}>SonoLane activity</div></div>
+              <><span style={{fontSize:16}}>🔔</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>notifications</div><div style={{fontSize:11,color:"#8a8f98"}}>SonoLane activity</div></div>
               {unreadNotifs>0 && (
                 <button onClick={()=>{
                   setNotifications(ns=>ns.map(x=>x.read?x:{...x,read:true}));
@@ -7360,11 +7470,15 @@ export default function SonoLane() {
                 }} style={{padding:"5px 10px",borderRadius:20,background:"#5865f222",border:"none",color:"#5865f2",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0}}>Mark all read</button>
               )}</>
             ) : activeChan==="sono" ? (
-              <><span style={{fontSize:16}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Sono AI · {pal.name}</div><div style={{fontSize:11,color:pal.color}}>{pal.desc}</div></div>
-              <div style={{display:"flex",gap:4}}>{AI_PALS.map(p=><button key={p.id} onClick={()=>setAiPalId(p.id)} title={p.name} style={{width:20,height:20,borderRadius:"50%",border:"none",cursor:"pointer",background:aiPalId===p.id?p.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}><CompassStar size={aiPalId===p.id?14:11} color={p.color}/></button>)}</div></>
+              // The Co-Pilot picker that used to live in this row moved up
+              // into the shared TopBar (see onLanes/activeChan==="sono"
+              // branch in TopBar) — one consistent place for it, reachable
+              // as soon as you're in the Sono room, not just once scrolled
+              // into the header content.
+              <><span style={{fontSize:16}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>Sono AI · {pal.name}</div><div style={{fontSize:11,color:pal.color}}>{pal.desc}</div></div></>
             ) : curFriend ? (
               <><FriendAvatar fr={curFriend} size={26} fontSize={10}/>
-              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{curFriend.name}</div><div style={{fontSize:11,color:"#23a55a"}}>● Online</div></div></>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>{curFriend.name}</div><div style={{fontSize:11,color:"#23a55a"}}>● Online</div></div></>
             ) : null}
             {/* Voice chat indicator in header */}
             {voiceChatActive===activeChan && (
@@ -7381,7 +7495,7 @@ export default function SonoLane() {
             {/* NOTIFICATIONS */}
             {activeChan==="notifications"&&(
               notifications.length===0
-                ? (<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:38,marginBottom:8}}>🔔</div><div style={{fontSize:14}}>No notifications</div></div>)
+                ? (<div style={{textAlign:"center",color:"#8a8f98",paddingTop:40}}><div style={{fontSize:38,marginBottom:8}}>🔔</div><div style={{fontSize:14}}>No notifications</div></div>)
                 : notifications.map(n=>(
                   <div key={n.id} onClick={()=>{
                     setNotifications(ns=>ns.map(x=>x.id===n.id?{...x,read:true}:x));
@@ -7394,7 +7508,7 @@ export default function SonoLane() {
                   }}
                     style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:n.read?"transparent":"#5865f222",border:n.read?"none":"1px solid #5865f222",cursor:"pointer"}}>
                     <div style={{fontSize:20,flexShrink:0}}>{n.icon}</div>
-                    <div style={{flex:1}}><div style={{fontSize:14,color:n.read?"#72767d":"#dcddde",lineHeight:1.5}}>{n.text}</div><div style={{fontSize:11,color:"#72767d",marginTop:2}}>{n.ts}</div></div>
+                    <div style={{flex:1}}><div style={{fontSize:14,color:n.read?"#8a8f98":"#111",lineHeight:1.5}}>{n.text}</div><div style={{fontSize:11,color:"#8a8f98",marginTop:2}}>{n.ts}</div></div>
                     {!n.read&&<div style={{width:6,height:6,borderRadius:"50%",background:"#5865f2",marginTop:4}}/>}
                   </div>
                 ))
@@ -7402,13 +7516,13 @@ export default function SonoLane() {
 
             {/* NOTES */}
             {activeChan==="notes"&&(<>
-              {tLines.length===0&&<div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}><div style={{fontSize:38,marginBottom:8}}>📝</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:4}}>Your notes lane</div><div style={{fontSize:13,color:"#4f545c",lineHeight:1.6}}>Just for you. Jot, voice-transcribe, think out loud.</div></div>}
+              {tLines.length===0&&<div style={{textAlign:"center",color:"#8a8f98",paddingTop:40}}><div style={{fontSize:38,marginBottom:8}}>📝</div><div style={{fontSize:15,fontWeight:700,color:"#8a8f98",marginBottom:4}}>Your notes lane</div><div style={{fontSize:13,color:"#8a8f98",lineHeight:1.6}}>Just for you. Jot, voice-transcribe, think out loud.</div></div>}
               {tLines.map((l,i)=>(
                 <div key={i} style={{display:"flex",gap:9,marginBottom:3,padding:"1px 0"}}>
                   <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,"+OR+",#fb923c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>
                     {userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?"}
                   </div>
-                  <div style={{flex:1}}><div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1}}><span style={{fontSize:14,fontWeight:700,color:"#fff"}}>{userName||"You"}</span><span style={{fontSize:11,color:"#72767d"}}>Today</span></div><div style={{fontSize:15,color:"#dcddde",lineHeight:1.5}}>{l}</div></div>
+                  <div style={{flex:1}}><div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1}}><span style={{fontSize:14,fontWeight:700,color:"#111"}}>{userName||"You"}</span><span style={{fontSize:11,color:"#8a8f98"}}>Today</span></div><div style={{fontSize:15,color:"#111",lineHeight:1.5}}>{l}</div></div>
                 </div>
               ))}
             </>)}
@@ -7419,21 +7533,21 @@ export default function SonoLane() {
                 <div key={i} style={{display:"flex",gap:9,marginBottom:3,flexDirection:c.role==="user"?"row-reverse":"row"}}>
                   <div style={{width:30,height:30,borderRadius:"50%",background:c.role==="user"?"linear-gradient(135deg,"+OR+",#fb923c)":pal.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:c.role==="user"?12:15,fontWeight:800,color:"#fff",flexShrink:0}}>{c.role==="user"?(userName?userName[0].toUpperCase():"?"):<CompassStar size={16} color="#fff"/>}</div>
                   <div style={{flex:1,maxWidth:"80%"}}>
-                    <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1,flexDirection:c.role==="user"?"row-reverse":"row"}}><span style={{fontSize:14,fontWeight:700,color:c.role==="user"?"#fff":pal.color}}>{c.role==="user"?(userName||"You"):pal.name}</span><span style={{fontSize:11,color:"#72767d"}}>Today</span></div>
-                    <div style={{fontSize:15,color:"#dcddde",lineHeight:1.5,background:c.role==="user"?"#4f545c22":"transparent",borderRadius:4,padding:c.role==="user"?"4px 8px":"0"}}>{c.text}</div>
+                    <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:1,flexDirection:c.role==="user"?"row-reverse":"row"}}><span style={{fontSize:14,fontWeight:700,color:c.role==="user"?"#111":pal.color}}>{c.role==="user"?(userName||"You"):pal.name}</span><span style={{fontSize:11,color:"#8a8f98"}}>Today</span></div>
+                    <div style={{fontSize:15,color:"#111",lineHeight:1.5,background:c.role==="user"?"#8a8f9822":"transparent",borderRadius:4,padding:c.role==="user"?"4px 8px":"0"}}>{c.text}</div>
                   </div>
                 </div>
               ))}
-              {aiThinking&&<div style={{display:"flex",gap:9,padding:"1px 0"}}><div style={{width:30,height:30,borderRadius:"50%",background:pal.color,display:"flex",alignItems:"center",justifyContent:"center"}}><CompassStar size={16} color="#fff"/></div><div style={{paddingTop:8,color:"#72767d",fontSize:14,fontStyle:"italic"}}>{pal.name} is typing…</div></div>}
+              {aiThinking&&<div style={{display:"flex",gap:9,padding:"1px 0"}}><div style={{width:30,height:30,borderRadius:"50%",background:pal.color,display:"flex",alignItems:"center",justifyContent:"center"}}><CompassStar size={16} color="#fff"/></div><div style={{paddingTop:8,color:"#8a8f98",fontSize:14,fontStyle:"italic"}}>{pal.name} is typing…</div></div>}
             </>)}
 
             {/* CB LANE OR FRIEND DM */}
             {(curCityLane||curCustomLane||curFriend)&&(<>
               {allMsgs.length===0&&(
-                <div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}>
-                  {curCityLane&&<><div style={{marginBottom:6,display:"flex",justifyContent:"center"}}><WalkieTalkieIcon size={30} color="#4f545c"/></div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:13,color:"#4f545c",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
-                  {curCustomLane&&<><div style={{fontSize:30,marginBottom:6}}>{curCustomLane.garageId?"🚗":"🛣️"}</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>#{curLane.name}</div><div style={{fontSize:13,color:"#4f545c"}}>{curCustomLane.garageId ? "Your Shared Garage's group chat." : curCustomLane.host ? "A public lane hosted by "+curCustomLane.host+"." : curCustomLane.visibility==="public" ? "Your public lane — anyone can join." : "Your friends-only lane."} Hold mic to voice message.</div></>}
-                  {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
+                <div style={{textAlign:"center",color:"#8a8f98",paddingTop:40}}>
+                  {curCityLane&&<><div style={{marginBottom:6,display:"flex",justifyContent:"center"}}><WalkieTalkieIcon size={30} color="#8a8f98"/></div><div style={{fontSize:15,fontWeight:700,color:"#8a8f98",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:13,color:"#8a8f98",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
+                  {curCustomLane&&<><div style={{fontSize:30,marginBottom:6}}>{curCustomLane.garageId?"🚗":"🛣️"}</div><div style={{fontSize:15,fontWeight:700,color:"#8a8f98",marginBottom:3}}>#{curLane.name}</div><div style={{fontSize:13,color:"#8a8f98"}}>{curCustomLane.garageId ? "Your Shared Garage's group chat." : curCustomLane.host ? "A public lane hosted by "+curCustomLane.host+"." : curCustomLane.visibility==="public" ? "Your public lane — anyone can join." : "Your friends-only lane."} Hold mic to voice message.</div></>}
+                  {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:15,fontWeight:700,color:"#8a8f98",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
                 </div>
               )}
               {allMsgs.map(msg=>(
@@ -7441,34 +7555,34 @@ export default function SonoLane() {
                   <div style={{width:30,height:30,borderRadius:"50%",background:msg.mine?"linear-gradient(135deg,"+OR+",#fb923c)":msg.color||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>{msg.initials||"?"}</div>
                   <div style={{flex:1,maxWidth:"78%"}}>
                     <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:2,flexDirection:msg.mine?"row-reverse":"row"}}>
-                      <span style={{fontSize:13,fontWeight:700,color:msg.mine?"#fff":msg.color||"#dcddde"}}>{msg.user||"Rider"}</span>
-                      <span style={{fontSize:11,color:"#72767d"}}>{msg.ts}</span>
+                      <span style={{fontSize:13,fontWeight:700,color:msg.mine?OR:msg.color||"#111"}}>{msg.user||"Rider"}</span>
+                      <span style={{fontSize:11,color:"#8a8f98"}}>{msg.ts}</span>
                     </div>
                     {msg.isVoice ? (
                       <div style={{display:"flex",flexDirection:"column",alignItems:msg.mine?"flex-end":"flex-start",gap:3}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,background:msg.mine?"#f97316":"#40444b",borderRadius:20,padding:"7px 12px",width:"fit-content"}}>
-                          <button onClick={()=>toggleVoicePlayback(msg)} disabled={!msg.audioUrl} style={{width:24,height:24,borderRadius:"50%",background:msg.mine?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)",border:"none",padding:0,color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:msg.audioUrl?"pointer":"default"}}>{playingVoiceId===msg.id?"❚❚":"▶"}</button>
+                        <div style={{display:"flex",alignItems:"center",gap:8,background:msg.mine?"#f97316":"#f3f3f3",borderRadius:20,padding:"7px 12px",width:"fit-content"}}>
+                          <button onClick={()=>toggleVoicePlayback(msg)} disabled={!msg.audioUrl} style={{width:24,height:24,borderRadius:"50%",background:msg.mine?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.06)",border:"none",padding:0,color:msg.mine?"#fff":"#111",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:msg.audioUrl?"pointer":"default"}}>{playingVoiceId===msg.id?"❚❚":"▶"}</button>
                           <div style={{flex:1}}>
                             <div style={{display:"flex",gap:2,alignItems:"center",height:16}}>
                               {Array.from({length:16}).map((_,wi)=>(
-                                <div key={wi} style={{width:2,borderRadius:1,background:msg.mine?"rgba(255,255,255,0.7)":"#72767d",height:Math.max(3,Math.sin(wi*0.8)*7+8)+"px"}}/>
+                                <div key={wi} style={{width:2,borderRadius:1,background:msg.mine?"rgba(255,255,255,0.7)":"#8a8f98",height:Math.max(3,Math.sin(wi*0.8)*7+8)+"px"}}/>
                               ))}
                             </div>
                           </div>
-                          <span style={{fontSize:11,color:msg.mine?"rgba(255,255,255,0.7)":"#72767d",fontWeight:600,flexShrink:0}}>{"0:"+(String(msg.voiceSeconds||3).padStart(2,"0"))}</span>
+                          <span style={{fontSize:11,color:msg.mine?"rgba(255,255,255,0.7)":"#8a8f98",fontWeight:600,flexShrink:0}}>{"0:"+(String(msg.voiceSeconds||3).padStart(2,"0"))}</span>
                         </div>
                         {msg.transcript && (
                           <button onClick={()=>toggleTranscript(msg.id)} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:3,fontFamily:F}}>
-                            <span style={{fontSize:11,color:"#72767d"}}>📝</span>
-                            <span style={{fontSize:11,color:"#72767d",fontWeight:600}}>{openTranscripts[msg.id]?"Hide transcript":"Show transcript"}</span>
+                            <span style={{fontSize:11,color:"#8a8f98"}}>📝</span>
+                            <span style={{fontSize:11,color:"#8a8f98",fontWeight:600}}>{openTranscripts[msg.id]?"Hide transcript":"Show transcript"}</span>
                           </button>
                         )}
                         {msg.transcript && openTranscripts[msg.id] && (
-                          <div style={{fontSize:13,color:"#b9bbbe",lineHeight:1.4,background:"#2f3136",border:"1px solid #202225",borderRadius:8,padding:"6px 10px",maxWidth:220}}>"{msg.transcript}"</div>
+                          <div style={{fontSize:13,color:"#555",lineHeight:1.4,background:"#f8f8f8",border:"1px solid #ebebeb",borderRadius:8,padding:"6px 10px",maxWidth:220}}>"{msg.transcript}"</div>
                         )}
                       </div>
                     ) : (
-                      <div style={{fontSize:15,color:"#dcddde",lineHeight:1.5,background:msg.mine?"#5865f233":"transparent",borderRadius:4,padding:msg.mine?"5px 9px":"0"}}>{msg.text}</div>
+                      <div style={{fontSize:15,color:"#111",lineHeight:1.5,background:msg.mine?"#5865f233":"transparent",borderRadius:4,padding:msg.mine?"5px 9px":"0"}}>{msg.text}</div>
                     )}
                   </div>
                 </div>
@@ -7478,7 +7592,7 @@ export default function SonoLane() {
 
           {/* Input bar */}
           {activeChan!=="notifications"&&(
-            <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#36393f"}}>
+            <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#fff"}}>
 
               {/* Voice chat banner — shows when VC is active in this channel */}
               {voiceChatActive===activeChan && (
@@ -7501,7 +7615,7 @@ export default function SonoLane() {
               {laneLocked && (
                 <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:6,borderRadius:8,background:"#66666622",border:"1px solid #66666644"}}>
                   <span style={{fontSize:15}}>🔒</span>
-                  <span style={{flex:1,fontSize:12,color:"#8e9297"}}>Get on {curCityLane.name} to talk here — you can still read what's posted.</span>
+                  <span style={{flex:1,fontSize:12,color:"#8a8f98"}}>Get on {curCityLane.name} to talk here — you can still read what's posted.</span>
                 </div>
               )}
 
@@ -7509,7 +7623,7 @@ export default function SonoLane() {
                   circle, with a keyboard icon in the corner to switch to typing. */}
               {isLaneChat && chatInputMode==="voice" ? (
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative",padding:"4px 0 2px",opacity:laneLocked?0.6:1}}>
-                  <button onClick={()=>setChatInputMode("text")} title="Type a message instead" style={{position:"absolute",left:4,bottom:0,width:34,height:34,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,color:"#72767d"}}>⌨️</button>
+                  <button onClick={()=>setChatInputMode("text")} title="Type a message instead" style={{position:"absolute",left:4,bottom:0,width:34,height:34,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,color:"#8a8f98"}}>⌨️</button>
                   <button disabled={laneLocked} onClick={()=>{
                     if(laneLocked) return;
                     if(voiceChatActive===activeChan){setVoiceChatActive(null);clearInterval(vcTimerRef.current);}
@@ -7518,14 +7632,14 @@ export default function SonoLane() {
                       const SAMPLE=["SoCalDrifter","NightOwl","TruckDog"];
                       setVoiceChatMembers(m=>({...m,[activeChan]:[userName||"You",...SAMPLE.slice(0,Math.floor(Math.random()*3))]}));
                     }
-                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{position:"absolute",right:4,bottom:0,width:34,height:34,borderRadius:8,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:voiceChatActive===activeChan?"#23a55a":"#72767d"}}>🔊</button>
+                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{position:"absolute",right:4,bottom:0,width:34,height:34,borderRadius:8,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:voiceChatActive===activeChan?"#23a55a":"#8a8f98"}}>🔊</button>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
                     {laneRecPhase==="paused" && laneRecPreviewUrl && (
                       <audio controls src={laneRecPreviewUrl} style={{height:26,width:190,marginBottom:2}}/>
                     )}
                     <div style={{display:"flex",alignItems:"center",gap:14}}>
                       {laneRecPhase!=="idle" && (
-                        <button onClick={cancelLaneVoiceMsg} title="Cancel" style={{width:32,height:32,borderRadius:"50%",background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#8e9297",flexShrink:0}}>✕</button>
+                        <button onClick={cancelLaneVoiceMsg} title="Cancel" style={{width:32,height:32,borderRadius:"50%",background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#8a8f98",flexShrink:0}}>✕</button>
                       )}
                       <button
                         disabled={laneLocked}
@@ -7543,23 +7657,57 @@ export default function SonoLane() {
                         <button onClick={sendLaneVoiceMsg} title="Send" style={{width:32,height:32,borderRadius:"50%",background:"#23a55a",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#fff",flexShrink:0}}>➤</button>
                       )}
                     </div>
-                    <span style={{fontSize:11,fontWeight:700,color:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#72767d"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:laneRecPhase==="recording"?"#ed4245":laneRecPhase==="paused"?"#f0a020":"#8a8f98"}}>
                       {laneLocked ? "Get on "+curCityLane.name+" to talk" : laneRecPhase==="recording" ? "Recording… "+laneRecSeconds+"s — tap to pause" : laneRecPhase==="paused" ? "Paused "+laneRecSeconds+"s — tap to resume, or send" : "Tap to record a voice message"}
                     </span>
                   </div>
                 </div>
-              ) : (
+              ) : activeChan==="sono" ? (() => {
+                const sendSonoChan = () => {
+                  if(!chanInput.trim()) return;
+                  const q=chanInput.trim();
+                  setAiChat(c=>[...c,{role:"user",text:q}]);
+                  setChanInput(""); setAiThinking(true);
+                  callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant. Be concise.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
+                };
+                // Ask Sono — styled like a familiar AI-chat composer (one
+                // rounded bar: + to attach/create, the question, then either
+                // the mic/voice-mode pair or a send arrow once you've typed
+                // something). No back button here — the Sono tab up in the
+                // strip is how you leave, same as tapping any other tab.
+                return (
+                <div style={{display:"flex",alignItems:"center",gap:4,background:"#f3f3f3",borderRadius:28,padding:"6px 6px 6px 6px"}}>
+                  <button onClick={()=>setShowQuickCreate(true)} title="Add" style={{width:32,height:32,borderRadius:"50%",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:"#555",flexShrink:0,lineHeight:1}}>+</button>
+                  <input value={chanInput} onChange={e=>setChanInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendSonoChan();}}}
+                    placeholder="Ask Sono…"
+                    style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:"#111",fontSize:15,fontFamily:F,padding:"6px 2px"}}/>
+                  {chanInput.trim() ? (
+                    <button onClick={sendSonoChan} title="Send" style={{width:34,height:34,borderRadius:"50%",background:"#111",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:15,flexShrink:0}}>↑</button>
+                  ) : (
+                    <>
+                      <button onClick={toggleSonoDictation} title={sonoListening?"Stop dictating":"Dictate"} style={{width:34,height:34,borderRadius:"50%",background:sonoListening?"#ef444422":"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:sonoListening?"#ef4444":"#555",fontSize:17,flexShrink:0}}>🎤</button>
+                      <button onClick={startAiCall} title={"Voice mode — talk to "+pal.name} style={{width:34,height:34,borderRadius:"50%",background:"#3b82f6",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <div style={{display:"flex",gap:2,alignItems:"center",height:14}}>
+                          {[5,9,13,9,5].map((h,i)=>(<div key={i} style={{width:2,borderRadius:1,background:"#fff",height:h}}/>))}
+                        </div>
+                      </button>
+                    </>
+                  )}
+                </div>
+                );
+              })() : (
               <div style={{display:"flex",alignItems:"center",gap:6,opacity:laneLocked?0.6:1}}>
                 {/* A second, always-reachable way back besides the shared
                     TopBar's back arrow above — same destination either way
                     (see backFromLanesRoom): the Shared Garage page this
                     chat was opened from, or the plain chat list. */}
-                <button onClick={backFromLanesRoom} title="Back" style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>
+                <button onClick={backFromLanesRoom} title="Back" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>
                   ☰
                 </button>
 
                 {/* Text bar */}
-                <div style={{flex:1,display:"flex",alignItems:"center",gap:6,background:"#40444b",borderRadius:8,padding:"4px 6px 4px 12px",minWidth:0}}>
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:6,background:"#f3f3f3",borderRadius:8,padding:"4px 6px 4px 12px",minWidth:0}}>
                   {/* Voice chat join button */}
                   <button disabled={laneLocked} onClick={()=>{
                     if(laneLocked) return;
@@ -7569,34 +7717,17 @@ export default function SonoLane() {
                       const SAMPLE=["SoCalDrifter","NightOwl","TruckDog"];
                       setVoiceChatMembers(m=>({...m,[activeChan]:[userName||"You",...SAMPLE.slice(0,Math.floor(Math.random()*3))]}));
                     }
-                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{width:26,height:26,borderRadius:6,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:voiceChatActive===activeChan?"#23a55a":"#72767d",flexShrink:0}}>🔊</button>
+                  }} title={laneLocked?"Get on this freeway to join voice chat":voiceChatActive===activeChan?"Leave voice chat":"Join voice chat"} style={{width:26,height:26,borderRadius:6,background:voiceChatActive===activeChan?"#23a55a22":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:voiceChatActive===activeChan?"#23a55a":"#8a8f98",flexShrink:0}}>🔊</button>
                   <input value={chanInput} onChange={e=>setChanInput(e.target.value)} disabled={laneLocked}
-                    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();
-                      if(activeChan==="sono"){
-                        if(!chanInput.trim())return;
-                        const q=chanInput.trim();
-                        setAiChat(c=>[...c,{role:"user",text:q}]);
-                        setChanInput(""); setAiThinking(true);
-                        callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant. Be concise.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
-                      } else { sendChanMsg(chanInput); }
-                    }}}
-                    placeholder={laneLocked?"Get on "+curCityLane.name+" to talk…":curCityLane?"Message "+curCityLane.name+"…":curCustomLane?"Message #"+curCustomLane.name+"…":activeChan==="notes"?"Jot a note…":activeChan==="sono"?"Ask "+pal.name+"…":curFriend?"Message "+curFriend.name+"…":""}
-                    style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:"#dcddde",fontSize:15,fontFamily:F}}/>
-                  <button disabled={laneLocked} onClick={()=>{
-                    if(laneLocked) return;
-                    if(activeChan==="sono"){
-                      if(!chanInput.trim())return;
-                      const q=chanInput.trim();
-                      setAiChat(c=>[...c,{role:"user",text:q}]);
-                      setChanInput(""); setAiThinking(true);
-                      callClaude([...aiChat,{role:"user",content:q}].map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text||m.content})),"You are "+pal.name+", a "+pal.desc+" AI driving assistant.").then(r=>{setAiChat(c=>[...c,{role:"ai",text:r}]);setAiThinking(false);});
-                    } else { sendChanMsg(chanInput); }
-                  }} style={{width:14,height:14,borderRadius:6,background:chanInput.trim()?"#5865f2":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:chanInput.trim()?"#fff":"#72767d",flexShrink:0}}>↑</button>
+                    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChanMsg(chanInput);}}}
+                    placeholder={laneLocked?"Get on "+curCityLane.name+" to talk…":curCityLane?"Message "+curCityLane.name+"…":curCustomLane?"Message #"+curCustomLane.name+"…":activeChan==="notes"?"Jot a note…":curFriend?"Message "+curFriend.name+"…":""}
+                    style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:"#111",fontSize:15,fontFamily:F}}/>
+                  <button disabled={laneLocked} onClick={()=>sendChanMsg(chanInput)} style={{width:14,height:14,borderRadius:6,background:chanInput.trim()?"#5865f2":"transparent",border:"none",cursor:laneLocked?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:chanInput.trim()?"#fff":"#8a8f98",flexShrink:0}}>↑</button>
                 </div>
 
                 {/* Voice message button — hold-to-talk voice notes, lane chats only */}
                 {isLaneChat && (
-                  <button onClick={()=>setChatInputMode("voice")} title="Switch to hold-to-talk" style={{width:34,height:34,borderRadius:8,background:"#40444b",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8e9297",flexShrink:0}}>🎙</button>
+                  <button onClick={()=>setChatInputMode("voice")} title="Switch to hold-to-talk" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>🎙</button>
                 )}
               </div>
               )}
@@ -7608,19 +7739,19 @@ export default function SonoLane() {
         {/* Create Lane sheet */}
         {showCreateLane&&(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:800,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowCreateLane(false)}>
-            <div style={{background:"#2f3136",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
-              <div style={{width:30,height:3,background:"#40444b",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:16,fontWeight:800,color:"#fff",marginBottom:4}}>Create a Lane</div>
-              <div style={{fontSize:12,color:"#72767d",marginBottom:14}}>Lanes are your own private or shared CB channels.</div>
-              <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>LANE NAME</div>
-              <input value={newLaneName} onChange={e=>setNewLaneName(e.target.value)} placeholder="e.g. Car Meet Crew, Night Rides…" style={{...INP,background:"#40444b",border:"1px solid #202225",color:"#dcddde",marginBottom:16}}/>
-              <div style={{fontSize:11,color:"#8e9297",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>WHO CAN JOIN</div>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:30,height:3,background:"#f3f3f3",borderRadius:2,margin:"0 auto 16px"}}/>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Create a Lane</div>
+              <div style={{fontSize:12,color:"#8a8f98",marginBottom:14}}>Lanes are your own private or shared CB channels.</div>
+              <div style={{fontSize:11,color:"#8a8f98",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>LANE NAME</div>
+              <input value={newLaneName} onChange={e=>setNewLaneName(e.target.value)} placeholder="e.g. Car Meet Crew, Night Rides…" style={{...INP,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",marginBottom:16}}/>
+              <div style={{fontSize:11,color:"#8a8f98",fontWeight:700,letterSpacing:0.8,marginBottom:6}}>WHO CAN JOIN</div>
               <div style={{display:"flex",gap:8,marginBottom:6}}>
-                <button onClick={()=>setNewLaneVisibility("friends")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="friends"?"1.5px solid #5865f2":"1px solid #202225",background:newLaneVisibility==="friends"?"#5865f222":"#40444b",color:newLaneVisibility==="friends"?"#fff":"#8e9297",fontSize:13,fontWeight:700,textAlign:"left"}}>
-                  👥 Friends<div style={{fontSize:10,fontWeight:400,color:"#8e9297",marginTop:2}}>Only your friends</div>
+                <button onClick={()=>setNewLaneVisibility("friends")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="friends"?"1.5px solid #5865f2":"1px solid #ebebeb",background:newLaneVisibility==="friends"?"#5865f2":"#f3f3f3",color:newLaneVisibility==="friends"?"#fff":"#555",fontSize:13,fontWeight:700,textAlign:"left"}}>
+                  👥 Friends<div style={{fontSize:10,fontWeight:400,color:newLaneVisibility==="friends"?"#ffffffcc":"#8a8f98",marginTop:2}}>Only your friends</div>
                 </button>
-                <button onClick={()=>setNewLaneVisibility("public")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="public"?"1.5px solid "+OR:"1px solid #202225",background:newLaneVisibility==="public"?OR+"22":"#40444b",color:newLaneVisibility==="public"?"#fff":"#8e9297",fontSize:13,fontWeight:700,textAlign:"left"}}>
-                  🌐 Public<div style={{fontSize:10,fontWeight:400,color:"#8e9297",marginTop:2}}>Anyone nearby can join</div>
+                <button onClick={()=>setNewLaneVisibility("public")} style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontFamily:F,border:newLaneVisibility==="public"?"1.5px solid "+OR:"1px solid #ebebeb",background:newLaneVisibility==="public"?OR:"#f3f3f3",color:newLaneVisibility==="public"?"#fff":"#555",fontSize:13,fontWeight:700,textAlign:"left"}}>
+                  🌐 Public<div style={{fontSize:10,fontWeight:400,color:newLaneVisibility==="public"?"#ffffffcc":"#8a8f98",marginTop:2}}>Anyone nearby can join</div>
                 </button>
               </div>
               <div style={{fontSize:11,color:"#5b5e66",marginBottom:16}}>{newLaneVisibility==="public" ? "Shows in Public Lanes for anyone within your discovery radius." : "Stays in My Lanes, visible only to your friends."}</div>
@@ -7633,7 +7764,7 @@ export default function SonoLane() {
                   setActiveChan(lane.id);
                   setNewLaneName("");setNewLaneVisibility("friends");setShowCreateLane(false);
                 }} style={{flex:1,padding:"12px",borderRadius:10,background:"#5865f2",color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create Lane</button>
-                <button onClick={()=>setShowCreateLane(false)} style={{padding:"12px 16px",borderRadius:10,background:"#40444b",border:"none",color:"#8e9297",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                <button onClick={()=>setShowCreateLane(false)} style={{padding:"12px 16px",borderRadius:10,background:"#f3f3f3",border:"none",color:"#8a8f98",cursor:"pointer",fontFamily:F}}>Cancel</button>
               </div>
             </div>
           </div>
@@ -8542,25 +8673,23 @@ export default function SonoLane() {
   // tall empty-feeling strip). Active vs inactive is just the icon's own
   // color now, the same way those apps darken/highlight only the active
   // icon rather than boxing it in a tinted background. A top border still
-  // separates it from the page content above. While Lanes is the active
-  // page, it picks up Lanes' own dark grey theme (matching the chat above
-  // it) instead of staying white like every other page — only the
-  // currently-open page's own nav bar tints, not the app globally.
+  // separates it from the page content above. Lanes used to pick up its own
+  // dark grey theme here (matching the old dark chat above it) — Lanes is
+  // white like every other page now, so this bar no longer special-cases it.
   const TopNav = () => {
-    const onLanes = panel==="create";
     const renderTab = it => {
       const active = it.activeIds ? it.activeIds.includes(panel) : panel===it.id;
-      const color = active ? DPAD_COLORS[it.iconId] : (onLanes?"#72767d":"#9a9a9a");
+      const color = active ? DPAD_COLORS[it.iconId] : "#9a9a9a";
       return (
         <button key={it.id} onClick={()=>go(it.id)} title={it.label} style={{
           flex:1,display:"flex",alignItems:"center",justifyContent:"center",
           padding:"4px",border:"none",background:"transparent",cursor:"pointer",fontFamily:F}}>
-          {it.id==="profile" ? <CompassStar size={25} color={color}/> : it.iconId==="garage" ? <GarageDoorIcon size={25} color={color}/> : <DPadIcon id={it.iconId} color={color} size={25}/>}
+          {it.id==="profile" ? <ProfileIcon id="person" size={25} color={color}/> : it.iconId==="garage" ? <GarageDoorIcon size={25} color={color}/> : <DPadIcon id={it.iconId} color={color} size={25}/>}
         </button>
       );
     };
     return (
-    <div style={{flexShrink:0,display:"flex",alignItems:"center",padding:"9px 8px",paddingBottom:"calc(9px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+    <div style={{flexShrink:0,display:"flex",alignItems:"center",padding:"9px 8px",paddingBottom:"calc(9px + env(safe-area-inset-bottom, 0px))",background:"#fff",borderTop:"1px solid #ebebeb",zIndex:100}}>
       {TOPNAV_ITEMS.slice(0,2).map(renderTab)}
       {/* Center Drive button — a gold star inside a rounded square, raised
           slightly above the bar. The one way into Drive mode now that the
@@ -8605,16 +8734,18 @@ export default function SonoLane() {
     top3friend:   { onBack: ()=>setSubPanel("routes"), dark:true }};
   const TopBar = () => {
     const onLanes = panel==="create";
-    // Lanes' chat room is its own full page too (see lanesView) — the
-    // shared TopBar becomes its back button the same way BACK_PAGES does
-    // for Profile sub-pages, even though Lanes isn't driven by subPanel.
-    // No title/right action here since the chat room's own header (name,
-    // online status, etc.) already renders as page content underneath.
-    const backPage = (panel==="profile"||panel==="garage") ? BACK_PAGES[subPanel]
-      : (onLanes && lanesView==="room") ? { onBack: backFromLanesRoom }
-      : null;
+    // Lanes no longer has its own back button here — the Sono | You | Chats
+    // | Lanes tab strip under this bar (see LANES_TABS/goLanesTab) is the
+    // real way to move between its rooms/lists now, the same way tapping
+    // Routes/Events/Radio in that strip works, so a redundant ← that only
+    // ever led back to the chat list would just be one more thing to tap.
+    const backPage = (panel==="profile"||panel==="garage") ? BACK_PAGES[subPanel] : null;
     const onRadio = panel==="radio";
-    const dark = onLanes || onRadio || !!backPage?.dark;
+    // Lanes is a plain white page like everywhere else now — it used to
+    // force the whole top bar (and the chat below it) into a dark Discord-
+    // style theme; only Radio and the handful of `dark:true` BACK_PAGES
+    // entries still do that.
+    const dark = onRadio || !!backPage?.dark;
     // Filter icon replaces the ☰ menu only on Routes/Events, where there's
     // something to filter — every other page (Profile, Garage, Lanes,
     // Radio, every back page) keeps ☰ so Settings/Terms/About stay just as
@@ -8661,6 +8792,20 @@ export default function SonoLane() {
             ) : (
               backPage.title && <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:dark?"#fff":"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{backPage.title}</div>
             )
+          ) : (onLanes && lanesView==="room" && activeChan==="sono") ? (
+            // Co-Pilot picker — moved here from a small row inside the Sono
+            // room's own header so it's reachable straight from the top
+            // bar, the same place people already look for it on every
+            // other page (see renderSettingsBody's own bigger version of
+            // this same list under AI ▸ Select Co-Pilot). No longer nested
+            // under backPage since Lanes doesn't use that anymore.
+            <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,overflowX:"auto"}}>
+              {AI_PALS.map(p=>(
+                <button key={p.id} onClick={()=>setAiPalId(p.id)} title={p.name} style={{width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",background:aiPalId===p.id?p.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}>
+                  <CompassStar size={aiPalId===p.id?16:13} color={p.color}/>
+                </button>
+              ))}
+            </div>
           ) : panel==="routes" ? (
             <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/>Routes</div>
           ) : panel==="events" ? (
@@ -8678,10 +8823,10 @@ export default function SonoLane() {
                 value={laneUserSearch}
                 onChange={e=>setLaneUserSearch(e.target.value)}
                 placeholder="Find users…"
-                style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #4f545c",background:"#40444b",color:"#dcddde",fontSize:13,fontFamily:F,outline:"none"}}
+                style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
               />
             ) : (
-              <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 <DPadIcon id="chat" color={DPAD_COLORS.chat} size={16}/> Lanes
               </div>
             )
@@ -8939,7 +9084,7 @@ export default function SonoLane() {
       // through under the active bar, which read as a stray blank gap
       // (most visible as white under Lanes' dark chat). This way whatever
       // bar is showing runs its own background all the way to the true edge.
-      style={{display:"flex",flexDirection:"column",background:panel==="create"?"#36393f":"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",boxSizing:"border-box"}}>
+      style={{display:"flex",flexDirection:"column",background:"#fff",fontFamily:F,position:"fixed",inset:0,paddingTop:"env(safe-area-inset-top, 0px)",boxSizing:"border-box"}}>
       {/* iOS Safari specifically (not Chromium, which is why the swipe
           carousel tested fine here but still failed on a real iPhone) has
           its own native touch gesture recognizers that can claim a
@@ -8956,7 +9101,7 @@ export default function SonoLane() {
           Discovery Radius page, etc.) now just appear instantly, with no
           entrance animation — removed because of real-device crash
           reports; only the plain "pulse" spinner keyframe remains. */}
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}@media (prefers-reduced-motion: reduce){*{animation-duration:0.001s!important;animation-iteration-count:1!important;}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}img{-webkit-user-drag:none;-webkit-touch-callout:none;}input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}@media (prefers-reduced-motion: reduce){*{animation-duration:0.001s!important;animation-iteration-count:1!important;}}html,body{overscroll-behavior:none;background:#fff;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}img{-webkit-user-drag:none;-webkit-touch-callout:none;}input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
 
       {panel!=="drive" && <TopBar/>}
 
@@ -8975,6 +9120,30 @@ export default function SonoLane() {
               background:panel===id?OR:(panel==="radio"?"#1a1a1a":"#f3f3f3"),
               color:panel===id?"#fff":(panel==="radio"?"#8e9297":"#555")}}>{label}</button>
           ))}
+        </div>
+      )}
+
+      {/* Lanes tab strip — Sono | You | Chats | Lanes, right under the
+          shared TopBar, styled to match the Discover strip above. Replaces
+          the old first-four "toggle" bubbles inside the chat itself (see
+          LANES_TABS/goLanesTab/cycleLanesTab above) — swipe left on any
+          Lanes screen cycles through these same four in the same order. An
+          individual friend DM or specific lane room isn't one of the four,
+          so none show as active there (matches curLanesTab() returning
+          null), but the strip still lets you jump straight to one. */}
+      {panel==="create" && (
+        <div style={{display:"flex",gap:6,padding:"8px 14px",flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
+          {LANES_TABS.map(id=>{
+            const label = id==="sono" ? pal.name : id==="notifications" ? "You" : id==="chats" ? "Chats" : "Lanes";
+            const active = curLanesTab()===id;
+            return (
+              <button key={id} onClick={()=>{vibrate();goLanesTab(id);}} style={{
+                flex:1,padding:"7px 6px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:F,
+                fontSize:13,fontWeight:700,
+                background:active?OR:"#f3f3f3",
+                color:active?"#fff":"#555"}}>{label}</button>
+            );
+          })}
         </div>
       )}
 
