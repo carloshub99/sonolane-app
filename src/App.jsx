@@ -1165,6 +1165,19 @@ const FilterIcon = ({ size=24, color="currentColor" }) => (
   </svg>
 );
 
+/* ── InboxIcon — simple line-art envelope, matching the reference picture
+   used for the Inbox tab (formerly "Chats"): a rounded-rect envelope
+   outline with a single V-fold flap, drawn in the same hand-authored-SVG
+   style as every other icon here (DPadIcon, JukeboxIcon, SearchIcon, …)
+   instead of embedding the uploaded photo, so it stays crisp at any size
+   and recolors like the rest of the icon set. ── */
+const InboxIcon = ({ size=24, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <rect x="2.5" y="5" width="19" height="14" rx="2.4" stroke={color} strokeWidth="1.8" strokeLinejoin="round"/>
+    <path d="M3.5 6.5L11.1 12.8C11.6 13.2 12.4 13.2 12.9 12.8L20.5 6.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 /* ── Achievement sound — triumphant fanfare ── */
 const playAchievementSound = () => {
   try {
@@ -2251,6 +2264,15 @@ export default function SonoLane() {
   // every other way of opening Lanes (see go()) so it never leaks into an
   // unrelated chat opened afterward.
   const [lanesRoomOrigin, setLanesRoomOrigin] = useState(null);
+  // Car Details (subPanel==="car") lives under the Garage tab, but it can be
+  // opened from two different places: Profile's car-hero banner (which jumps
+  // over to Garage just to show it) or Garage's own car-switcher grid (where
+  // you're already on Garage). The back button should return wherever you
+  // actually came from — Profile in the first case, Garage's home grid in the
+  // second — so this flag records "came from Profile" and is consumed by
+  // BACK_PAGES.car's onBack below, then cleared so it doesn't leak into a
+  // later Car Details visit opened directly from Garage.
+  const [carDetailsFromProfile, setCarDetailsFromProfile] = useState(false);
   const [laneMsgs,     setLaneMsgs]     = useState({}); // {laneId: [{id,text,user,initials,color,ts,isVoice,voiceSeconds}]}
   const [showCreateLane,setShowCreateLane]=useState(false);
   const [voiceChatActive, setVoiceChatActive] = useState(null); // chanId currently in voice
@@ -2372,7 +2394,7 @@ export default function SonoLane() {
   const [noteText,     setNoteText]     = useState("");
   const [sonoMode,     setSonoMode]     = useState("notes");
   const [aiInput,      setAiInput]      = useState("");
-  const [aiChat,       setAiChat]       = useState([{role:"ai",text:"Ready. Say \"Sono\" to ask me anything."}]);
+  const [aiChat,       setAiChat]       = useState([]); // starts empty — no canned "Say Sono" greeting message
   // Drive mode's 3 stacked widget slots (top/mid/bottom of the widgets
   // column) — persisted so your picks survive closing the app, same as
   // every other saved preference. Standard setting is only 2 active
@@ -5010,7 +5032,7 @@ export default function SonoLane() {
              case to render — the screen never changed, even though
              BACK_PAGES.car still made the TopBar show a back button. ── */}
         <div style={{margin:"14px 16px 0",borderRadius:18,overflow:"hidden",background:carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css,flexShrink:0}}>
-          <button onClick={()=>{go("garage");setTimeout(()=>setSubPanel("car"),100);}} style={{width:"100%",padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
+          <button onClick={()=>{setCarDetailsFromProfile(true);go("garage");setTimeout(()=>setSubPanel("car"),100);}} style={{width:"100%",padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
             {carAvatarMode==="photo" && carAvatarPhoto
               ? <img src={carAvatarPhoto} alt="" style={{width:104,height:104,borderRadius:16,objectFit:"cover",border:"2px solid rgba(255,255,255,0.85)",boxShadow:"0 6px 20px rgba(0,0,0,0.4)"}}/>
               : <CarSVG color={carColor} mods={carMods} size={140} styleId={carBodyStyle}/>}
@@ -5431,10 +5453,10 @@ export default function SonoLane() {
             <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setGarageMemberAction(null)}>
               <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,paddingBottom:26}} onClick={e=>e.stopPropagation()}>
                 <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                <button onClick={()=>{const fr=garageMemberAction;setGarageMemberAction(null);setViewedProfile(fr);}} title={"View "+garageMemberAction.name+"'s profile"} style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,width:"100%",background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",padding:0}}>
                   <FriendAvatar fr={garageMemberAction} size={44} fontSize={16}/>
                   <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{garageMemberAction.name}</div>
-                </div>
+                </button>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>{setCallingFriend({friend:garageMemberAction,status:"ringing",secs:0});setGarageMemberAction(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
                   <button onClick={()=>{const fr=garageMemberAction;setGarageMemberAction(null);setActiveChan(fr.id);go("create",{lanesRoom:true,lanesGarageOrigin:{garageId:g.id}});}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
@@ -5901,7 +5923,7 @@ export default function SonoLane() {
           <div style={{display:"flex",gap:14,overflowX:"auto",padding:"4px 14px 14px",scrollSnapType:"x proximity"}}>
             {myGarageCards.map(c=>(
               <div key={c.key} style={{position:"relative",flexShrink:0,width:158,scrollSnapAlign:"start"}}>
-                <button onClick={()=>{if(!c.isActive){vibrate();switchToCar(c.id);}setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"22px 12px 16px",borderRadius:20,border:c.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:c.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                <button onClick={()=>{if(!c.isActive){vibrate();switchToCar(c.id);}setCarDetailsFromProfile(false);setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"22px 12px 16px",borderRadius:20,border:c.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:c.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
                   <div style={{width:118,height:118,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:10,flexShrink:0}}>
                     {c.avatarMode==="photo" && c.avatarPhoto
                       ? <img src={c.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
@@ -7409,8 +7431,8 @@ export default function SonoLane() {
               {friends.length===0 ? (
                 !laneUserSearch.trim() && (
                   <div style={{textAlign:"center",color:"#8a8f98",padding:"30px 20px"}}>
-                    <div style={{fontSize:30,marginBottom:8}}>💬</div>
-                    <div style={{fontSize:14,fontWeight:700,color:"#8a8f98"}}>No friend chats yet</div>
+                    <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><InboxIcon size={30} color="#8a8f98"/></div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#8a8f98"}}>Your inbox is empty</div>
                     <div style={{fontSize:12,marginTop:4,lineHeight:1.6}}>Add some friends to start messaging them here.</div>
                   </div>
                 )
@@ -7539,8 +7561,13 @@ export default function SonoLane() {
               // into the header content.
               <><span style={{fontSize:16}}>#</span><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>Sono AI · {pal.name}</div><div style={{fontSize:11,color:pal.color}}>{pal.desc}</div></div></>
             ) : curFriend ? (
-              <><FriendAvatar fr={curFriend} size={26} fontSize={10}/>
-              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>{curFriend.name}</div><div style={{fontSize:11,color:"#23a55a"}}>● Online</div></div></>
+              // Every account is public now, so tapping the friend's own
+              // name/avatar right here in their DM header opens their full
+              // profile — this used to be plain, non-interactive text.
+              <button onClick={()=>setViewedProfile(curFriend)} title={"View "+curFriend.name+"'s profile"} style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0,background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",padding:0}}>
+                <FriendAvatar fr={curFriend} size={26} fontSize={10}/>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:700,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{curFriend.name}</div><div style={{fontSize:11,color:"#23a55a"}}>● Online</div></div>
+              </button>
             ) : null}
             {/* Voice chat indicator in header */}
             {voiceChatActive===activeChan && (
@@ -7612,12 +7639,24 @@ export default function SonoLane() {
                   {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:15,fontWeight:700,color:"#8a8f98",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
                 </div>
               )}
-              {allMsgs.map(msg=>(
+              {allMsgs.map(msg=>{
+                // Every account is public now — tapping a message's avatar or
+                // name (anyone but yourself) opens their profile. A friend DM
+                // is always with curFriend; a lane's other senders don't carry
+                // a real account id (they're simulated riders), so fall back
+                // to a minimal profile built from the message itself, same
+                // pattern as openAuthorProfile's own fallback.
+                const msgSender = msg.mine ? null : (curFriend || {id:msg.user||"rider", name:msg.user||"Rider", initials:msg.initials||"?", color:msg.color||"#6366f1"});
+                return (
                 <div key={msg.id} style={{display:"flex",gap:9,marginBottom:6,padding:"1px 0",flexDirection:msg.mine?"row-reverse":"row"}}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:msg.mine?"linear-gradient(135deg,"+OR+",#fb923c)":msg.color||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>{msg.initials||"?"}</div>
+                  <button onClick={()=>msgSender&&setViewedProfile(msgSender)} disabled={!msgSender} title={msgSender?"View "+msgSender.name+"'s profile":undefined} style={{width:30,height:30,borderRadius:"50%",background:msg.mine?"linear-gradient(135deg,"+OR+",#fb923c)":msg.color||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0,border:"none",padding:0,cursor:msgSender?"pointer":"default",fontFamily:F}}>{msg.initials||"?"}</button>
                   <div style={{flex:1,maxWidth:"78%"}}>
                     <div style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:2,flexDirection:msg.mine?"row-reverse":"row"}}>
-                      <span style={{fontSize:13,fontWeight:700,color:msg.mine?OR:msg.color||"#111"}}>{msg.user||"Rider"}</span>
+                      {msgSender ? (
+                        <button onClick={()=>setViewedProfile(msgSender)} title={"View "+msgSender.name+"'s profile"} style={{fontSize:13,fontWeight:700,color:msg.color||"#111",background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:F}}>{msg.user||"Rider"}</button>
+                      ) : (
+                        <span style={{fontSize:13,fontWeight:700,color:OR}}>{msg.user||"Rider"}</span>
+                      )}
                       <span style={{fontSize:11,color:"#8a8f98"}}>{msg.ts}</span>
                     </div>
                     {msg.isVoice ? (
@@ -7648,16 +7687,15 @@ export default function SonoLane() {
                     )}
                   </div>
                 </div>
-              ))}
+              );})}
             </>)}
           </div>
 
-          {/* Input bar — notifications is a plain feed (no composer at all),
-              but it's now an individual room like a friend DM rather than a
-              fixed tab (see the "notifications as a chat bubble with
-              yourself" row in the Chats list below), so it still needs its
-              own way back — just the ☰ button, with nothing to type into. */}
-          {activeChan!=="notifications" ? (
+          {/* Input bar — notifications is a plain feed, so it gets no
+              composer at all; its way back is the shared TopBar's ← (see
+              onLanesRoomBack in <TopBar/>), same as any other individual
+              room now, so there's nothing else to render here for it. */}
+          {activeChan!=="notifications" && (
             <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#fff"}}>
 
               {/* Voice chat banner — shows when VC is active in this channel */}
@@ -7764,13 +7802,11 @@ export default function SonoLane() {
                 );
               })() : (
               <div style={{display:"flex",alignItems:"center",gap:6,opacity:laneLocked?0.6:1}}>
-                {/* A second, always-reachable way back besides the shared
-                    TopBar's back arrow above — same destination either way
-                    (see backFromLanesRoom): the Shared Garage page this
-                    chat was opened from, or the plain chat list. */}
-                <button onClick={backFromLanesRoom} title="Back" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>
-                  ☰
-                </button>
+                {/* No back button down here anymore — the shared TopBar's ←
+                    (see onLanesRoomBack in <TopBar/>) is the one, consistent
+                    way back for any individual room now, same as every
+                    other back-button page in the app, instead of a
+                    hard-to-spot ☰ tucked into the composer. */}
 
                 {/* Text bar */}
                 <div style={{flex:1,display:"flex",alignItems:"center",gap:6,background:"#f3f3f3",borderRadius:8,padding:"4px 6px 4px 12px",minWidth:0}}>
@@ -7797,12 +7833,6 @@ export default function SonoLane() {
                 )}
               </div>
               )}
-            </div>
-          ) : (
-            <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#fff"}}>
-              <button onClick={backFromLanesRoom} title="Back" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>
-                ☰
-              </button>
             </div>
           )}
         </div>
@@ -8793,7 +8823,7 @@ export default function SonoLane() {
   // than the page drawing a second header row underneath. `back`/`onBack`
   // handlers were hoisted up next to `go()` for exactly this reason.
   const BACK_PAGES = {
-    car:          { onBack: ()=>setSubPanel(null), right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
+    car:          { onBack: ()=>{ if(carDetailsFromProfile){ setCarDetailsFromProfile(false); go("profile"); } else { setSubPanel(null); } }, right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
     editcar:      { onBack: ()=>setSubPanel("car"), title:"Edit Car", right: {label:"Save", onClick:saveEditCar} },
     createroute:  { onBack: cancelCreateRoute, title: editingRouteId?"Edit Route":"Create Route", right: {label:"Save", onClick:saveCreateRoute} },
     sharedgarage: { onBack: cancelSharedGarage, right: {label:"💬 Chat", onClick:openSharedGarageChat} },
@@ -8806,11 +8836,18 @@ export default function SonoLane() {
     top3friend:   { onBack: ()=>setSubPanel("routes"), dark:true }};
   const TopBar = () => {
     const onLanes = panel==="create";
-    // Lanes no longer has its own back button here — the Sono | Notifications
-    // | Chats | Lanes tab strip under this bar (see LANES_TABS/goLanesTab) is
-    // the real way to move between its rooms/lists now, the same way tapping
-    // Routes/Events/Radio in that strip works, so a redundant ← that only
-    // ever led back to the chat list would just be one more thing to tap.
+    // The three fixed Lanes tabs (Chats/Sono/Lanes — see LANES_TABS/
+    // goLanesTab) don't get a back button here, since the tab strip under
+    // this bar is the real way to move between them, same as tapping
+    // Routes/Events/Radio in that strip works. But an individual room —a
+    // friend DM, a lane, or the notifications self-chat — isn't one of
+    // those three, and used to have no way back at all except a small ☰
+    // tucked into the bottom of the composer (or, for notifications, its
+    // own composer-less footer bar) — easy to miss since every other "back"
+    // in the app is this same ← up here instead. Both of those are gone now
+    // in favor of just always showing this bar's usual back arrow for any
+    // individual room, same as everywhere else in the app.
+    const onLanesRoomBack = onLanes && lanesView==="room" && activeChan!=="sono";
     const backPage = (panel==="profile"||panel==="garage") ? BACK_PAGES[subPanel] : null;
     const onRadio = panel==="radio";
     // Lanes and the top-level SonoLane Radio page are plain white pages like
@@ -8838,8 +8875,8 @@ export default function SonoLane() {
               instead of the generic Route Post/Event sheet — chat is what
               this page is for, so + here should do the chat thing (Jakob's
               Law: a + inside a chat list is expected to start a chat). */}
-          {backPage ? (
-            <button onClick={backPage.onBack} title="Back" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+          {backPage || onLanesRoomBack ? (
+            <button onClick={backPage ? backPage.onBack : backFromLanesRoom} title="Back" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
           ) : (
             <button onClick={()=>(onLanes&&lanesView==="list") ? setShowCreateLane(true) : setShowQuickCreate(true)} title={(onLanes&&lanesView==="list") ? "New Lane" : "Create"} style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:40,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,flexShrink:0}}>+</button>
           )}
@@ -8901,7 +8938,7 @@ export default function SonoLane() {
               />
             ) : (
               <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                <DPadIcon id="chat" color={DPAD_COLORS.chat} size={16}/> Lanes
+                {curLanesTab()==="chats" ? (<><InboxIcon size={16} color={DPAD_COLORS.chat}/> Inbox</>) : (<><DPadIcon id="chat" color={DPAD_COLORS.chat} size={16}/> Lanes</>)}
               </div>
             )
           ) : null}
@@ -8948,7 +8985,7 @@ export default function SonoLane() {
 
               {panel==="garage" && !subPanel && (<>
                 {(1+myCars.length) < MAX_CARS && (
-                  <button onClick={()=>{setShowQuickCreate(false);addNewCar();setSubPanel("car");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                  <button onClick={()=>{setShowQuickCreate(false);addNewCar();setCarDetailsFromProfile(false);setSubPanel("car");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                     <GarageDoorIcon size={20} color={OR}/>
                     <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Add Another Car</div>
                   </button>
@@ -9211,7 +9248,7 @@ export default function SonoLane() {
       {panel==="create" && (
         <div style={{display:"flex",gap:6,padding:"8px 14px",flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
           {LANES_TABS.map(id=>{
-            const label = id==="sono" ? pal.name : id==="chats" ? "Chats" : "Lanes";
+            const label = id==="sono" ? pal.name : id==="chats" ? "Inbox" : "Lanes";
             const active = curLanesTab()===id;
             return (
               <button key={id} onClick={()=>{vibrate();goLanesTab(id);}} style={{
