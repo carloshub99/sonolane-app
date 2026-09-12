@@ -50,8 +50,7 @@ const memStore = (() => {
     removeItem: (k) => {
       if (hasLS) { try { window.localStorage.removeItem(k); return; } catch { /* fall through */ } }
       delete fallback[k];
-    },
-  };
+    }};
 })();
 
 // Dashcam footage storage. Recorded clips are real video Blobs — localStorage
@@ -108,9 +107,16 @@ const clipsDB = (() => {
           tx.oncomplete = res; tx.onerror = () => rej(tx.error);
         });
       } catch { /* nothing to clean up if the DB never opened */ }
-    },
-  };
+    }};
 })();
+
+// Small haptic tap — real hardware feedback (iOS Safari's PWA/home-screen
+// mode and most Android browsers support the vibration API; anywhere else
+// this just silently no-ops, so it's always safe to call). Used sparingly:
+// entering/leaving Drive mode, and switching the Garage/Radio/Routes/
+// Events/History toggle on Profile — moments that already feel like a
+// physical "click" into a different mode, not on every ordinary tap.
+const vibrate = (ms=15) => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
 
 // A useState that automatically saves to (and loads from) memStore under
 // `key`, so profile/car customization survives closing and reopening the
@@ -162,8 +168,7 @@ const kvDB = (() => {
           tx.oncomplete = res; tx.onerror = () => rej(tx.error);
         });
       } catch { /* IndexedDB unavailable (e.g. sandboxed preview) — falls back to whatever usePersistedIDBState already had in memory */ }
-    },
-  };
+    }};
 })();
 
 // Same shape/contract as usePersistedState (drop-in replacement) but backed
@@ -372,8 +377,7 @@ const SD_ROUTE_POSTS = [
   { title:"Torrey Pines Reserve Hike", type:"hike",     distance:"14 mi", body:"North county drive to Torrey Pines — coffee stop before the trailhead, then park right at the reserve.", stops:["Food: Torrey Pines Café","Park: Torrey Pines State Reserve Lot"], author:"FreewayFiona"    },
 ].map((r,i)=>({
   id:"sd_route_"+i, title:r.title, type:r.type, body:r.body, distance:r.distance, stops:r.stops,
-  highlights:"", photos:[], fromSaved:false, likes:40+i*23, authorId:"me", authorName:"You",
-}));
+  highlights:"", photos:[], fromSaved:false, likes:40+i*23, authorId:"me", authorName:"You"}));
 // The same 10 San Diego routes, but shaped for the "My Routes" created-routes
 // list (routes state) instead of the community feed (posts state) — so
 // "My Routes" shows you as having actually created all 10, not just posted
@@ -381,8 +385,7 @@ const SD_ROUTE_POSTS = [
 // feed-post copies above.
 const SD_ROUTES = SD_ROUTE_POSTS.map((r,i)=>({
   id:"sd_myroute_"+i, title:r.title, type:r.type, distance:r.distance, bio:r.body, stops:r.stops,
-  color:[OR,"#22c55e","#6366f1","#a855f7"][i%4], public:true,
-}));
+  color:[OR,"#22c55e","#6366f1","#a855f7"][i%4], public:true}));
 // Simulated vehicle + bio an invited friend shows up with once they "accept"
 // an invite into one of your Shared Garages (no real multi-user backend, so
 // this mirrors the app's existing pattern of a simulated reply — same idea
@@ -445,13 +448,11 @@ function RouteMap({ route, height = 140, interactive = false, color = "#f97316" 
       touchZoom: interactive,
       boxZoom: interactive,
       keyboard: interactive,
-      attributionControl: interactive,
-    });
+      attributionControl: interactive});
     mapRef.current = map;
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
-      subdomains: "abc",
-    }).addTo(map);
+      subdomains: "abc"}).addTo(map);
     if (points.length > 1) {
       L.polyline(points, { color, weight: 4, opacity: 0.85 }).addTo(map);
     }
@@ -460,8 +461,7 @@ function RouteMap({ route, height = 140, interactive = false, color = "#f97316" 
         html: `<div style="width:24px;height:24px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font:800 12px sans-serif;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">${i + 1}</div>`,
         className: "",
         iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
+        iconAnchor: [12, 12]});
       const marker = L.marker(pt, { icon, interactive }).addTo(map);
       if (interactive && stops[i]) marker.bindPopup(stops[i]);
     });
@@ -621,8 +621,7 @@ const CAR_MODS = {
   "Body Kit":["None","Widebody"],
   Spoiler:["None","Lip","Duck Tail","GT Wing"],
   Tint:["None","Light","Medium","Dark","Limo"],
-  Exhaust:["Stock","Dual","Quad"],
-};
+  Exhaust:["Stock","Dual","Quad"]};
 // Simulated Spotify "Now Playing" queue — a real Spotify connection needs a
 // developer OAuth key we don't have here, so this drives an actually-ticking
 // mini player (real elapsed time, auto-advances tracks) once you tap Connect.
@@ -652,8 +651,7 @@ const SD_EVENTS = [
   { title:"North Park Vinyl & Vintage Market", type:"market",   date:"2030-10-25", address:"North Park, San Diego, CA",                   desc:"Crate-diggers' market of vinyl, vintage clothing, and local record labels spread across North Park's main strip." },
 ].map((e,i)=>({
   id:"sd_event_"+i, title:e.title, type:e.type, desc:e.desc, address:e.address, date:e.date,
-  icon:EV_ICONS[e.type]||"📍", photos:[], authorId:"me", authorName:"You", rsvps:20+i*7,
-}));
+  icon:EV_ICONS[e.type]||"📍", photos:[], authorId:"me", authorName:"You", rsvps:20+i*7}));
 // Premade garage-banner backgrounds — users can pick one of these instead of uploading a photo.
 const CAR_BANNERS = [
   {id:"midnight", label:"Midnight",      css:"linear-gradient(180deg,#1a1a1a 0%,#111 60%,#0d0d0d 100%)"},
@@ -670,8 +668,7 @@ const callClaude = async (msgs, sys) => {
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:300, system:sys, messages:msgs }),
-    });
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:300, system:sys, messages:msgs })});
     const d = await r.json();
     return d.content?.[0]?.text || "No response.";
   } catch { return "Connection error."; }
@@ -683,8 +680,7 @@ const STARTUP_SOUNDS = {
   engine:   {label:"Engine Rev",     notes:[110,165,220,330]},
   digital:  {label:"Digital Beep",   notes:[880,1175]},
   warm:     {label:"Warm Tone",      notes:[392,494,587,659]},
-  none:     {label:"Silent",         notes:[]},
-};
+  none:     {label:"Silent",         notes:[]}};
 const playStartupSound = (key) => {
   const cfg = STARTUP_SOUNDS[key] || STARTUP_SOUNDS.classic;
   if (!cfg.notes.length) return;
@@ -747,8 +743,7 @@ const BODY_FAMILY = {
   shooting_brake: {x0:14, x1:128, bodyTop:40, roofY:14, roofX:[54,60,90,98],   wheelR:10, wInset:21, low:true, longRoof:true},
   hyper:          {x0:14, x1:130, bodyTop:48, roofY:20, roofX:[60,66,84,92],   wheelR:11, wInset:23, low:true, wide:true},
   muscle:         {x0:8,  x1:132, bodyTop:44, roofY:16, roofX:[76,82,98,104],  wheelR:11, wInset:23, low:true, longHood:true},
-  limousine:      {x0:2,  x1:138, bodyTop:38, roofY:12, roofX:[44,50,96,104],  wheelR:9,  wInset:17, trunk:true, stretch:true},
-};
+  limousine:      {x0:2,  x1:138, bodyTop:38, roofY:12, roofX:[44,50,96,104],  wheelR:9,  wInset:17, trunk:true, stretch:true}};
 
 function OpenWheelSVG({ color="#f97316", size=80 }) {
   return (
@@ -942,6 +937,43 @@ function JukeboxIcon({ size=20, color="#111" }) {
   );
 }
 
+/* ── WalkieTalkieIcon — line-art handheld radio glyph (antenna, top knob,
+   screen, speaker grille, side buttons), replaces the 📡 emoji everywhere
+   CB Radio shows up so it matches the rest of the UI's hand-drawn stroke
+   icon style instead of relying on an emoji glyph. Modeled directly on the
+   reference walkie-talkie picture provided. ── */
+function WalkieTalkieIcon({ size=20, color="#111" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* antenna */}
+      <path d="M11 8V3.6a1.4 1.4 0 0 1 2.8 0V6" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      {/* top knob, next to the antenna base */}
+      <rect x="13.6" y="6.4" width="2.6" height="2.4" rx="0.6" stroke={color} strokeWidth="1.3"/>
+      {/* body */}
+      <rect x="5.4" y="8.6" width="13.2" height="13.4" rx="2.2" stroke={color} strokeWidth="1.6" fill={color+"10"}/>
+      {/* side buttons — one bump on the left, two stacked on the right */}
+      <rect x="3.6" y="10.8" width="1.8" height="4" rx="0.7" stroke={color} strokeWidth="1.2"/>
+      <rect x="18.6" y="10" width="1.8" height="2.8" rx="0.7" stroke={color} strokeWidth="1.2"/>
+      <rect x="18.6" y="13.6" width="1.8" height="2.8" rx="0.7" stroke={color} strokeWidth="1.2"/>
+      {/* screen */}
+      <rect x="7.6" y="10.6" width="8.8" height="4.4" rx="0.8" stroke={color} strokeWidth="1.3"/>
+      {/* speaker grille */}
+      <path d="M7.6 17.4h8.8M7.6 19.1h8.8M7.6 20.8h5.6" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+/* ── MapPinIcon — a plain map-pin/location marker, replacing the folded-
+   map glyph and 🗺️ emoji wherever they stood in for "open the map". ── */
+function MapPinIcon({ size=20, color="#111" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 21.5S5 14.4 5 9.5a7 7 0 0 1 14 0c0 4.9-7 12-7 12Z" stroke={color} strokeWidth="1.7" strokeLinejoin="round" fill={color+"10"}/>
+      <circle cx="12" cy="9.5" r="2.6" stroke={color} strokeWidth="1.5" fill="none"/>
+    </svg>
+  );
+}
+
 /* ── ListBarsIcon — 3-bar "hamburger" list glyph, used on the Top 3 Friends
    header bar to jump to the full Friends tab. ── */
 function ListBarsIcon({ size=16, color="#111" }) {
@@ -1069,7 +1101,7 @@ function ProfileIcon({ id, size=20, color="#8a8f98" }) {
    Feed = routes shared → winding road (yellow), Create = Lanes chat →
    message bubble (red), Profile = car (brand orange), Drive = live map →
    map icon (green), Map = Events → calendar+star (blue). ── */
-const DPAD_COLORS = { road:"#f5c518", chat:"#ef4444", profile:OR, map:"#22c55e", event:"#3b82f6" };
+const DPAD_COLORS = { road:"#f5c518", chat:"#ef4444", profile:OR, map:"#22c55e", event:"#3b82f6", garage:OR };
 const DPadIcon = ({ id, color, size=17 }) => {
   const p = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};
   if(id==="road") return (
@@ -1090,7 +1122,10 @@ const DPadIcon = ({ id, color, size=17 }) => {
     </svg>
   );
   if(id==="map") return (
-    <svg {...p}><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+    <svg {...p}>
+      <path d="M12 21.5S5 14.4 5 9.5a7 7 0 0 1 14 0c0 4.9-7 12-7 12Z"/>
+      <circle cx="12" cy="9.5" r="2.6"/>
+    </svg>
   );
   if(id==="event") return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -1114,6 +1149,19 @@ const SearchIcon = ({ size=24, color="currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <circle cx="10" cy="10" r="7" stroke={color} strokeWidth="3.6"/>
     <line x1="15.3" y1="15.3" x2="21" y2="21" stroke={color} strokeWidth="3.6" strokeLinecap="round"/>
+  </svg>
+);
+
+/* ── FilterIcon — three sliders/tuning lines, used for the top-right filter
+   button on Routes/Events (replacing the ☰ menu on just those two pages). ── */
+const FilterIcon = ({ size=24, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <line x1="3" y1="6" x2="21" y2="6" stroke={color} strokeWidth="2.2" strokeLinecap="round"/>
+    <line x1="3" y1="12" x2="21" y2="12" stroke={color} strokeWidth="2.2" strokeLinecap="round"/>
+    <line x1="3" y1="18" x2="21" y2="18" stroke={color} strokeWidth="2.2" strokeLinecap="round"/>
+    <circle cx="8" cy="6" r="2.4" fill="#fff" stroke={color} strokeWidth="2"/>
+    <circle cx="16" cy="12" r="2.4" fill="#fff" stroke={color} strokeWidth="2"/>
+    <circle cx="10" cy="18" r="2.4" fill="#fff" stroke={color} strokeWidth="2"/>
   </svg>
 );
 
@@ -1257,8 +1305,7 @@ function AuthScreen() {
         const { error: err } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { name: name.trim(), region: region.trim(), username: u } },
-        });
+          options: { data: { name: name.trim(), region: region.trim(), username: u } }});
         if (err) throw err;
         setClaimedHandle(u);
         setCheckEmail(true);
@@ -1374,13 +1421,19 @@ export default function SonoLane() {
   const currentUserId = session?.user?.id || null;
 
   /* state */
-  const [panel,        setPanel]        = useState("profile");
-  const [discoverTab,  setDiscoverTab]  = useState("routes"); // "routes" | "events" — toggle within the combined Discover page
+  const [panel,        setPanel]        = useState("routes"); // app opens straight to the Routes feed now, not Profile
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false); // left-side Settings drawer — swipe right from Routes opens this
   // Shared top bar (+ quick-create / ☰ menu) — lives at the app shell level
   // now instead of inside Profile alone, so every page (Profile, Discover,
   // Lanes) shows the same persistent bar up top, matching the persistent
   // TopNav down below.
   const [showQuickCreate, setShowQuickCreate] = useState(false);
+  // Filter side panel — opened by the filter icon that replaces ☰ in the
+  // shared TopBar on Routes/Events only. Slides in from the right with
+  // whichever page's own category chips (Routes' FEED_CATS or Events'
+  // EV_ICONS types) — the same filter state each page already had, just
+  // moved out of an inline chip row and into this panel instead.
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showInfoDrawer,  setShowInfoDrawer]  = useState(false);
   const [infoDrawerPage,  setInfoDrawerPage]  = useState(null); // null (list) | "tos" | "privacy" | "about" | "help"
   const [confirmSignOut,  setConfirmSignOut]  = useState(false);
@@ -1475,8 +1528,7 @@ export default function SonoLane() {
     bannerPhoto:carBannerPhoto, bannerPreset:carBannerPreset, showInfoHome:carShowInfoHome,
     bio:carBio, plate:carPlate, regDate:carRegDate, mileage:carMileage,
     privateNotes:carPrivateNotes, privatePhotos:carPrivatePhotos,
-    exteriorPhotos:carExteriorPhotos, interiorPhotos:carInteriorPhotos,
-  });
+    exteriorPhotos:carExteriorPhotos, interiorPhotos:carInteriorPhotos});
   const applyCarSnapshot = (car) => {
     setCarName(car.name||""); setCarColor(car.color||"#f97316"); setCarModel(car.model||"Sedan");
     setCarBodyStyle(car.bodyStyle||"sedan"); setCarBrand(car.brand??null); setCarMods(car.mods||{});
@@ -1529,18 +1581,25 @@ export default function SonoLane() {
     }
   };
   // Publish your currently active/displayed car's look (body style, color,
-  // mods) onto your real profile row, so it shows up correctly on your Top
-  // 3 Friends' Top3Friend page for THEM — see the friends fetch above,
-  // which reads these same columns back for each friend. Previously friends
-  // had no real car data to show at all, so that page fell back to a
-  // random-looking deterministic car derived from their id. No-op in local
-  // demo mode (no real accounts to publish this to).
+  // mods, and now also avatar mode/photo) onto your real profile row, so it
+  // shows up correctly on your Top 3 Friends' Top3Friend page for THEM —
+  // see the friends fetch above, which reads these same columns back for
+  // each friend — and so it comes back correctly on the hydration effect
+  // above if you sign in on another device or lose local storage. Car
+  // avatar mode/photo previously had no server column and no sync at all,
+  // which is what "car avatar doesn't save when I sign out" actually was:
+  // signing out and back in on the same device was always fine (it's
+  // plain local storage, untouched by sign-out), but nothing ever made it
+  // durable beyond that one device/browser. No-op in local demo mode (no
+  // real accounts to publish this to); also a no-op (silently, same as
+  // every other field here) until car_avatar_mode/car_avatar_photo columns
+  // exist on the real profiles table.
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserId) return;
     supabase.from("profiles").update({
       car_body_style: carBodyStyle, car_color: carColor, car_mods: carMods,
-    }).eq("id", currentUserId);
-  }, [currentUserId, carBodyStyle, carColor, carMods]);
+      car_avatar_mode: carAvatarMode, car_avatar_photo: carAvatarPhoto}).eq("id", currentUserId);
+  }, [currentUserId, carBodyStyle, carColor, carMods, carAvatarMode, carAvatarPhoto]);
   // Persisted (used to be plain useState, so adding a friend never survived
   // closing the app — the same bug as "following" not saving, below).
   const [friends,      setFriends]      = usePersistedState("sl_friends", []);
@@ -1569,7 +1628,27 @@ export default function SonoLane() {
         setUserHandle(prof.handle || "");
         setUserBio(prof.bio || "");
         setUserRegion(prof.region || "");
-        setProfilePhoto(prof.photo_url || null);
+        // Only ever apply a REAL server value here, never a missing one —
+        // profilePhoto/car avatar are set immediately on this device the
+        // moment you pick a photo, but only reach the server on an explicit
+        // Save (profile photo) or the fire-and-forget sync below (car
+        // avatar). Unconditionally writing `prof.photo_url || null` meant
+        // signing in again — even on this same device — before that save
+        // had landed would wipe a real local photo back to null the moment
+        // this hydration ran. Same reasoning for the car fields: this used
+        // to only ever PUSH car_body_style/car_color/car_mods to the
+        // server and never pull them back down at all, so switching
+        // devices (or losing local storage) lost your car's look even
+        // though it was sitting right there in your profile row; car
+        // avatar mode/photo previously had no server column at all, so it
+        // couldn't survive that either — see the sync effect below, which
+        // now also pushes those two fields up.
+        if (prof.photo_url) setProfilePhoto(prof.photo_url);
+        if (prof.car_body_style) setCarBodyStyle(prof.car_body_style);
+        if (prof.car_color) setCarColor(prof.car_color);
+        if (prof.car_mods) setCarMods(prof.car_mods);
+        if (prof.car_avatar_mode) setCarAvatarMode(prof.car_avatar_mode);
+        if (prof.car_avatar_photo) setCarAvatarPhoto(prof.car_avatar_photo);
       }
       const { data: rows } = await supabase
         .from("friends")
@@ -1588,8 +1667,7 @@ export default function SonoLane() {
           // friends, which never have a real row to fetch this from).
           carBodyStyle: r.profiles.car_body_style || null,
           carColor: r.profiles.car_color || null,
-          carMods: r.profiles.car_mods || null,
-        })));
+          carMods: r.profiles.car_mods || null})));
       }
     })();
   }, [currentUserId]);
@@ -1704,16 +1782,14 @@ export default function SonoLane() {
       // column name. The app's own event objects keep using "desc"
       // everywhere else; this is just the wire format for this one table.
       title: ev.title, type: ev.type, description: ev.desc || "", address: ev.address || "",
-      event_date: ev.date || "", icon: ev.icon || "📍", photos: ev.photos || [], rsvps: 0,
-    }).select("id").single();
+      event_date: ev.date || "", icon: ev.icon || "📍", photos: ev.photos || [], rsvps: 0}).select("id").single();
     return data ? data.id : null;
   };
   const updateEventSupabase = async (sbId, ev) => {
     if (!isSupabaseConfigured || !currentUserId || !sbId) return;
     await supabase.from("events").update({
       title: ev.title, type: ev.type, description: ev.desc || "", address: ev.address || "",
-      event_date: ev.date || "", icon: ev.icon || "📍", photos: ev.photos || [],
-    }).eq("id", sbId).eq("author_id", currentUserId);
+      event_date: ev.date || "", icon: ev.icon || "📍", photos: ev.photos || []}).eq("id", sbId).eq("author_id", currentUserId);
   };
   const deleteEventSupabase = async (sbId) => {
     if (!isSupabaseConfigured || !currentUserId || !sbId) return;
@@ -1727,8 +1803,7 @@ export default function SonoLane() {
     id: "sb_"+r.id, sbId: r.id, title: r.title, type: r.type, desc: r.description || "",
     address: r.address || "", date: r.event_date || "", icon: r.icon || "📍",
     photos: r.photos || [], authorId: mine ? "me" : r.author_id, authorName: r.author_name || "Driver",
-    rsvps: r.rsvps || 0,
-  });
+    rsvps: r.rsvps || 0});
   // Loads every OTHER signed-in user's events for the shared community feed.
   // Your own stay purely local (already there the instant you create them,
   // no round trip needed) — this only ever fetches events you didn't author.
@@ -1761,8 +1836,7 @@ export default function SonoLane() {
       distance: post.distance || "", stops: post.stops || [],
       highlights: post.highlights || "", photos: post.photos || [],
       from_saved: !!post.fromSaved, saved_route_name: post.savedRouteName || "",
-      likes: post.likes || 0,
-    }).select("id").single();
+      likes: post.likes || 0}).select("id").single();
     return data ? data.id : null;
   };
   const updateRoutePostSupabase = async (sbId, post) => {
@@ -1770,8 +1844,7 @@ export default function SonoLane() {
     await supabase.from("route_posts").update({
       title: post.title, type: post.type, body: post.body || "",
       distance: post.distance || "", stops: post.stops || [],
-      highlights: post.highlights || "", photos: post.photos || [],
-    }).eq("id", sbId).eq("author_id", currentUserId);
+      highlights: post.highlights || "", photos: post.photos || []}).eq("id", sbId).eq("author_id", currentUserId);
   };
   const deleteRoutePostSupabase = async (sbId) => {
     if (!isSupabaseConfigured || !currentUserId || !sbId) return;
@@ -1784,21 +1857,32 @@ export default function SonoLane() {
     id: "sb_"+r.id, sbId: r.id, title: r.title, type: r.type, body: r.body || "",
     distance: r.distance || "", stops: r.stops || [], highlights: r.highlights || "",
     photos: r.photos || [], fromSaved: !!r.from_saved, savedRouteName: r.saved_route_name || "",
-    likes: r.likes || 0, authorId: mine ? "me" : r.author_id, authorName: r.author_name || "Driver",
-  });
-  // Loads every OTHER signed-in user's route posts for the shared Route
-  // feed. Your own stay purely local (already there the instant you post
-  // them, no round trip needed) — this only ever fetches posts you didn't
-  // author. Same "sb_" id-prefix pattern as the events fetch above, so a
-  // refresh never clobbers your own local posts.
+    likes: r.likes || 0, authorId: mine ? "me" : r.author_id, authorName: r.author_name || "Driver"});
+  // Loads every signed-in user's route posts for the shared Route feed —
+  // including your OWN. This used to only fetch posts you didn't author,
+  // on the theory that your own were already there locally the instant you
+  // posted them (true the first time). But `posts` is just this one
+  // device's local copy — sign in on another device, reinstall, clear
+  // site data, or lose that IndexedDB copy for any reason, and a route you
+  // already posted has a real row in `route_posts` that this fetch was
+  // explicitly skipping, so it could never come back. That's the mechanism
+  // behind "my posted route doesn't show in the feed": it posted fine, but
+  // only reaching a Supabase row is not the same as reaching THIS device's
+  // feed unless something also pulls it back down. Now every row is
+  // fetched and merged by its real id (sbId) — a post you already have
+  // locally (matched by sbId) is replaced by the fresher server copy
+  // instead of duplicated, and any post that's local-only so far (no sbId
+  // yet — the brief window before its own createRoutePostSupabase insert
+  // resolves) is left alone.
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserId) return;
     (async () => {
       const { data } = await supabase.from("route_posts").select("*")
-        .neq("author_id", currentUserId).order("created_at", { ascending: false }).limit(300);
+        .order("created_at", { ascending: false }).limit(300);
       if (!data) return;
-      const mapped = data.map(r => mapRoutePostRow(r));
-      setPosts(prev => [...mapped, ...prev.filter(p => !String(p.id).startsWith("sb_"))]);
+      const mapped = data.map(r => mapRoutePostRow(r, { mine: r.author_id === currentUserId }));
+      const fetchedIds = new Set(data.map(r => r.id));
+      setPosts(prev => [...mapped, ...prev.filter(p => !p.sbId || !fetchedIds.has(p.sbId))]);
     })();
   }, [currentUserId]);
 
@@ -2054,7 +2138,13 @@ export default function SonoLane() {
     setSubPanel("createroute");
   };
   const [showMusic,    setShowMusic]    = useState(false);
-  const [musicTab,     setMusicTab]     = useState(()=>memStore.getItem("sl_radioTab")||"lanes"); // last mode persists
+  const [musicTab,     setMusicTab]     = useState(()=>{
+    // "nearby" used to be a tab inside this sheet — it's a real page now
+    // (see RadioPanel), so a device that persisted that old value falls
+    // back to "lanes" instead of landing on a tab that no longer exists.
+    const v = memStore.getItem("sl_radioTab");
+    return v==="nearby" ? "lanes" : (v||"lanes");
+  }); // last mode persists
   const [startupSound,  setStartupSound]  = useState(()=>memStore.getItem("sl_startupSound")||"classic");
   const [spotifyLinked,setSpotifyLinked]= useState(false);
   // Spotify "Now Playing" activity — a real Spotify connection needs their
@@ -2208,8 +2298,7 @@ export default function SonoLane() {
         const known = new Set(prev.map(n=>String(n.id)));
         const fresh = data.filter(r=>!known.has(String(r.id))).map(r => ({
           id: r.id, icon: r.icon || "🔔", text: r.text,
-          ts: timeAgo(new Date(r.created_at).getTime()), read: r.read,
-        }));
+          ts: timeAgo(new Date(r.created_at).getTime()), read: r.read}));
         return fresh.length ? [...fresh, ...prev] : prev;
       });
     };
@@ -2223,17 +2312,20 @@ export default function SonoLane() {
   const [aiChat,       setAiChat]       = useState([{role:"ai",text:"Ready. Say \"Sono\" to ask me anything."}]);
   // Drive mode's 3 stacked widget slots (top/mid/bottom of the widgets
   // column) — persisted so your picks survive closing the app, same as
-  // every other saved preference.
+  // every other saved preference. Standard setting is only 2 active
+  // widgets (Weather + Points) — the 3rd slot defaults to "none" (hidden)
+  // until you turn it on yourself from Drive Settings → Widgets → Bottom,
+  // where you pick a real widget for it.
   const [widget1,      setWidget1]      = usePersistedState("sl_driveWidget1", "weather");
   const [widget2,      setWidget2]      = usePersistedState("sl_driveWidget2", "points");
-  const [widget3,      setWidget3]      = usePersistedState("sl_driveWidget3", "dashcam");
+  const [widget3,      setWidget3]      = usePersistedState("sl_driveWidget3", "none");
   // Per-slot "only show when turned on" — when true, that slot disappears
   // (instead of showing an idle widget) until it's actually active, and the
   // remaining slot(s) stretch to fill the freed space since they're just
   // equal flex children of the same row/column.
   const [widget1OnlyOn, setWidget1OnlyOn] = usePersistedState("sl_driveWidget1OnlyOn", false);
   const [widget2OnlyOn, setWidget2OnlyOn] = usePersistedState("sl_driveWidget2OnlyOn", false);
-  const [widget3OnlyOn, setWidget3OnlyOn] = usePersistedState("sl_driveWidget3OnlyOn", false);
+  const [widget3OnlyOn, setWidget3OnlyOn] = usePersistedState("sl_driveWidget3OnlyOn", true);
   const [widgetEdit,   setWidgetEdit]   = useState(null);
   // Where the widget picker was opened from, so its back button can return
   // there instead of just closing — "drive" means the small ⚙️ list inside
@@ -2301,8 +2393,6 @@ export default function SonoLane() {
   // separate (identical-looking) Discovery Radius section for editing it
   // from inside Profile.
   const [showRadiusPage, setShowRadiusPage] = useState(false);
-  const [startDriveStyle, setStartDriveStyle] = usePersistedState("sl_startDriveStyle", "flag"); // "flag" | "solid" | "outline" — changeable from Edit Profile
-  const [startDriveColor, setStartDriveColor] = usePersistedState("sl_startDriveColor", "#000000"); // accent color for the Start Drive button
   const [widgetAction, setWidgetAction] = useState(null); // 'weather'|'music'|'points'|'friends'
   // Reset voice counter when page state changes
   useEffect(() => { voiceCounter.current = 10; voiceActions.current = {}; }, [panel, subPanel]);
@@ -2327,17 +2417,9 @@ export default function SonoLane() {
   const scrollRef     = useRef(null);
   const swipeStartRef = useRef(null); // {x,y} — page-swipe gesture tracking (Lanes ↔ Home ↔ Discover)
   const swipeActiveRef = useRef(false); // true once the current drag has been confirmed as a horizontal carousel swipe (vs. a vertical scroll, tap, or a back-page swipe which stays instant/unanimated)
-  // Live drag state for the sliding carousel animation. swipeDir (React
-  // state — changes only twice per gesture) says which neighbor tab is
-  // being revealed ("next" = the tab to the right, "prev" = to the left)
-  // and controls whether that neighbor panel is mounted at all. swipeDXRef
-  // (a plain ref, NOT state) is the raw live finger offset in px — it's
-  // painted straight onto the DOM via swipeWrapperRef on every move, so
-  // the drag tracks the finger at a full 60fps without forcing React to
-  // re-render whichever heavy panel is mounted on every pixel of movement.
-  const [swipeDir, setSwipeDir] = useState(null);
-  const swipeDXRef = useRef(0);
-  const swipeWrapperRef = useRef(null); // the 2x-wide sliding row — see the render below
+  // No live-drag animation — swipes switch tabs/go back the instant the
+  // gesture is confirmed, with no visual tracking or settle transition (see
+  // onSwipeEnd below). Only the gesture-detection refs remain.
   const swipeContainerRef = useRef(null); // the swipeable content area — native (non-passive) touch listeners are attached to this below
   const voiceActions  = useRef({});   // number -> fn
   const voiceCounter  = useRef(11);   // page-level counter, starts at 11
@@ -2363,8 +2445,7 @@ export default function SonoLane() {
     const snap = {
       tripHistory, friends, routes, events, carSaved,
       totalMiles, lastDriveUnderLimit, greenLightStreak, hadNightDrive,
-      ...extraState,
-    };
+      ...extraState};
     const newlyUnlocked = ACHIEVEMENTS.filter(a => {
       if(unlockedAch.includes(a.id)) return false;
       try { return a.check(snap); } catch { return false; }
@@ -2397,15 +2478,18 @@ export default function SonoLane() {
     // etc.) was open every time. Only reset it when actually switching to a
     // different panel, so the open section survives a re-tap.
     setPanel(p);
-    // Landing on Profile fresh (from another tab) always opens with Garage
-    // already expanded, instead of the collapsed home grid.
-    if(p!==panel) setSubPanel(p==="profile" ? "garage" : null);
-    // Landing on Lanes fresh (from another tab) always opens the chat list
-    // first, not whatever chat room happened to be open last time — direct
-    // "message so-and-so" entry points pass lanesRoom:true to jump straight
-    // into that chat's room instead.
+    // Landing on Profile fresh (from another tab) always opens with My
+    // Routes already expanded, instead of the collapsed home grid — Garage
+    // is its own bottom-nav tab now, so it's no longer Profile's default.
+    if(p!==panel) setSubPanel(p==="profile" ? "routes" : null);
+    // Landing on Lanes fresh (from another tab) always opens straight into
+    // Nova's AI chat room now — Lanes reads as an open AI chat room with
+    // every other chat as a bubble up top, not a chat-list app — instead of
+    // whatever chat room happened to be open last time. Direct "message
+    // so-and-so" entry points still pass lanesRoom:true + activeChan set by
+    // the caller to jump straight into THAT chat's room instead of Nova's.
     if(lanesRoom) setLanesView("room");
-    else if(p!==panel && p==="create") setLanesView("list");
+    else if(p!==panel && p==="create"){ setLanesView("room"); setActiveChan("sono"); }
     // Landing on Lanes fresh always shows the page title first, not
     // whatever search box was left open last time you were here.
     if(p!==panel && p==="create"){ setLanesSearchActive(false); setLaneUserSearch(""); }
@@ -2437,7 +2521,18 @@ export default function SonoLane() {
   // icon-toggle row always has one tab open now (Garage by default), so
   // "back" out of a full sub-page (Following, Edit Profile, Discovery
   // Radius, …) shouldn't leave the row collapsed with none of them active.
-  const back = () => { setSubPanel("garage"); setSelTrip(null); };
+  const back = () => { setSubPanel("routes"); setSelTrip(null); };
+  // Opens the public ProfileViewSheet for whoever posted a route/event —
+  // every account is public now, so any "Posted by X" credit anywhere in
+  // the app is tappable. Looks up a richer known record (Friends/
+  // Following/Followers) by id first so a real friend's actual avatar/
+  // handle show up instead of a bare placeholder; falls back to a minimal
+  // object built from just the authorId/authorName a post/event stores.
+  const openAuthorProfile = (authorId, authorName) => {
+    if(!authorId) return;
+    const known = friends.find(f=>f.id===authorId) || following.find(f=>f.id===authorId) || followersList.find(f=>f.id===authorId);
+    setViewedProfile(known || {id:authorId, name:authorName||"Driver", initials:(authorName||"?").trim().charAt(0).toUpperCase()||"?", color:OR});
+  };
   const cancelCreateRoute = () => {
     setNewRoute({title:"",type:"commute",distance:"",bio:"",stops:[""],public:false});
     setEditingRouteId(null);
@@ -2456,8 +2551,7 @@ export default function SonoLane() {
           id: Date.now()+1, title: newRoute.title, type: newRoute.type, body: newRoute.bio,
           distance: newRoute.distance, stops: cleanStops, highlights: "", photos: [],
           fromSaved: true, savedRouteName: newRoute.title, likes: 0,
-          authorId: "me", authorName: userName||"You",
-        };
+          authorId: "me", authorName: userName||"You"};
         setPosts(p=>[post,...p]);
         setNotifications(n=>[{id:Date.now()+2,icon:"🗺️",text:"Your route \""+newRoute.title+"\" has been posted to the feed!",ts:"now",read:false},...n]);
         // Same real-row reconciliation as the Route Post sheet's submitPost
@@ -2472,7 +2566,7 @@ export default function SonoLane() {
     setEditingRouteId(null);
     setSubPanel("routes");
   };
-  const cancelSharedGarage = () => { setSubPanel("garage"); setSelSharedGarage(null); };
+  const cancelSharedGarage = () => { setSubPanel(null); setSelSharedGarage(null); };
   const openSharedGarageChat = () => {
     const g = sharedGarages.find(x=>x.id===selSharedGarage);
     if(g){ setActiveChan(g.laneId); go("create", {lanesRoom:true, lanesGarageOrigin:{garageId:g.id}}); }
@@ -2513,39 +2607,44 @@ export default function SonoLane() {
     }
   };
 
-  // ── Swipe carousel — Lanes ↔ Home ↔ Discover (Drive mode is not part of it) ──
-  // Order matches the TopNav's actual left-to-right tab layout (Lanes | Home
-  // | Discover — see TOPNAV_ITEMS below), NOT the order pages were coded in.
-  // Swipe direction is read against THIS order, so it has to match what's
-  // literally on screen or "swipe left" and "swipe right" end up backwards.
-  const CAROUSEL = ["create","profile","discover"];
-  // subPanel is dual-purpose on Profile — these 6 values are just which
+  // ── Swipe — Routes ↔ Events ↔ SonoLane Radio only; Lanes/Profile are tap-
+  // only now (no more swiping directly between the main bottom-bar tabs).
+  // SWIPE_PANELS gates which panels even look at a horizontal drag at all —
+  // it still has to include Lanes/Profile too, just so swipe-to-go-back out
+  // of a sub-page (Edit Profile, a Lanes room, …) keeps working there; the
+  // actual tab-switching logic in onSwipeEnd below only fires for
+  // "routes"/"events" (and the SonoLane Radio sheet), never Lanes/Profile.
+  const SWIPE_PANELS = ["routes","events","radio","create","profile","garage"];
+  // subPanel is dual-purpose on Profile — these 3 values are just which
   // "My Stuff" icon-toggle section is expanded INLINE on the Profile home
-  // screen (which now defaults to "garage" open), not a full-screen
-  // sub-page. Only a subPanel value OUTSIDE this list (Edit Profile, Car
-  // Details, Create Route, …) is an actual full-screen page with its own
-  // back button — swipe-back below needs that distinction, or it would
-  // treat the Profile home screen itself as "on a sub-page" simply because
-  // Garage is expanded by default.
-  const PROFILE_INLINE_SECTIONS = ["garage","routes","myevents","history","radiostations"];
+  // screen (which now defaults to "routes" open), not a full-screen
+  // sub-page. Only a subPanel value OUTSIDE this list (Edit Profile, Create
+  // Route, …) is an actual full-screen page with its own back button —
+  // swipe-back below needs that distinction, or it would treat the Profile
+  // home screen itself as "on a sub-page" simply because a tab is expanded
+  // by default. Garage/History moved out to their own bottom-nav tab (see
+  // GaragePanel) — Garage's own main view is subPanel===null there, so it
+  // never needs an entry in this list.
+  const PROFILE_INLINE_SECTIONS = ["radiostations","routes","myevents"];
   // Whenever the current screen already has its own ← back button (a Profile
-  // sub-page like Edit Car/Settings/My Routes, or a route's full-screen
-  // detail view), swipe-right should trigger THAT back action instead of the
-  // carousel's "previous tab" — otherwise swiping right to go back a page
-  // instead jumped all the way to the Lanes chat tab.
-  const backAvailable = (panel==="profile" && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="discover" && !!viewRouteId) || (panel==="create" && lanesView==="room");
+  // sub-page like Edit Profile/Settings, a Garage sub-page like Car Details/
+  // Edit Car/Shared Garage, or a route's full-screen detail view), swipe-
+  // right should trigger THAT back action instead of the carousel's
+  // "previous tab" — otherwise swiping right to go back a page instead
+  // jumped all the way to the Lanes chat tab.
+  const backAvailable = ((panel==="profile"||panel==="garage") && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="routes" && !!viewRouteId) || (panel==="create" && lanesView==="room");
   const runBack = () => {
-    if(panel==="discover" && viewRouteId){ setViewRouteId(null); return; }
+    if(panel==="routes" && viewRouteId){ setViewRouteId(null); return; }
     // Reuse the exact same onBack each sub-page's own ← button in the
     // TopBar uses (see BACK_PAGES below) instead of a separate blanket
     // "clear subPanel" — otherwise swipe-back and tap-back could disagree
     // about where a page returns to (e.g. Car Details always returns to
-    // the Garage tab either way, never to a blank collapsed Profile).
-    if(panel==="profile" && subPanel){ (BACK_PAGES[subPanel]?.onBack || (()=>setSubPanel("garage")))(); setSelTrip(null); return; }
+    // Garage's main view either way, never to a blank collapsed Profile).
+    if((panel==="profile"||panel==="garage") && subPanel){ (BACK_PAGES[subPanel]?.onBack || (()=>setSubPanel(panel==="garage"?null:"routes")))(); setSelTrip(null); return; }
     if(panel==="create" && lanesView==="room"){ backFromLanesRoom(); return; }
   };
   const onSwipeStart = e => {
-    if(!CAROUSEL.includes(panel)) { swipeStartRef.current=null; return; }
+    if(!SWIPE_PANELS.includes(panel)) { swipeStartRef.current=null; return; }
     const t = e.touches ? e.touches[0] : e;
     const tag = e.target.tagName;
     if(tag==="INPUT"||tag==="TEXTAREA"){ swipeStartRef.current=null; return; }
@@ -2583,152 +2682,57 @@ export default function SonoLane() {
     }
     swipeStartRef.current = {x:t.clientX, y:t.clientY};
     swipeActiveRef.current = false;
-    swipeDXRef.current = 0;
-    // Cancel any settle animation still finishing from a previous gesture —
-    // otherwise a quick second swipe right after the first could fight the
-    // leftover transition and visibly stutter.
-    if(swipeWrapperRef.current) swipeWrapperRef.current.style.transition = "none";
   };
-  // Live-tracks the finger/mouse while a gesture is in progress, so the
-  // current page and its neighbor visibly slide together in real time,
-  // proportional to how far the drag has gone — instead of only reacting
-  // once the finger lifts. Only kicks in for the plain tab carousel
-  // (Lanes ↔ Home ↔ Discover); a page with its own back button available
-  // (a Profile sub-page, a Discover route detail, the Lanes chat room)
-  // keeps the simpler instant swipe-to-go-back behavior from onSwipeEnd,
-  // since animating "back out of a sub-page" would mean live-rendering two
-  // states of the SAME panel at once rather than two different panels.
-  //
-  // The live drag position is tracked in a plain ref (swipeDXRef) and
-  // painted straight onto the DOM node, NOT through React state — driving
-  // a setState (and the re-render of whichever heavy panel is mounted) on
-  // every single pixel of finger movement is exactly what made this feel
-  // sticky/laggy on an actual phone. React only gets involved twice per
-  // gesture: once to mount the neighbor panel when the drag is first
-  // confirmed, and once to commit or discard it when the finger lifts.
+  // Confirms whether a gesture in progress is a deliberate horizontal drag
+  // (vs. an ordinary vertical scroll) — no live painting, no animation.
+  // swipeActiveRef flips true once confirmed, which the native touchmove
+  // listener below uses to preventDefault so the browser's own scroll/
+  // rubber-band handling doesn't fight the gesture; the actual tab switch
+  // or back-navigation only happens instantly, on release, in onSwipeEnd.
   const onSwipeMove = e => {
     const start = swipeStartRef.current;
-    if(!start || backAvailable) return;
-    const idx = CAROUSEL.indexOf(panel);
-    if(idx===-1) return;
+    if(!start || swipeActiveRef.current) return;
     const t = e.touches ? e.touches[0] : e;
     const dx = t.clientX - start.x, dy = t.clientY - start.y;
-    if(!swipeActiveRef.current){
-      // Not yet confirmed as a horizontal carousel drag — require a small
-      // deliberate horizontal movement (clearly more horizontal than
-      // vertical) before committing to it, so an ordinary vertical scroll
-      // never gets hijacked into a sideways page slide. Kept small/lenient
-      // so the page starts following the finger almost immediately.
-      if(Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)*1.1) return;
-      if(dx < 0 && idx >= CAROUSEL.length-1) return; // no next tab to reveal
-      if(dx > 0 && idx <= 0) return;                 // no previous tab to reveal
-      swipeActiveRef.current = true;
-      setSwipeDir(dx < 0 ? "next" : "prev"); // one React update — mounts the neighbor panel
-    }
-    const w = window.innerWidth || 390;
-    const clamped = Math.max(-w, Math.min(w, dx));
-    swipeDXRef.current = clamped;
-    const wrapperEl = swipeWrapperRef.current;
-    if(wrapperEl){
-      const dir = clamped < 0 ? "next" : "prev";
-      wrapperEl.style.transform = `translateX(${dir==="next" ? clamped : clamped-w}px)`;
-    }
+    // Require a small deliberate horizontal movement (clearly more
+    // horizontal than vertical) before treating this as a swipe — kept
+    // small/lenient so it confirms almost immediately.
+    if(Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)*1.1) return;
+    swipeActiveRef.current = true;
   };
+  // Fires once the finger lifts. Purely instant — no drag tracking, no
+  // transition, no neighbor panel: just decide, from the total distance
+  // travelled, whether this was a deliberate horizontal swipe, and if so
+  // switch tabs or go back immediately.
   const onSwipeEnd = e => {
     const start = swipeStartRef.current;
-    const wasActive = swipeActiveRef.current;
     swipeStartRef.current = null;
     swipeActiveRef.current = false;
     if(!start) return;
-
-    if(wasActive){
-      // A live carousel drag was under way — commit to the neighbor once
-      // dragged far enough (under a third of the screen springs back), and
-      // either way ANIMATE the rest of the way with a real CSS transition
-      // (applied directly to the DOM node, same as the drag itself) so the
-      // motion the finger started continues naturally instead of snapping.
-      const idx = CAROUSEL.indexOf(panel);
-      const w = window.innerWidth || 390;
-      const dx = swipeDXRef.current;
-      const commit = Math.abs(dx) > w*0.32;
-      const wrapperEl = swipeWrapperRef.current;
-      const dir = dx < 0 ? "next" : "prev";
-      const settleTo = (target, after) => {
-        if(wrapperEl){
-          wrapperEl.style.transition = "transform 0.24s cubic-bezier(0.22,1,0.36,1)";
-          wrapperEl.style.transform = `translateX(${dir==="next" ? target : target-w}px)`;
-        }
-        setTimeout(()=>{
-          if(wrapperEl) wrapperEl.style.transition = "none";
-          swipeDXRef.current = 0;
-          setSwipeDir(null);
-          after && after();
-        }, 240);
-      };
-      if(commit && dx<0 && idx<CAROUSEL.length-1) settleTo(-w, ()=>go(CAROUSEL[idx+1]));
-      else if(commit && dx>0 && idx>0) settleTo(w, ()=>go(CAROUSEL[idx-1]));
-      else settleTo(0);
-      return;
-    }
-
-    // Fallback — a short tap, or a swipe on a page with its own back button
-    // (see backAvailable) — same instant behavior as before, no live drag.
     const t = e.changedTouches ? e.changedTouches[0] : e;
     const dx = t.clientX - start.x, dy = t.clientY - start.y;
     if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)*1.4) return; // require a deliberate horizontal drag
-    if(dx > 0 && backAvailable) { runBack(); return; }               // swipe right → back out of this sub-page, not to Lanes
-    if(backAvailable) return;                                         // a back page is open — leave tab-carousel swipes alone
-    const idx = CAROUSEL.indexOf(panel);
-    if(idx===-1) return;
-    if(dx < 0 && idx < CAROUSEL.length-1) go(CAROUSEL[idx+1]);      // swipe left → move right (Lanes→Home, Home→Discover)
-    else if(dx > 0 && idx > 0) go(CAROUSEL[idx-1]);                  // swipe right → move left (Discover→Home, Home→Lanes)
-  };
-  // Tapping a TopNav tab used to just call go(id) directly — an instant
-  // hard cut with no motion at all, the one gap in the carousel's own
-  // fluid-feeling swipe. This drives the exact same sliding wrapper a real
-  // swipe does (mount the neighbor tab, animate the row across, then
-  // commit the panel switch) so a tap and a swipe to the same tab look and
-  // feel identical — same easing/duration as the drag-release settle above
-  // (spatial consistency: one motion language for "switch tabs", not two).
-  const tabSlideTimeoutRef = useRef(null);
-  const slideToTab = (targetId) => {
-    const idx = CAROUSEL.indexOf(panel);
-    const targetIdx = CAROUSEL.indexOf(targetId);
-    if(idx===-1 || targetIdx===-1 || targetId===panel){ go(targetId); return; }
-    // A tap can land while a previous tap's slide is still animating —
-    // cancel its pending commit so two overlapping calls to go() can never
-    // race, and let this new animation restart cleanly from the neutral
-    // (idle-equivalent) position rather than leaving a stuck transition.
-    if(tabSlideTimeoutRef.current){ clearTimeout(tabSlideTimeoutRef.current); tabSlideTimeoutRef.current = null; }
-    const dir = targetIdx > idx ? "next" : "prev";
-    const w = window.innerWidth || 390;
-    const wrapperEl0 = swipeWrapperRef.current;
-    if(wrapperEl0) wrapperEl0.style.transition = "none";
-    swipeDXRef.current = 0;
-    setSwipeDir(dir); // mounts the neighbor (target) panel, starting at the same position idle looks like
-    // Wait a frame so the browser actually registers that starting position
-    // before switching on the transition — otherwise the two style writes
-    // can collapse into one and the slide never plays. A single rAF plus an
-    // explicit forced reflow (reading offsetHeight) is the reliable way to
-    // do this — it was briefly a double-nested rAF instead, which cost an
-    // extra frame of the neighbor panel sitting there static before
-    // animating, visible as a small stutter/flash on a loaded real device
-    // even though it looked fine here.
-    requestAnimationFrame(() => {
-      const wrapperEl = swipeWrapperRef.current;
-      if(wrapperEl){
-        void wrapperEl.offsetHeight; // force the browser to commit the current (idle-equivalent) transform first
-        wrapperEl.style.transition = "transform 0.24s cubic-bezier(0.22,1,0.36,1)";
-        wrapperEl.style.transform = `translateX(${dir==="next" ? -w : 0}px)`;
-      }
-      tabSlideTimeoutRef.current = setTimeout(() => {
-        if(wrapperEl) wrapperEl.style.transition = "none";
-        swipeDXRef.current = 0;
-        setSwipeDir(null);
-        tabSlideTimeoutRef.current = null;
-        go(targetId);
-      }, 240);
-    });
+    if(dx > 0 && backAvailable) { runBack(); return; }               // swipe right → back out of this sub-page, not to another tab
+    if(backAvailable) return;                                         // a back page is open — leave the page-swipe alone
+    // Routes ↔ Events ↔ SonoLane Radio — the only swipeable sequence left.
+    // Lanes and Profile (the other two bottom-bar tabs) are tap-only now.
+    // Radio is a real page in this same sequence now (see RadioPanel), not
+    // a pop-up sheet — swipe right off it goes back to Events, swipe left
+    // does nothing (no page after it).
+    if(panel==="routes"){
+      if(dx < 0){ vibrate(); go("events"); }                          // swipe left → Events
+      else if(dx > 0){ vibrate(); setShowSettingsDrawer(true); }       // swipe right → Settings drawer
+      return;
+    }
+    if(panel==="events"){
+      if(dx < 0){ vibrate(); go("radio"); }                            // swipe left → Radio
+      else if(dx > 0){ vibrate(); go("routes"); }                      // swipe right → back to Routes
+      return;
+    }
+    if(panel==="radio"){
+      if(dx > 0){ vibrate(); go("events"); }                           // swipe right → back to Events
+      return;
+    }
   };
   // Native (non-passive) touch listeners on the swipe container — React
   // attaches onTouchMove as a PASSIVE listener by default, which silently
@@ -2808,8 +2812,8 @@ export default function SonoLane() {
         return;
       }
       // ── Page navigation ──────────────────────────────────────────────────────
-      if(cmd.includes("events")||cmd.includes("map")){setDiscoverTab("events");go("discover");}
-      else if(cmd.includes("feed")){setDiscoverTab("routes");go("discover");}
+      if(cmd.includes("events")||cmd.includes("map")){go("events");}
+      else if(cmd.includes("feed")){go("routes");}
       else if(cmd.includes("create")||cmd.includes("notes"))go("create");
       else if(cmd.includes("drive"))go("drive");
       else if(cmd.includes("profile")||cmd.includes("home"))go("profile");
@@ -2930,8 +2934,7 @@ export default function SonoLane() {
             dist: dist.toFixed(1),
             date: new Date(id).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),
             time: new Date(id).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-            ext: usedMime.includes("mp4") ? ".mp4" : ".webm",
-          };
+            ext: usedMime.includes("mp4") ? ".mp4" : ".webm"};
           // Persist the actual video Blob to IndexedDB so this clip is still
           // there — and gets its 72-hour retention countdown — the next
           // time the app opens; see clipsDB near the top of this file.
@@ -2975,8 +2978,7 @@ export default function SonoLane() {
       pts: bonus,
       avgSpeed, maxSpeed, lights: streak,
       startAddr: "San Diego, CA",
-      endAddr: "San Diego, CA",
-    }, ...tripHistory].slice(0, 50);
+      endAddr: "San Diego, CA"}, ...tripHistory].slice(0, 50);
     setTripHistory(newHistory);
 
     // Check achievements with fresh state
@@ -2985,8 +2987,7 @@ export default function SonoLane() {
       totalMiles: newTotal,
       lastDriveUnderLimit: underLimit,
       greenLightStreak: streak,
-      hadNightDrive: nightDrive || hadNightDrive,
-    }), 500);
+      hadNightDrive: nightDrive || hadNightDrive}), 500);
   };
 
   // Fully releases the camera/mic stream (used both when recording stops
@@ -3219,7 +3220,7 @@ export default function SonoLane() {
       </button>
     );
     if(id==="music")   return <button onClick={()=>{setMusicTab("music");memStore.setItem("sl_radioTab","music");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:22}}>🎵</div><div style={{fontSize:11,color:"#111"}}>My Music</div></button>;
-    if(id==="cbradio") return <button onClick={()=>{setMusicTab("lanes");memStore.setItem("sl_radioTab","lanes");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><div style={{fontSize:22}}>📡</div><div style={{fontSize:11,color:"#111"}}>CB Radio</div></button>;
+    if(id==="cbradio") return <button onClick={()=>{setMusicTab("lanes");memStore.setItem("sl_radioTab","lanes");setShowMusic(true);}} style={{...WW,background:"none",border:"none",cursor:"pointer"}}><WalkieTalkieIcon size={22} color="#111"/><div style={{fontSize:11,color:"#111"}}>CB Radio</div></button>;
     if(id==="spotify") return (
       // Real Spotify activity needs their own developer OAuth key, which we
       // don't have — once linked in My Music, this tap-to-play/pause and the
@@ -3386,8 +3387,7 @@ export default function SonoLane() {
           fontSize:n>99?7.5:n>9?8.5:10,fontWeight:900,
           lineHeight:"18px",textAlign:"center",
           pointerEvents:"none",
-          boxShadow:"0 1px 5px rgba(99,102,241,0.5)",
-        }}>{n}</div>}
+          boxShadow:"0 1px 5px rgba(99,102,241,0.5)"}}>{n}</div>}
         <button onClick={action} style={style} {...rest}>{children}</button>
       </div>
     );
@@ -3422,7 +3422,7 @@ export default function SonoLane() {
         {_saved.length===0 ? (
           <div style={{...cardStyle,textAlign:"center",color:textSecondary,fontSize:13,padding:"24px 16px"}}>
             <div style={{marginBottom:12}}>Star a station from SonoLane Radio.</div>
-            <VN action={()=>{setMusicTab("nearby");setShowMusic(true);}} style={{padding:"9px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:6}}><JukeboxIcon size={14} color="#fff"/>Go to SonoLane Radio</VN>
+            <VN action={()=>go("radio")} style={{padding:"9px 18px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:6}}><JukeboxIcon size={14} color="#fff"/>Go to SonoLane Radio</VN>
           </div>
         ) : _saved.map((h,i)=>(
           <div key={i} style={{...cardStyle,display:"flex",alignItems:"center",gap:12}}>
@@ -3482,252 +3482,211 @@ export default function SonoLane() {
     );
   };
 
-  /* ── PROFILE PANEL ── */
-  const ProfilePanel = useStablePanel(() => {
-    // `back` is now defined at the SonoLane() top level (near `go`) so the
-    // shared TopBar can call it too — see the back-button actions block.
-    // `radiusDraft`/`commitRadius` similarly live at the SonoLane() top
-    // level now (shared with the standalone RadiusPage overlay) — see there.
-
-    // Profile Completion card — collapsed by default (top 3 next-up objectives);
-    // expands to show every objective (done and not) with its point value.
-    const [showAllObjectives, setShowAllObjectives] = useState(false);
-    // Dismissible like a notification — once closed it stays hidden for the
-    // session (persisted so it doesn't pop back up on every visit to Profile).
-    const [objectivesDismissed, setObjectivesDismissed] = useState(()=>memStore.getItem("sl_objDismissed")==="1");
-    const dismissObjectives = () => { setObjectivesDismissed(true); memStore.setItem("sl_objDismissed","1"); };
-
-    // Private car info now opens from a wallet button at the bottom of the
-    // car page instead of always sitting inline on the page.
-    const [showPrivateCard, setShowPrivateCard] = useState(false);
-    // Home screen's top bar (+ quick-create, ☰ menu) is now shared across
-    // every page — its state (showQuickCreate/showInfoDrawer/infoDrawerPage)
-    // and JSX live at the app shell level instead of here; see <TopBar/>.
-    // The row of profile tile buttons (My Garage, My Routes, Settings, …) is
-    // now a row of toggle icons under TOP 3 instead of a grid — which of
-    // them is open reuses `subPanel` itself (same as every other subpage),
-    // so links elsewhere in the app that jump straight to e.g.
-    // setSubPanel("routes") still land in the right place.
-    // Confirm-before-delete for a car in the garage — {id,name} of the car
-    // pending deletion, or null. Deleting a car wipes its photos/details,
-    // so this is a deliberate extra tap rather than an instant ✕.
-    const [confirmDeleteCar, setConfirmDeleteCar] = useState(null);
-
-    // friendSearch/addFriendSearch/supaFriendResults now live at the
-    // SonoLane() top level (near showAddFriend) — the Add Friend sheet is a
-    // global overlay now, reachable from the + Quick Create menu on any
-    // Profile subPanel, not only from the Friends page itself.
-    // Special Top 3 Friend page — a combined walkie-talkie + text chat box
-    // for whichever Top 3 friend you tapped (see subPanel==="top3friend").
-    const [top3ChatText, setTop3ChatText] = useState("");
-    const top3AudioRef = useRef(null);
-    const [top3PlayingId, setTop3PlayingId] = useState(null);
-    const toggleTop3Voice = (msg) => {
-      if (!msg.audioUrl) return;
-      const audio = top3AudioRef.current || (top3AudioRef.current = new Audio());
-      if (top3PlayingId === msg.id) { audio.pause(); setTop3PlayingId(null); return; }
-      audio.src = msg.audioUrl;
-      audio.onended = () => setTop3PlayingId(null);
-      audio.play().catch(()=>{});
-      setTop3PlayingId(msg.id);
-    };
-    // Simulated call overlay — { friend, status:"ringing"|"live", secs } —
-    // status flips to "live" a beat after opening and a running timer ticks
-    // while it's up, mirroring how the rest of the app fakes real-time
-    // social features without a backend.
-    const [callingFriend, setCallingFriend] = useState(null);
-    useEffect(() => {
-      if (!callingFriend) return;
-      if (callingFriend.status === "ringing") {
-        const t = setTimeout(() => setCallingFriend(c => c && ({...c, status:"live", secs:0})), 1400);
-        return () => clearTimeout(t);
-      }
-      if (callingFriend.status === "live") {
-        const t = setInterval(() => setCallingFriend(c => c && ({...c, secs:c.secs+1})), 1000);
-        return () => clearInterval(t);
-      }
-    }, [callingFriend?.status, callingFriend?.friend?.id]);
-
-    // Simulated in-call overlay — shared by every page with a Call button
-    // (Friends, Shared Garage members) so calling feels the same everywhere.
-    const CallOverlay = () => !callingFriend ? null : (
-      <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
-        <div style={{fontSize:12,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>{callingFriend.status==="ringing"?"CALLING":"LIVE CALL"}</div>
-        <FriendAvatar fr={callingFriend.friend} size={96} fontSize={32} style={{marginBottom:18,animation:callingFriend.status==="ringing"?"pulse 1.4s ease-in-out infinite":"none"}}/>
-        <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{callingFriend.friend.name}</div>
-        <div style={{fontSize:14,color:"#aaa",marginBottom:48}}>
-          {callingFriend.status==="ringing" ? "Ringing…" : String(Math.floor(callingFriend.secs/60)).padStart(2,"0")+":"+String(callingFriend.secs%60).padStart(2,"0")}
+  // Nearby Stations / My Broadcast — this used to be the "SonoLane Radio"
+  // tab inside the pop-up Music sheet, reached only by swiping left past
+  // Events. It's now its own real page (see RadioPanel/PANELS.radio below),
+  // extracted here unchanged so it renders as normal page content instead
+  // of inside a fixed bottom-sheet overlay.
+  const renderNearbyStationsSection = () => (
+    <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
+      <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MY BROADCAST</div>
+      {isBroad ? (
+        <div style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:14,padding:"14px",display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
+          <div style={{width:12,height:12,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0}}/>
+          <div style={{flex:1}}><div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:12,color:"#666"}}>Broadcasting live now</div></div>
+          <button onClick={()=>setIsBroad(false)} style={{padding:"6px 14px",borderRadius:20,background:"#2a2a2a",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
         </div>
-        <button onClick={()=>setCallingFriend(null)} style={{width:60,height:60,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:24,cursor:"pointer"}}>✕</button>
-      </div>
-    );
-
-    // Quick walkie-talkie voice message — replaces the old "Call" button on
-    // a friend's card. Tap the mic to start recording, tap it again to stop
-    // and send right away (a one-shot push-to-talk clip, not a call), or
-    // Cancel to back out without sending. Uses the same real getUserMedia +
-    // MediaRecorder recording as Lanes' voice messages, and appends into the
-    // same friendMsgs store so the clip shows up in that friend's DM thread.
-    const [walkieTarget, setWalkieTarget] = useState(null); // friend object, or null when closed
-    const [walkiePhase,  setWalkiePhase]  = useState("idle"); // idle | recording | sent
-    const [walkieSeconds,setWalkieSeconds]= useState(0);
-    const walkieMR = useRef(null);
-    const walkieChunks = useRef([]);
-    const walkieStream = useRef(null);
-    const walkieTimer = useRef(null);
-    const closeWalkie = () => {
-      clearInterval(walkieTimer.current); walkieTimer.current = null;
-      if(walkieStream.current){ walkieStream.current.getTracks().forEach(t=>t.stop()); walkieStream.current=null; }
-      walkieChunks.current = []; walkieMR.current = null;
-      setWalkieTarget(null); setWalkiePhase("idle"); setWalkieSeconds(0);
-    };
-    const startWalkie = async () => {
-      if(walkiePhase!=="idle") return;
-      try{
-        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        walkieStream.current = stream;
-        const mr = new MediaRecorder(stream);
-        walkieChunks.current = [];
-        mr.ondataavailable = e => { if(e.data && e.data.size>0) walkieChunks.current.push(e.data); };
-        walkieMR.current = mr;
-        mr.start();
-        setWalkiePhase("recording"); setWalkieSeconds(0);
-        walkieTimer.current = setInterval(()=>setWalkieSeconds(s=>s+1), 1000);
-      }catch{
-        setWalkieTarget(null); // mic permission denied / no mic — nothing to record
-      }
-    };
-    const sendWalkie = () => {
-      const mr = walkieMR.current;
-      const target = walkieTarget;
-      if(!mr || !target){ closeWalkie(); return; }
-      clearInterval(walkieTimer.current); walkieTimer.current = null;
-      const secs = walkieSeconds;
-      mr.onstop = () => {
-        const usedMime = mr.mimeType || "audio/webm";
-        const blob = new Blob(walkieChunks.current, {type:usedMime});
-        const audioUrl = URL.createObjectURL(blob);
-        const msg = {
-          id:Date.now(), text:"", mine:true,
-          user:userName||"You",
-          initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
-          color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-          isVoice:true, voiceSeconds:secs||1, audioUrl,
-        };
-        setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),msg]}));
-        setNotifications(n=>[{id:Date.now(),icon:"🎙️",text:"Walkie-talkie message sent to "+target.name+".",ts:"now",read:false},...n]);
-        if(walkieStream.current){ walkieStream.current.getTracks().forEach(t=>t.stop()); walkieStream.current=null; }
-        walkieChunks.current = []; walkieMR.current = null;
-        setWalkiePhase("sent");
-        // Simulated reply, same idea as the CB/lane auto-reply pattern.
-        setTimeout(()=>{
-          const reply = {id:Date.now()+1, text:"", mine:false, user:target.name, initials:target.initials, color:target.color, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), isVoice:true, voiceSeconds:Math.floor(Math.random()*6)+2, transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)]};
-          setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),reply]}));
-          setNotifications(n=>[{id:Date.now()+2,icon:"🎙️",text:target.name+" sent you a voice message back.",ts:"now",read:false},...n]);
-        }, 1800+Math.random()*1200);
-        setTimeout(closeWalkie, 700);
-      };
-      try{ mr.stop(); }catch{ closeWalkie(); }
-    };
-    // Don't leak an open mic stream if this panel unmounts mid-recording.
-    useEffect(() => () => {
-      if(walkieStream.current) walkieStream.current.getTracks().forEach(t=>t.stop());
-      clearInterval(walkieTimer.current);
-    }, []);
-    // Text side of the special Top 3 Friend page's chat box — appends into
-    // the same friendMsgs thread the walkie voice clips use, so both kinds
-    // of messages show up together in one combined thread.
-    const sendTop3Text = (target) => {
-      const text = top3ChatText.trim();
-      if(!text || !target) return;
-      const msg = {
-        id:Date.now(), text, mine:true,
-        user:userName||"You",
-        initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
-        color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-        isVoice:false, voiceSeconds:0,
-      };
-      setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),msg]}));
-      setTop3ChatText("");
-      setTimeout(()=>{
-        const replies = ["👍","On my way!","Haha same","Let's do it this weekend","Sounds good.","😂"];
-        const reply = {id:Date.now()+1, text:replies[Math.floor(Math.random()*replies.length)], mine:false, user:target.name, initials:target.initials, color:target.color, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), isVoice:false, voiceSeconds:0};
-        setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),reply]}));
-      }, 1400+Math.random()*1200);
-    };
-    const WalkieTalkieSheet = () => !walkieTarget ? null : (
-      <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
-        <div style={{fontSize:12,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>WALKIE-TALKIE</div>
-        <FriendAvatar fr={walkieTarget} size={96} fontSize={32} style={{marginBottom:18,animation:walkiePhase==="recording"?"pulse 1.4s ease-in-out infinite":"none"}}/>
-        <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{walkieTarget.name}</div>
-        <div style={{fontSize:14,color:"#aaa",marginBottom:40}}>
-          {walkiePhase==="idle" ? "Tap the mic to record" : walkiePhase==="recording" ? "Recording… "+String(Math.floor(walkieSeconds/60)).padStart(2,"0")+":"+String(walkieSeconds%60).padStart(2,"0") : "Sent!"}
-        </div>
-        {walkiePhase!=="sent" && (
-          <button onClick={walkiePhase==="idle"?startWalkie:sendWalkie} title={walkiePhase==="idle"?"Start recording":"Stop and send"} style={{width:76,height:76,borderRadius:"50%",background:walkiePhase==="recording"?"#ef4444":"#22c55e",border:"none",color:"#fff",fontSize:30,cursor:"pointer",marginBottom:28,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {walkiePhase==="recording" ? "■" : "🎙️"}
-          </button>
-        )}
-        {walkiePhase!=="sent" && <button onClick={closeWalkie} style={{background:"none",border:"1px solid #444",color:"#aaa",borderRadius:20,padding:"8px 20px",fontSize:13,cursor:"pointer",fontFamily:F}}>Cancel</button>}
-      </div>
-    );
-
-    // Quick-access account sheet — opened by tapping a row in Following /
-    // Followers. Gives fast access to that person's basics, a follow toggle,
-    // and a shortcut into a direct message with them in Lanes.
-    const QuickUserSheet = () => {
-      if(!quickUser) return null;
-      const isF = following.some(f=>f.id===quickUser.id);
-      const isFriend = friends.some(f=>f.id===quickUser.id);
-      const reqSent = friendRequestsSent.includes(quickUser.id);
-      return (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setQuickUser(null)}>
-          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
-            <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-            <button onClick={()=>{setQuickUser(null);setViewedProfile(quickUser);}} style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,width:"100%",background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",padding:0}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:quickUser.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff",flexShrink:0}}>{quickUser.initials}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{quickUser.name}</div>
-                <div style={{fontSize:13,color:"#111"}}>@{quickUser.handle}</div>
-              </div>
-              <div style={{fontSize:12,fontWeight:700,color:OR,flexShrink:0}}>View Profile ›</div>
-            </button>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <button onClick={()=>{
-                if(isF){setFollowing(f=>f.filter(x=>x.id!==quickUser.id));}
-                else{setFollowing(f=>[...f,quickUser]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+quickUser.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
-              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
-                {isF?"✓ Following":"+ Follow"}
-              </button>
-              <button disabled={isFriend||reqSent} onClick={()=>{
-                setFriendRequestsSent(r=>[...r,quickUser.id]);
-                setNotifications(n=>[{id:Date.now(),icon:"🤝",text:"Friend request sent to "+quickUser.name+".",ts:"now",read:false},...n]);
-              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:(isFriend||reqSent)?"default":"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isFriend?"#22c55e11":reqSent?"#f3f3f3":OR+"15",color:isFriend?"#22c55e":reqSent?"#888":OR}}>
-                {isFriend?"✓ Friends":reqSent?"Request Sent":"🤝 Send Friend Request"}
-              </button>
+      ) : radioHosts.length>0 ? (
+        <div style={{marginBottom:18}}>
+          {radioHosts.map((h,i)=>(
+            <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:44,height:44,borderRadius:11,background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={20} color={OR}/></div>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{h.name}</div><div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div></div>
+              <button onClick={()=>{setBroadName(h.name);setIsBroad(true);}} style={{padding:"6px 12px",borderRadius:20,background:"#ef4444",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Go Live</button>
             </div>
-            <button onClick={()=>{
-              const already = friends.some(f=>f.id===quickUser.id);
-              if(!already) setFriends(f=>[...f,quickUser]);
-              setQuickUser(null);
-              setActiveChan(quickUser.id);
-              go("create", {lanesRoom:true});
-            }} style={{width:"100%",padding:"12px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800}}>
-              💬 Message
-            </button>
-            <button onClick={()=>setQuickUser(null)} style={{width:"100%",padding:"10px",marginTop:10,borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:13,fontFamily:F}}>Close</button>
+          ))}
+        </div>
+      ) : !showReg ? (
+        <button onClick={()=>setShowReg(true)} style={{width:"100%",padding:"14px",borderRadius:14,background:"transparent",border:"1.5px dashed #ef444466",color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><JukeboxIcon size={15} color="#ef4444"/>Register as Radio Host</button>
+      ) : null}
+
+      {showReg && (
+        <div style={{background:"#181818",borderRadius:14,padding:"16px",marginBottom:18}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:12}}>Host Registration</div>
+          <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
+              <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#222",color:hostForm.genre===g?"#fff":"#666",border:"none",fontFamily:F}}>{g}</button>
+            ))}
+          </div>
+          <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
+          <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",resize:"none",marginBottom:12}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
+            <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#222",border:"1px solid #333",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
           </div>
         </div>
-      );
-    };
+      )}
+
+      <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
+        {radiusActive ? "RADIO HOSTS · "+appRadius+" MI" : "ALL RADIO HOSTS"}
+      </div>
+      {radioHosts.length===0 ? (
+        <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
+          <div style={{marginBottom:10,display:"flex",justifyContent:"center"}}><JukeboxIcon size={38} color="#444"/></div>
+          <div style={{fontSize:15,fontWeight:700,color:"#666",marginBottom:6}}>No stations nearby yet</div>
+          <div style={{fontSize:13,color:"#444",marginBottom:14}}>Be the first to register a station above.</div>
+        </div>
+      ) : radioHosts.map((h,i)=>(
+        <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:48,height:48,borderRadius:12,background:OR+"22",border:"1.5px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={22} color={OR}/></div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{h.name}</div>
+            <div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div>
+            {h.bio && <div style={{fontSize:12,color:"#444",marginTop:3}}>{h.bio}</div>}
+          </div>
+          <button onClick={()=>toggleSavedStation(h.name)} title={savedStations.includes(h.name)?"Remove from saved stations":"Save station"} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#555",fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
+          {isBroad&&broadName===h.name
+            ? (<div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/><span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span></div>)
+            : (<button style={{padding:"6px 12px",borderRadius:20,background:"#2a2a2a",color:"#888",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Listen</button>)}
+        </div>
+      ))}
+    </div>
+  );
+
+  /* ── PROFILE PANEL ── */
+  // Settings page body — shared between Profile's full-screen Settings
+  // sub-page (subPanel==="settings") and the new left-side Settings drawer
+  // (swipe right from Routes) so the two never drift out of sync with two
+  // separate copies of the same toggles.
+  const renderSettingsBody = () => (
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
+
+        <button onClick={()=>{setShowSettingsDrawer(false);go("profile");setTimeout(()=>setSubPanel("edit"),100);}} style={{width:"100%",padding:"9px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:12}}>Edit full profile →</button>
+
+        {/* AI — Co-Pilot picker, plus the voice-control setting for
+            everywhere OUTSIDE Drive mode. Drive mode has its own separate
+            voice toggle in its own Settings sheet. */}
+        <div style={SEC}>AI</div>
+        <div style={{...CARD,marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
+            <div style={{flex:1,paddingRight:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Say "Sono" to Wake</div>
+              <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Keep voice control on everywhere outside Drive mode, so you can talk to your Co-Pilot hands-free without tapping the mic first. This setting saves.</div>
+            </div>
+            <button onClick={()=>setSayWakeEnabled(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:sayWakeEnabled?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+              <div style={{position:"absolute",top:2,left:sayWakeEnabled?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+            </button>
+          </div>
+          <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>Select Co-Pilot</div>
+          <div style={{fontSize:12,color:"#111",marginBottom:10,lineHeight:1.5}}>Choose who talks back when you say "Sono" or tap the car avatar while driving.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {AI_PALS.map(p=>(
+              <button key={p.id} onClick={()=>setAiPalId(p.id)} style={{
+                display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
+                cursor:"pointer",fontFamily:F,textAlign:"left",
+                border:"1.5px solid "+(aiPalId===p.id?p.color:"#ebebeb"),
+                background:aiPalId===p.id?p.color+"0f":"#f8f8f8"}}>
+                <div style={{width:34,height:34,borderRadius:"50%",background:p.color+"22",border:"1.5px solid "+p.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={19} color={p.color}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:aiPalId===p.id?p.color:"#111"}}>{p.name}</div>
+                  <div style={{fontSize:11,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.desc}</div>
+                </div>
+                {aiPalId===p.id && <div style={{width:18,height:18,borderRadius:"50%",background:p.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>✓</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Lanes — used to live in its own separate "Lanes Settings" sheet
+            (reached only from a gear icon in the chat list's user bar);
+            moved here so every setting in the app lives in the one place
+            people already expect to find settings (Jakob's Law), instead
+            of Lanes having its own hidden second Settings page. */}
+        <div style={SEC}>LANES</div>
+        <div style={{...CARD,marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
+            <div style={{flex:1,paddingRight:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Show online status</div>
+              <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Let others see the "● Online" indicator next to your name in Lanes.</div>
+            </div>
+            <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+              <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+            </button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
+            <div style={{flex:1,paddingRight:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Lanes notifications</div>
+              <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Get badge alerts for new messages and activity in Lanes.</div>
+            </div>
+            <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+              <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
+            </button>
+          </div>
+          <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>📌 Pinning chats</div>
+          <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>Tap the pin icon next to any lane or direct message in the Lanes list to keep it at the top.</div>
+        </div>
+
+        <div style={SEC}>STATS</div>
+        <div style={CARD}>
+          {[["⭐",pts,"Points"],["event",events.length,"Events"],["road",routes.length,"Routes"],["👥",friends.length,"Friends"],["📹",clips.length,"Clips"]].map(([ic,v,l])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
+              <span style={{fontSize:13,color:"#111",display:"flex",alignItems:"center",gap:5}}>{ic==="event"||ic==="road"?<DPadIcon id={ic} color={DPAD_COLORS[ic]} size={12}/>:ic} {l}</span>
+              <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {isSupabaseConfigured && (
+          <button onClick={()=>supabase.auth.signOut()} style={{width:"100%",padding:"11px",borderRadius:9,background:"#fff",border:"1px solid #ef444444",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:14}}>Log Out</button>
+        )}
+      </div>
+    </div>
+  );
+
+  // Simulated call overlay — { friend, status:"ringing"|"live", secs } —
+  // status flips to "live" a beat after opening and a running timer ticks
+  // while it's up, mirroring how the rest of the app fakes real-time social
+  // features without a backend. Hoisted up to the SonoLane() top level
+  // (same as go/back/viewedProfile) because it's shared by more than one
+  // top-level panel now — Profile's Friends page AND Garage's Shared
+  // Garage member sheet both open it.
+  const [callingFriend, setCallingFriend] = useState(null);
+  useEffect(() => {
+    if (!callingFriend) return;
+    if (callingFriend.status === "ringing") {
+      const t = setTimeout(() => setCallingFriend(c => c && ({...c, status:"live", secs:0})), 1400);
+      return () => clearTimeout(t);
+    }
+    if (callingFriend.status === "live") {
+      const t = setInterval(() => setCallingFriend(c => c && ({...c, secs:c.secs+1})), 1000);
+      return () => clearInterval(t);
+    }
+  }, [callingFriend?.status, callingFriend?.friend?.id]);
+
+  // Simulated in-call overlay — shared by every page with a Call button
+  // (Friends, Shared Garage members) so calling feels the same everywhere.
+  const CallOverlay = () => !callingFriend ? null : (
+    <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
+      <div style={{fontSize:12,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>{callingFriend.status==="ringing"?"CALLING":"LIVE CALL"}</div>
+      <FriendAvatar fr={callingFriend.friend} size={96} fontSize={32} style={{marginBottom:18,animation:callingFriend.status==="ringing"?"pulse 1.4s ease-in-out infinite":"none"}}/>
+      <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{callingFriend.friend.name}</div>
+      <div style={{fontSize:14,color:"#aaa",marginBottom:48}}>
+        {callingFriend.status==="ringing" ? "Ringing…" : String(Math.floor(callingFriend.secs/60)).padStart(2,"0")+":"+String(callingFriend.secs%60).padStart(2,"0")}
+      </div>
+      <button onClick={()=>setCallingFriend(null)} style={{width:60,height:60,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:24,cursor:"pointer"}}>✕</button>
+    </div>
+  );
 
     // Full public profile page — every account is public, so tapping a
     // person's name anywhere (Followers/Following, Friends, Add a Friend
-    // search, the quick-access sheet) opens this: their garage/car avatar
-    // and whatever routes/events they've posted. Simulated people have no
-    // real posts linked to them, so their Routes/Events sections just show
-    // a friendly empty state — "me" is the only account with real data.
-    const ProfileViewSheet = () => {
+    // search, the quick-access sheet, a route/event's "Posted by" credit)
+    // opens this: their garage/car avatar, top friends, and whatever
+    // routes/events they've posted. Simulated people have no real posts or
+    // friends list linked to them, so those sections just show a friendly
+    // empty state — "me" is the only account with real data everywhere.
+  const ProfileViewSheet = useStablePanel(() => {
       if(!viewedProfile) return null;
       const person = viewedProfile;
       const isMe = person.id === "me";
@@ -3795,6 +3754,27 @@ export default function SonoLane() {
               </div>
             )}
 
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>TOP FRIENDS</div>
+            {/* Only "me" has a real friends list synced anywhere — everyone
+                else's Top Friends is an honest "not available yet" rather
+                than faking data no backend actually has for them. */}
+            {!isMe ? (
+              <div style={{textAlign:"center",padding:"18px 12px",color:"#111",background:"#f8f8f8",borderRadius:14,marginBottom:24,fontSize:13}}>Not available yet.</div>
+            ) : friends.length===0 ? (
+              <div style={{textAlign:"center",padding:"18px 12px",color:"#111",background:"#f8f8f8",borderRadius:14,marginBottom:24,fontSize:13}}>No friends added yet.</div>
+            ) : (
+              <div style={{display:"flex",gap:14,marginBottom:24}}>
+                {friends.slice(0,3).map(fr=>(
+                  <div key={fr.id} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:0}}>
+                    <div style={{width:56,height:56,borderRadius:"50%",background:fr.photo?"transparent":fr.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#fff",fontWeight:800,overflow:"hidden",flexShrink:0}}>
+                      {fr.photo ? <img src={fr.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : fr.initials}
+                    </div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{fr.name}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>ROUTES POSTED</div>
             {theirRoutes.length===0 ? (
               <div style={{textAlign:"center",padding:"18px 12px",color:"#111",background:"#f8f8f8",borderRadius:14,marginBottom:24,fontSize:13}}>No routes posted yet.</div>
@@ -3828,7 +3808,207 @@ export default function SonoLane() {
           </div>
         </div>
       );
+  });
+
+  const ProfilePanel = useStablePanel(() => {
+    // `back` is now defined at the SonoLane() top level (near `go`) so the
+    // shared TopBar can call it too — see the back-button actions block.
+    // `radiusDraft`/`commitRadius` similarly live at the SonoLane() top
+    // level now (shared with the standalone RadiusPage overlay) — see there.
+
+    // Profile Completion card — collapsed by default (top 3 next-up objectives);
+    // expands to show every objective (done and not) with its point value.
+    const [showAllObjectives, setShowAllObjectives] = useState(false);
+    // Dismissible like a notification — once closed it stays hidden for the
+    // session (persisted so it doesn't pop back up on every visit to Profile).
+    const [objectivesDismissed, setObjectivesDismissed] = useState(()=>memStore.getItem("sl_objDismissed")==="1");
+    const dismissObjectives = () => { setObjectivesDismissed(true); memStore.setItem("sl_objDismissed","1"); };
+
+    // Home screen's top bar (+ quick-create, ☰ menu) is now shared across
+    // every page — its state (showQuickCreate/showInfoDrawer/infoDrawerPage)
+    // and JSX live at the app shell level instead of here; see <TopBar/>.
+    // The row of profile tile buttons (My Garage, My Routes, Settings, …) is
+    // now a row of toggle icons under TOP 3 instead of a grid — which of
+    // them is open reuses `subPanel` itself (same as every other subpage),
+    // so links elsewhere in the app that jump straight to e.g.
+    // setSubPanel("routes") still land in the right place.
+
+    // friendSearch/addFriendSearch/supaFriendResults now live at the
+    // SonoLane() top level (near showAddFriend) — the Add Friend sheet is a
+    // global overlay now, reachable from the + Quick Create menu on any
+    // Profile subPanel, not only from the Friends page itself.
+    // Special Top 3 Friend page — a combined walkie-talkie + text chat box
+    // for whichever Top 3 friend you tapped (see subPanel==="top3friend").
+    const [top3ChatText, setTop3ChatText] = useState("");
+    const top3AudioRef = useRef(null);
+    const [top3PlayingId, setTop3PlayingId] = useState(null);
+    const toggleTop3Voice = (msg) => {
+      if (!msg.audioUrl) return;
+      const audio = top3AudioRef.current || (top3AudioRef.current = new Audio());
+      if (top3PlayingId === msg.id) { audio.pause(); setTop3PlayingId(null); return; }
+      audio.src = msg.audioUrl;
+      audio.onended = () => setTop3PlayingId(null);
+      audio.play().catch(()=>{});
+      setTop3PlayingId(msg.id);
     };
+
+    // Quick walkie-talkie voice message — replaces the old "Call" button on
+    // a friend's card. Tap the mic to start recording, tap it again to stop
+    // and send right away (a one-shot push-to-talk clip, not a call), or
+    // Cancel to back out without sending. Uses the same real getUserMedia +
+    // MediaRecorder recording as Lanes' voice messages, and appends into the
+    // same friendMsgs store so the clip shows up in that friend's DM thread.
+    const [walkieTarget, setWalkieTarget] = useState(null); // friend object, or null when closed
+    const [walkiePhase,  setWalkiePhase]  = useState("idle"); // idle | recording | sent
+    const [walkieSeconds,setWalkieSeconds]= useState(0);
+    const walkieMR = useRef(null);
+    const walkieChunks = useRef([]);
+    const walkieStream = useRef(null);
+    const walkieTimer = useRef(null);
+    const closeWalkie = () => {
+      clearInterval(walkieTimer.current); walkieTimer.current = null;
+      if(walkieStream.current){ walkieStream.current.getTracks().forEach(t=>t.stop()); walkieStream.current=null; }
+      walkieChunks.current = []; walkieMR.current = null;
+      setWalkieTarget(null); setWalkiePhase("idle"); setWalkieSeconds(0);
+    };
+    const startWalkie = async () => {
+      if(walkiePhase!=="idle") return;
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        walkieStream.current = stream;
+        const mr = new MediaRecorder(stream);
+        walkieChunks.current = [];
+        mr.ondataavailable = e => { if(e.data && e.data.size>0) walkieChunks.current.push(e.data); };
+        walkieMR.current = mr;
+        mr.start();
+        setWalkiePhase("recording"); setWalkieSeconds(0);
+        walkieTimer.current = setInterval(()=>setWalkieSeconds(s=>s+1), 1000);
+      }catch{
+        setWalkieTarget(null); // mic permission denied / no mic — nothing to record
+      }
+    };
+    const sendWalkie = () => {
+      const mr = walkieMR.current;
+      const target = walkieTarget;
+      if(!mr || !target){ closeWalkie(); return; }
+      clearInterval(walkieTimer.current); walkieTimer.current = null;
+      const secs = walkieSeconds;
+      mr.onstop = () => {
+        const usedMime = mr.mimeType || "audio/webm";
+        const blob = new Blob(walkieChunks.current, {type:usedMime});
+        const audioUrl = URL.createObjectURL(blob);
+        const msg = {
+          id:Date.now(), text:"", mine:true,
+          user:userName||"You",
+          initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
+          color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+          isVoice:true, voiceSeconds:secs||1, audioUrl};
+        setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),msg]}));
+        setNotifications(n=>[{id:Date.now(),icon:"🎙️",text:"Walkie-talkie message sent to "+target.name+".",ts:"now",read:false},...n]);
+        if(walkieStream.current){ walkieStream.current.getTracks().forEach(t=>t.stop()); walkieStream.current=null; }
+        walkieChunks.current = []; walkieMR.current = null;
+        setWalkiePhase("sent");
+        // Simulated reply, same idea as the CB/lane auto-reply pattern.
+        setTimeout(()=>{
+          const reply = {id:Date.now()+1, text:"", mine:false, user:target.name, initials:target.initials, color:target.color, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), isVoice:true, voiceSeconds:Math.floor(Math.random()*6)+2, transcript:VOICE_TRANSCRIPTS[Math.floor(Math.random()*VOICE_TRANSCRIPTS.length)]};
+          setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),reply]}));
+          setNotifications(n=>[{id:Date.now()+2,icon:"🎙️",text:target.name+" sent you a voice message back.",ts:"now",read:false},...n]);
+        }, 1800+Math.random()*1200);
+        setTimeout(closeWalkie, 700);
+      };
+      try{ mr.stop(); }catch{ closeWalkie(); }
+    };
+    // Don't leak an open mic stream if this panel unmounts mid-recording.
+    useEffect(() => () => {
+      if(walkieStream.current) walkieStream.current.getTracks().forEach(t=>t.stop());
+      clearInterval(walkieTimer.current);
+    }, []);
+    // Text side of the special Top 3 Friend page's chat box — appends into
+    // the same friendMsgs thread the walkie voice clips use, so both kinds
+    // of messages show up together in one combined thread.
+    const sendTop3Text = (target) => {
+      const text = top3ChatText.trim();
+      if(!text || !target) return;
+      const msg = {
+        id:Date.now(), text, mine:true,
+        user:userName||"You",
+        initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
+        color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+        isVoice:false, voiceSeconds:0};
+      setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),msg]}));
+      setTop3ChatText("");
+      setTimeout(()=>{
+        const replies = ["👍","On my way!","Haha same","Let's do it this weekend","Sounds good.","😂"];
+        const reply = {id:Date.now()+1, text:replies[Math.floor(Math.random()*replies.length)], mine:false, user:target.name, initials:target.initials, color:target.color, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), isVoice:false, voiceSeconds:0};
+        setFriendMsgs(m=>({...m,[target.id]:[...(m[target.id]||[]),reply]}));
+      }, 1400+Math.random()*1200);
+    };
+    const WalkieTalkieSheet = () => !walkieTarget ? null : (
+      <div style={{position:"fixed",inset:0,background:"#111",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff",fontFamily:F}}>
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:1.5,color:"#888",marginBottom:24}}>WALKIE-TALKIE</div>
+        <FriendAvatar fr={walkieTarget} size={96} fontSize={32} style={{marginBottom:18,animation:walkiePhase==="recording"?"pulse 1.4s ease-in-out infinite":"none"}}/>
+        <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{walkieTarget.name}</div>
+        <div style={{fontSize:14,color:"#aaa",marginBottom:40}}>
+          {walkiePhase==="idle" ? "Tap the mic to record" : walkiePhase==="recording" ? "Recording… "+String(Math.floor(walkieSeconds/60)).padStart(2,"0")+":"+String(walkieSeconds%60).padStart(2,"0") : "Sent!"}
+        </div>
+        {walkiePhase!=="sent" && (
+          <button onClick={walkiePhase==="idle"?startWalkie:sendWalkie} title={walkiePhase==="idle"?"Start recording":"Stop and send"} style={{width:76,height:76,borderRadius:"50%",background:walkiePhase==="recording"?"#ef4444":"#22c55e",border:"none",color:"#fff",fontSize:30,cursor:"pointer",marginBottom:28,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {walkiePhase==="recording" ? "■" : "🎙️"}
+          </button>
+        )}
+        {walkiePhase!=="sent" && <button onClick={closeWalkie} style={{background:"none",border:"1px solid #444",color:"#aaa",borderRadius:20,padding:"8px 20px",fontSize:13,cursor:"pointer",fontFamily:F}}>Cancel</button>}
+      </div>
+    );
+
+    // Quick-access account sheet — opened by tapping a row in Following /
+    // Followers. Gives fast access to that person's basics, a follow toggle,
+    // and a shortcut into a direct message with them in Lanes.
+    const QuickUserSheet = () => {
+      if(!quickUser) return null;
+      const isF = following.some(f=>f.id===quickUser.id);
+      const isFriend = friends.some(f=>f.id===quickUser.id);
+      const reqSent = friendRequestsSent.includes(quickUser.id);
+      return (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setQuickUser(null)}>
+          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
+            <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+            <button onClick={()=>{setQuickUser(null);setViewedProfile(quickUser);}} style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,width:"100%",background:"none",border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",padding:0}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:quickUser.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff",flexShrink:0}}>{quickUser.initials}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{quickUser.name}</div>
+                <div style={{fontSize:13,color:"#111"}}>@{quickUser.handle}</div>
+              </div>
+              <div style={{fontSize:12,fontWeight:700,color:OR,flexShrink:0}}>View Profile ›</div>
+            </button>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <button onClick={()=>{
+                if(isF){setFollowing(f=>f.filter(x=>x.id!==quickUser.id));}
+                else{setFollowing(f=>[...f,quickUser]);setNotifications(n=>[{id:Date.now(),icon:"✨",text:"Now following "+quickUser.name+"! Their events and routes appear in your feeds.",ts:"now",read:false},...n]);}
+              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isF?"#f3f3f3":OR,color:isF?"#555":"#fff"}}>
+                {isF?"✓ Following":"+ Follow"}
+              </button>
+              <button disabled={isFriend||reqSent} onClick={()=>{
+                setFriendRequestsSent(r=>[...r,quickUser.id]);
+                setNotifications(n=>[{id:Date.now(),icon:"🤝",text:"Friend request sent to "+quickUser.name+".",ts:"now",read:false},...n]);
+              }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:(isFriend||reqSent)?"default":"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:isFriend?"#22c55e11":reqSent?"#f3f3f3":OR+"15",color:isFriend?"#22c55e":reqSent?"#888":OR}}>
+                {isFriend?"✓ Friends":reqSent?"Request Sent":"🤝 Send Friend Request"}
+              </button>
+            </div>
+            <button onClick={()=>{
+              const already = friends.some(f=>f.id===quickUser.id);
+              if(!already) setFriends(f=>[...f,quickUser]);
+              setQuickUser(null);
+              setActiveChan(quickUser.id);
+              go("create", {lanesRoom:true});
+            }} style={{width:"100%",padding:"12px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800}}>
+              💬 Message
+            </button>
+            <button onClick={()=>setQuickUser(null)} style={{width:"100%",padding:"10px",marginTop:10,borderRadius:9,background:"none",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontSize:13,fontFamily:F}}>Close</button>
+          </div>
+        </div>
+      );
+    };
+
 
     // Dispatches an objective's icon id to the right icon set — "road" (Routes)
     // and "event" (Events) use the app-wide DPad symbol/color for consistency
@@ -3839,68 +4019,19 @@ export default function SonoLane() {
         : <ProfileIcon id={icon} size={size} color="#8a8f98"/>
     );
 
-    // Renders a Shared Garage vehicle's real car avatar — the same uploaded
-    // photo or CarSVG a member picked from their own garage — inside a
-    // circle tile, falling back to a plain 🚘 for older entries that were
-    // only ever given a typed name (no avatar data attached).
-    const VehicleAvatar = ({ v, size=40 }) => (
-      <div style={{width:size,height:size,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",fontSize:size*0.45,flexShrink:0}}>
-        {v.avatarMode==="photo" && v.avatarPhoto
-          ? <img src={v.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-          : v.color
-            ? <CarSVG color={v.color} mods={v.mods||{}} size={size-12} styleId={v.bodyStyle||"sedan"}/>
-            : "🚘"}
-      </div>
-    );
-
-    // Reusable photo-gallery grid — used for the garage's exterior/interior
-    // shots. Tap the dashed "+" tile to upload (multi-select), tap the ×
-    // on a thumbnail to remove it.
-    const PhotoGallery = (photos, setPhotos, fileRef, max=12) => {
-      // One empty slot shown at a time — uploading a photo fills it and adds
-      // a fresh empty slot right after, growing one at a time until `max`
-      // photos are filled. Small galleries (car's 4 exterior/interior slots)
-      // still get the shadowed grid-tile look, just without pre-showing all
-      // the unfilled slots up front.
-      const showAllSlots = max<=4;
-      const cols = showAllSlots ? 2 : 3;
-      const emptyCount = photos.length<max ? 1 : 0;
-      const slotShadow = showAllSlots ? "0 1px 4px rgba(0,0,0,0.08)" : "none";
-      return (
-      <>
-        <div style={{display:"grid",gridTemplateColumns:"repeat("+cols+",1fr)",gap:8,marginBottom:8}}>
-          {photos.map(p=>(
-            <div key={p.id} style={{position:"relative",aspectRatio:"1",borderRadius:10,overflow:"hidden",background:"#f5f5f5",boxShadow:slotShadow}}>
-              <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-              <button onClick={()=>setPhotos(ps=>ps.filter(x=>x.id!==p.id))} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-            </div>
-          ))}
-          {Array.from({length:emptyCount}).map((_,i)=>(
-            <button key={"empty"+i} onClick={()=>fileRef.current?.click()} style={{aspectRatio:"1",borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",boxShadow:slotShadow,fontSize:26,color:"#bbb",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-          ))}
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
-          Array.from(e.target.files||[]).slice(0,Math.max(0,max-photos.length)).forEach(f=>{
-            readImageCompressed(f).then(url=>{ if(url) setPhotos(p=>[...p,{id:Date.now()+Math.random(),url}]); });
-          });
-          e.target.value="";
-        }}/>
-      </>
-      );
-    };
-
-    /* ── My Stuff sections — My Garage, My Routes, My Events, Drive
-         History, Dashcam, Achievements, Radio Stations all used to
-         be their own full-screen pages under Profile; now each just fills
-         one of these variables with its content, shown inline below the
-         icon toggle row on the Profile home screen instead (see "home
+    /* ── My Stuff sections — My Routes, My Events, Radio Stations all used
+         to be their own full-screen pages under Profile; now each just
+         fills one of these variables with its content, shown inline below
+         the icon toggle row on the Profile home screen instead (see "home
          grid" below). Each block below still only runs its content when
          its own subPanel value is active, same as before. Settings is NOT
          one of these anymore — it's its own full-screen page (see
-         subPanel==="settings" below, and BACK_PAGES), same as Edit Profile
-         or Car Details, instead of opening on top of the Profile dashboard. ── */
-    let garageSection = null, routesSection = null, myeventsSection = null,
-        historySection = null,
+         subPanel==="settings" below, and BACK_PAGES), same as Edit Profile,
+         instead of opening on top of the Profile dashboard. My Garage and
+         Drive History/Dashcam moved out to their own dedicated GaragePanel
+         (its own bottom-nav tab) — see there for VehicleAvatar/PhotoGallery
+         too, which now live there since they're only used by Garage. ── */
+    let routesSection = null, myeventsSection = null,
         radiostationsSection = null;
 
     /* routes sub */
@@ -3937,7 +4068,7 @@ export default function SonoLane() {
                     <button onClick={()=>{
                       setNewPost({title:r.title||"",body:r.body||"",type:r.type||"scenic",distance:r.distance||"",stops:r.stops?.length?[...r.stops,""]:["",""],highlights:r.highlights||""});
                       setPostPhotos(r.photos||[]); setPostSavedRoute(null); setPostRouteMode("new"); setEditingPostId(r.id); setShowPost(true);
-                      go("discover"); setDiscoverTab("routes");
+                      go("routes");
                     }} title="Edit route post" style={{width:26,height:26,borderRadius:"50%",background:"#fff",border:"1px solid #ebebeb",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
                   </div>
                   {r.stops?.length>0 && (
@@ -4086,1050 +4217,6 @@ export default function SonoLane() {
       );
     }
 
-    /* garage sub — grid of your saved cars (up to MAX_CARS, currently 3),
-       plus shared garages; tap a car tile to make it active and open its
-       full detail view (banner, stats, photos), or "Add Another Car" to
-       park the current one and start a new blank one. */
-    if(subPanel==="garage") garageSection = (
-      <div>
-        {/* The "My Profile" title row that used to sit here is gone — the
-            Garage/Routes/Events/History/Radio tab row right above already
-            says which section you're in, so a second title repeating it
-            was redundant (Law of Uniform Connectedness: the active tab
-            already carries that job). */}
-        <div style={{padding:"16px 14px 7px"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <span style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
-            <span style={{fontSize:11,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-            {/* Active car — reads the live carName/carColor/etc. fields, same
-                as every other screen that shows "your car", including the
-                avatar window at the top of Profile. The ★ badge here (vs.
-                the ★ button on parked cars below) just confirms this is the
-                one currently shown up there. */}
-            <div style={{position:"relative"}}>
-              <button onClick={()=>setSubPanel("car")} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:carSaved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:carSaved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
-                <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
-                  {carAvatarMode==="photo" && carAvatarPhoto
-                    ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                    : <CarSVG color={carColor} mods={carMods} size={62} styleId={carBodyStyle}/>}
-                </div>
-                {carName && <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{carName}</div>}
-                <div style={{fontSize:11,color:"#111",marginTop:carName?2:0}}>{carSaved?"✓ saved":carModel}</div>
-              </button>
-              <div title="Displayed at the top of your profile" style={{position:"absolute",top:6,left:6,width:24,height:24,borderRadius:"50%",background:OR,color:"#fff",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.25)"}}>★</div>
-              <button onClick={()=>setConfirmDeleteCar({id:activeCarId,name:carName||carModel||"this car"})} title="Delete car" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-            </div>
-            {/* Other saved cars — tap the tile to make one active and open
-                its full details, or tap the ★ to just display that car's
-                avatar up top without leaving the Garage grid. */}
-            {myCars.map(car=>(
-              <div key={car.id} style={{position:"relative"}}>
-                <button onClick={()=>{switchToCar(car.id);setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:car.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:car.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
-                  <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:8,flexShrink:0}}>
-                    {car.avatarMode==="photo" && car.avatarPhoto
-                      ? <img src={car.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      : <CarSVG color={car.color} mods={car.mods} size={62} styleId={car.bodyStyle}/>}
-                  </div>
-                  {car.name && <div style={{fontSize:14,fontWeight:700,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{car.name}</div>}
-                  <div style={{fontSize:11,color:"#111",marginTop:car.name?2:0}}>{car.saved?"✓ saved":car.model}</div>
-                </button>
-                <button onClick={e=>{e.stopPropagation();switchToCar(car.id);}} title="Display This Car" style={{position:"absolute",top:6,left:6,width:24,height:24,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ccc",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>★</button>
-                <button onClick={()=>setConfirmDeleteCar({id:car.id,name:car.name||car.model||"this car"})} title="Delete car" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-              </div>
-            ))}
-            {/* "Add Another Car" used to be a tile here — it's a ＋ button
-                option in the top bar's Create sheet now instead, alongside
-                Create Shared Garage, so every "start something new" action
-                lives in one place (the ＋) instead of being split between
-                the top bar and cards buried in each section. */}
-          </div>
-
-          {/* Confirm before deleting a car — wipes its photos/details, so a
-              deliberate extra step rather than an instant delete. */}
-          {confirmDeleteCar && (
-            <div onClick={()=>setConfirmDeleteCar(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}}>
-              <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18}}>
-                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:6}}>Delete {confirmDeleteCar.name}?</div>
-                <div style={{fontSize:13,color:"#111",lineHeight:1.6,marginBottom:16}}>This removes it from your garage for good, including its photos and details. This can't be undone.</div>
-                <button onClick={()=>{deleteCar(confirmDeleteCar.id);setConfirmDeleteCar(null);}} style={{width:"100%",padding:"13px",borderRadius:12,background:"#ef4444",color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>Delete Car</button>
-                <button onClick={()=>setConfirmDeleteCar(null)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>Cancel</button>
-              </div>
-            </div>
-          )}
-
-          {sharedGarages.length>0 && (
-            <>
-              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,margin:"0 0 12px"}}>SHARED GARAGES</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
-                {sharedGarages.map(g=>(
-                  <button key={g.id} onClick={()=>{setSelSharedGarage(g.id);setSubPanel("sharedgarage");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid #ebebeb",background:"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                    <div style={{width:44,height:44,borderRadius:12,background:g.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚗</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
-                      <div style={{fontSize:12,color:"#111"}}>{g.vehicles.length} vehicle{g.vehicles.length===1?"":"s"} · {g.memberIds.length+1} member{g.memberIds.length===0?"":"s"}</div>
-                    </div>
-                    <span style={{fontSize:16,color:"#ccc"}}>›</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* "Create Shared Garage" used to be a card here — it's in the
-              top bar's ＋ Create sheet now instead (see above). */}
-        </div>
-
-        {showCreateSharedGarage && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowCreateSharedGarage(false);setNewGarageInvitees([]);}}>
-            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-              <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Create a Shared Garage</div>
-              <div style={{fontSize:12,color:"#111",marginBottom:14}}>Invite friends to add their own vehicle, chat as a group, and call each other — all in one place.</div>
-              <input value={newSharedGarageName} onChange={e=>setNewSharedGarageName(e.target.value)} placeholder="e.g. The Crew's Builds" style={{...INP,marginBottom:14}}/>
-              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.8,marginBottom:8}}>INVITE FRIENDS</div>
-              {friends.length===0 && <div style={{fontSize:13,color:"#111",marginBottom:14}}>Add some friends first to invite them.</div>}
-              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
-                {friends.map(fr=>{
-                  const picked = newGarageInvitees.includes(fr.id);
-                  return (
-                    <button key={fr.id} onClick={()=>setNewGarageInvitees(p=>picked?p.filter(x=>x!==fr.id):[...p,fr.id])} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:picked?"1.5px solid "+OR:"1px solid #ebebeb",background:picked?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-                      <FriendAvatar fr={fr} size={30} fontSize={11}/>
-                      <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
-                      <div style={{width:18,height:18,borderRadius:5,border:picked?"none":"1.5px solid #ddd",background:picked?OR:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{picked?"✓":""}</div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{
-                  if(!newSharedGarageName.trim())return;
-                  const COLS=[OR,"#6366f1","#22c55e","#a855f7","#ec4899","#14b8a6"];
-                  const gid = "sg_"+Date.now();
-                  const laneId = "garage_"+gid;
-                  const invited = friends.filter(f=>newGarageInvitees.includes(f.id));
-                  const garage = {
-                    id:gid, name:newSharedGarageName.trim(),
-                    color:COLS[sharedGarages.length%COLS.length],
-                    memberIds:invited.map(f=>f.id),
-                    vehicles:[], laneId,
-                  };
-                  setSharedGarages(g=>[...g,garage]);
-                  // Dedicated group chat lane — reuses the same Lanes chat plumbing as
-                  // every other lane; kept out of the sidebar lists via garageId.
-                  setCustomLanes(l=>[...l,{id:laneId,name:garage.name.toLowerCase().replace(/\s+/g,"-"),color:garage.color,desc:"Shared garage chat",visibility:"friends",authorId:"me",garageId:gid}]);
-                  invited.forEach((fr,i)=>{
-                    setTimeout(()=>{
-                      const car = SAMPLE_GARAGE_CARS[Math.floor(Math.random()*SAMPLE_GARAGE_CARS.length)];
-                      setSharedGarages(gs=>gs.map(x=>x.id===gid ? {...x,vehicles:[...x.vehicles,{id:"v_"+Date.now()+"_"+i,ownerId:fr.id,ownerName:fr.name,ownerInitials:fr.initials,ownerColor:fr.color,name:car.name,bio:car.bio,color:car.color,bodyStyle:car.bodyStyle}]} : x));
-                      setNotifications(n=>[{id:Date.now()+i,icon:"🚗",text:fr.name+" joined "+garage.name+" and added their "+car.name+".",ts:"now",read:false},...n]);
-                    }, 1600+i*900);
-                  });
-                  setNewSharedGarageName("");setNewGarageInvitees([]);setShowCreateSharedGarage(false);
-                  setSelSharedGarage(gid);setSubPanel("sharedgarage");
-                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create</button>
-                <button onClick={()=>{setShowCreateSharedGarage(false);setNewGarageInvitees([]);}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-
-    /* shared garage sub — a garage co-owned with invited friends: each
-       member's vehicle + bio, a shortcut into the dedicated group chat, and
-       direct Call/Text access to every member. */
-    if(subPanel==="sharedgarage") {
-      const g = sharedGarages.find(x=>x.id===selSharedGarage);
-      if(!g) { setSubPanel("garage"); return null; }
-      const myVehicle = g.vehicles.find(v=>v.ownerId==="me");
-      const members = g.memberIds.map(id=>friends.find(f=>f.id===id)).filter(Boolean);
-      const invitableFriends = friends.filter(f=>!g.memberIds.includes(f.id));
-      return (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          {/* Own header removed — the shared TopBar shows back/Group Chat
-              while this page is open (see <TopBar/>). */}
-          <div style={{padding:"10px 14px 0",flexShrink:0,display:"flex",alignItems:"center",gap:8}}>
-            <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-              {g.photo ? <img src={g.photo} alt="" style={{width:22,height:22,borderRadius:"50%",objectFit:"cover",verticalAlign:"middle",marginRight:6}}/> : "🚗 "}
-              {g.name}
-            </div>
-            <button onClick={()=>{setEditGarageDraft({name:g.name,bio:g.bio||"",photo:g.photo||null});setShowEditGarage(true);}} title="Edit garage" style={{width:30,height:30,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
-          </div>
-          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 7px"}}>
-            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
-            {g.bio && g.bio.trim() && <div style={{fontSize:13,color:"#111",lineHeight:1.5,marginBottom:14}}>{g.bio}</div>}
-
-            {/* Car avatar window grid — same visual language as the MY CARS
-                grid on the Profile/Garage page: a bordered rounded tile per
-                person with a circular avatar window, name, and status line. */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
-              {/* Your vehicle tile */}
-              {myVehicle ? (
-                <div style={{position:"relative"}}>
-                  <button onClick={()=>{setShareCarId(myVehicle.sourceCarId||null);setNewVehicle({name:myVehicle.name,bio:myVehicle.bio});setShowAddVehicle(true);}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"1.5px solid "+OR+"44",background:"#fff9f5",cursor:"pointer",fontFamily:F}}>
-                    <VehicleAvatar v={myVehicle} size={72}/>
-                    <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:8,textAlign:"center",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{myVehicle.name}</div>
-                    <div style={{fontSize:11,color:OR,fontWeight:700,marginTop:2}}>· You</div>
-                  </button>
-                  <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,vehicles:x.vehicles.filter(v=>v.id!==myVehicle.id)}:x))} title="Remove your vehicle" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"#fff",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-                </div>
-              ) : (
-                <button onClick={()=>{setShareCarId(null);setNewVehicle({name:"",bio:""});setShowAddVehicle(true);}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
-                  <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,color:"#ccc"}}>＋</div>
-                  <div style={{fontSize:13,fontWeight:700,color:"#111",marginTop:8,textAlign:"center"}}>Share Your Car</div>
-                  <div style={{fontSize:10,color:"#111",marginTop:2,textAlign:"center"}}>· You</div>
-                </button>
-              )}
-
-              {/* Member tiles — tapping opens a Call/Text action sheet
-                  instead of always-visible inline buttons. */}
-              {members.map(fr=>{
-                const v = g.vehicles.find(x=>x.ownerId===fr.id);
-                return (
-                  <button key={fr.id} onClick={()=>setGarageMemberAction(fr)} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",fontFamily:F}}>
-                    {v ? <VehicleAvatar v={v} size={72}/> : <FriendAvatar fr={fr} size={72} fontSize={26}/>}
-                    <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:8,textAlign:"center",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v ? v.name : fr.name}</div>
-                    <div style={{fontSize:11,color:"#111",marginTop:2,textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{v ? fr.name : "Invited · pending"}</div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Invite more friends */}
-            {invitableFriends.length>0 && (
-              <div style={{marginTop:18}}>
-                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>INVITE MORE FRIENDS</div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {invitableFriends.map(fr=>(
-                    <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
-                      <FriendAvatar fr={fr} size={30} fontSize={11}/>
-                      <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
-                      <button onClick={()=>{
-                        setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:[...x.memberIds,fr.id]}:x));
-                        setTimeout(()=>{
-                          const car = SAMPLE_GARAGE_CARS[Math.floor(Math.random()*SAMPLE_GARAGE_CARS.length)];
-                          setSharedGarages(gs=>gs.map(x=>x.id===g.id ? {...x,vehicles:[...x.vehicles,{id:"v_"+Date.now(),ownerId:fr.id,ownerName:fr.name,ownerInitials:fr.initials,ownerColor:fr.color,name:car.name,bio:car.bio,color:car.color,bodyStyle:car.bodyStyle}]} : x));
-                          setNotifications(n=>[{id:Date.now(),icon:"🚗",text:fr.name+" joined "+g.name+" and added their "+car.name+".",ts:"now",read:false},...n]);
-                        }, 1800);
-                      }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Invite</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Member action sheet — tap a member's tile to Call or Text them.
-              Text opens the Lanes room with lanesGarageOrigin set so the
-              back button from that room returns here, not the Lanes list. */}
-          {garageMemberAction && (
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setGarageMemberAction(null)}>
-              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,paddingBottom:26}} onClick={e=>e.stopPropagation()}>
-                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                  <FriendAvatar fr={garageMemberAction} size={44} fontSize={16}/>
-                  <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{garageMemberAction.name}</div>
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{setCallingFriend({friend:garageMemberAction,status:"ringing",secs:0});setGarageMemberAction(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
-                  <button onClick={()=>{const fr=garageMemberAction;setGarageMemberAction(null);setActiveChan(fr.id);go("create",{lanesRoom:true,lanesGarageOrigin:{garageId:g.id}});}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Edit Garage sheet — photo, name, bio, and members (remove). */}
-          {showEditGarage && (
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEditGarage(false)}>
-              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Edit Garage</div>
-
-                <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
-                  <button onClick={()=>garagePhotoRef.current?.click()} style={{width:80,height:80,borderRadius:"50%",background:editGarageDraft.photo?"transparent":"#f3f3f3",border:"1.5px solid #ebebeb",cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
-                    {editGarageDraft.photo ? <img src={editGarageDraft.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:24,color:"#ccc"}}>🚗</span>}
-                  </button>
-                  <input ref={garagePhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,800,0.85).then(url=>{if(url)setEditGarageDraft(d=>({...d,photo:url}));});e.target.value="";}}/>
-                </div>
-                <div style={{textAlign:"center",marginBottom:16}}>
-                  <button onClick={()=>garagePhotoRef.current?.click()} style={{padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>{editGarageDraft.photo?"Replace Photo":"Upload Photo"}</button>
-                  {editGarageDraft.photo && <button onClick={()=>setEditGarageDraft(d=>({...d,photo:null}))} style={{marginLeft:8,padding:"6px 14px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
-                </div>
-
-                <input value={editGarageDraft.name} onChange={e=>setEditGarageDraft(d=>({...d,name:e.target.value}))} placeholder="Garage name" style={{...INP,marginBottom:8}}/>
-                <textarea value={editGarageDraft.bio} onChange={e=>setEditGarageDraft(d=>({...d,bio:e.target.value.slice(0,140)}))} placeholder="Short bio — what this garage/crew is about" maxLength={140} style={{...INP,minHeight:70,resize:"vertical",marginBottom:4}}/>
-                <div style={{fontSize:10,color:"#bbb",textAlign:"right",marginBottom:12}}>{editGarageDraft.bio.length}/140</div>
-
-                {members.length>0 && (
-                  <div style={{marginBottom:16}}>
-                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MEMBERS</div>
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {members.map(fr=>(
-                        <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
-                          <FriendAvatar fr={fr} size={30} fontSize={11}/>
-                          <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
-                          <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:x.memberIds.filter(id=>id!==fr.id),vehicles:x.vehicles.filter(v=>v.ownerId!==fr.id)}:x))} title="Remove member" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{
-                    if(!editGarageDraft.name.trim())return;
-                    setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,name:editGarageDraft.name.trim(),bio:editGarageDraft.bio.trim(),photo:editGarageDraft.photo}:x));
-                    setShowEditGarage(false);
-                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
-                  <button onClick={()=>setShowEditGarage(false)} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showAddVehicle && (() => {
-            // Every saved car in your garage (the active one + parked ones from
-            // myCars) that you can post here as-is, avatar and all — picking one
-            // fills the name/bio below with its real data, but they stay
-            // editable, and typing over the name clears the pick so a fully
-            // custom manual entry still works same as before.
-            const myGarageCars = [
-              {id:activeCarId, name:carName||carModel, model:carModel, color:carColor, bodyStyle:carBodyStyle, mods:carMods, avatarMode:carAvatarMode, avatarPhoto:carAvatarPhoto, bio:carBio, saved:carSaved},
-              ...myCars.map(c=>({id:c.id, name:c.name||c.model, model:c.model, color:c.color, bodyStyle:c.bodyStyle, mods:c.mods, avatarMode:c.avatarMode, avatarPhoto:c.avatarPhoto, bio:c.bio, saved:c.saved})),
-            ].filter(c=>c.saved);
-            const picked = myGarageCars.find(c=>c.id===shareCarId);
-            return (
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowAddVehicle(false);setShareCarId(null);}}>
-              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
-                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Share a Car From Your Garage</div>
-                <div style={{fontSize:12,color:"#111",marginBottom:14}}>Pick one of your saved car avatars, or type one in manually below.</div>
-                {myGarageCars.length>0 && (
-                  <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:6,marginBottom:16}}>
-                    {myGarageCars.map(car=>(
-                      <button key={car.id} onClick={()=>{setShareCarId(car.id);setNewVehicle({name:car.name,bio:car.bio||""});}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 8px",borderRadius:14,border:shareCarId===car.id?"1.5px solid "+OR:"1.5px solid #ebebeb",background:shareCarId===car.id?OR+"08":"#fff",cursor:"pointer",fontFamily:F,flexShrink:0,minWidth:76}}>
-                        <VehicleAvatar v={car} size={48}/>
-                        <div style={{fontSize:11,fontWeight:700,color:"#111",marginTop:6,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{car.name}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <input value={newVehicle.name} onChange={e=>{setShareCarId(null);setNewVehicle(v=>({...v,name:e.target.value}));}} placeholder="e.g. '20 Civic Type R" style={{...INP,marginBottom:8}}/>
-                <textarea value={newVehicle.bio} onChange={e=>setNewVehicle(v=>({...v,bio:e.target.value}))} placeholder="Short bio — mods, story, whatever you want the crew to know" style={{...INP,minHeight:70,resize:"vertical",marginBottom:14}}/>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{
-                    if(!newVehicle.name.trim())return;
-                    setSharedGarages(gs=>gs.map(x=>x.id===g.id?{
-                      ...x,
-                      vehicles:[
-                        ...x.vehicles.filter(v=>v.ownerId!=="me"),
-                        {id:"v_me_"+Date.now(), ownerId:"me", ownerName:userName||"You", ownerInitials:"ME", ownerColor:OR,
-                         name:newVehicle.name.trim(), bio:newVehicle.bio.trim()||"No bio yet.",
-                         avatarMode:picked?.avatarMode, avatarPhoto:picked?.avatarPhoto, color:picked?.color, bodyStyle:picked?.bodyStyle, mods:picked?.mods, sourceCarId:picked?.id},
-                      ],
-                    }:x));
-                    setNewVehicle({name:"",bio:""});setShareCarId(null);setShowAddVehicle(false);
-                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
-                  <button onClick={()=>{setShowAddVehicle(false);setShareCarId(null);}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
-                </div>
-              </div>
-            </div>
-            );
-          })()}
-          <CallOverlay/>
-        </div>
-      );
-    }
-
-    /* car sub — garage / stats view */
-    if(subPanel==="car") {
-      const bannerBg = carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css;
-      return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {/* Own header removed — the shared TopBar switches to back(left)/
-            edit(right) buttons while this page is open (see <TopBar/>). */}
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 7px"}}>
-
-          {/* Hero — customizable banner (upload or premade) behind either the custom SVG avatar or an uploaded car photo. Banner is edited from the Edit Car menu. */}
-          <div style={{background:bannerBg,padding:"28px 20px 20px",display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
-            {!carBannerPhoto && <div style={{position:"absolute",bottom:0,left:"50%",transform:"translateX(-50%)",width:"70%",height:40,background:carColor+"33",filter:"blur(20px)",borderRadius:"50%"}}/>}
-            <div style={{position:"relative",zIndex:1}}>
-              {carAvatarMode==="photo" && carAvatarPhoto
-                ? <img src={carAvatarPhoto} alt="" style={{width:150,height:150,borderRadius:20,objectFit:"cover",border:"3px solid rgba(255,255,255,0.85)",boxShadow:"0 6px 20px rgba(0,0,0,0.4)"}}/>
-                : <CarSVG color={carColor} mods={carMods} size={200} styleId={carBodyStyle}/>}
-            </div>
-            <div style={{marginTop:10,textAlign:"center",zIndex:1}}>
-              <div style={{fontSize:20,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carName || CAR_BRANDS.find(b=>b.id===carBrand)?.name || "My Car"}</div>
-              {(carName || carModel) && <div style={{fontSize:13,color:"#ddd",marginTop:2,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{(carName && carBrand) ? (CAR_BRANDS.find(b=>b.id===carBrand)?.name+" ") : ""}{carModel} · {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length} mods</div>}
-            </div>
-            {/* Private car info — opens from this wallet button on the car
-                avatar window instead of always sitting inline on the page.
-                Same data, edited from Edit Car, only ever visible to you. */}
-            <button onClick={()=>setShowPrivateCard(true)} title="Private Car Info" style={{position:"absolute",bottom:10,right:10,width:38,height:38,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>
-              <ProfileIcon id="briefcase" size={18} color="#fff"/>
-            </button>
-          </div>
-
-          {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length>0&&(
-            <div style={{padding:"12px 16px 0",display:"flex",gap:5,flexWrap:"wrap"}}>
-              {Object.entries(carMods).filter(([,v])=>v&&v!=="None"&&v!=="Stock").map(([k,v])=>(
-                <div key={k} style={{background:OR+"15",border:"1px solid "+OR+"33",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,color:OR}}>{k}: {v}</div>
-              ))}
-            </div>
-          )}
-
-          <div style={{padding:"14px 16px 0"}}>
-            {/* Bio — build story / mod description, set from Edit Car. Shown
-                right above Photos, only when the owner has written one. */}
-            {carBio && carBio.trim() && (<>
-              <div style={SEC}>BIO</div>
-              <div style={{...CARD,fontSize:14,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carBio}</div>
-            </>)}
-
-            <div style={SEC}>PHOTOS</div>
-            <div style={{fontSize:12,color:"#111",fontWeight:700,marginBottom:6}}>EXTERIOR (UP TO 4)</div>
-            {PhotoGallery(carExteriorPhotos, setCarExteriorPhotos, carExteriorPhotoRef, 4)}
-            <div style={{fontSize:12,color:"#111",fontWeight:700,marginTop:10,marginBottom:6}}>INTERIOR (UP TO 4)</div>
-            {PhotoGallery(carInteriorPhotos, setCarInteriorPhotos, carInteriorPhotoRef, 4)}
-
-            <div style={{...SEC,marginTop:16}}>DRIVING STATS</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
-              {[
-                {icKind:"profile",ic:"car",   label:"Total Mileage",val:totalMiles.toFixed(1),unit:"mi driven"},
-                {icKind:"profile",ic:"history",label:"Total Drives",val:tripHistory.length,unit:"recorded"},
-                {icKind:"dpad",   ic:"road",   dc:DPAD_COLORS.road,  label:"Total Routes",val:routes.length,unit:"saved"},
-                {icKind:"profile",ic:"video",  label:"Dashcam Clips",val:clips.length,unit:"recorded"},
-                {icKind:"profile",ic:"star",   label:"Star Points",val:pts,unit:"earned"},
-                {icKind:"profile",ic:"trophy", pc:"#f5a623",         label:"Driver Level",val:"Lv "+Math.floor(pts/200),unit:"rank"},
-              ].map(s=>(
-                <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",padding:"12px 14px"}}>
-                  <div style={{marginBottom:6}}>{s.icKind==="dpad" ? <DPadIcon id={s.ic} color={s.dc} size={20}/> : <ProfileIcon id={s.ic} size={20} color={s.pc||"#8a8f98"}/>}</div>
-                  <div style={{fontSize:18,fontWeight:900,color:"#111",lineHeight:1}}>{s.val}</div>
-                  <div style={{fontSize:10,color:"#111",marginTop:3}}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {routes.length>0&&<>
-              <div style={SEC}>RECENT ROUTES</div>
-              {routes.slice(0,3).map(r=>(
-                <div key={r.id} style={{...CARD,display:"flex",alignItems:"center",gap:10,padding:"10px 12px"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{r.title}</div>
-                    <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
-                  </div>
-                  <button onClick={()=>startRouteDirections(r)} title="Get Directions" style={{padding:"4px 10px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭</button>
-                </div>
-              ))}
-            </>}
-
-            {/* Private car info is no longer shown inline on this page at
-                all — the only way to open it is the briefcase button on the
-                car avatar banner above. Same data, edited from Edit Car,
-                only ever visible to you on your own device. */}
-          </div>
-        </div>
-
-        {/* Private car info sheet — only visible to the owner here on their
-            own device; never shown on posts, the home hero, or anywhere else
-            public. Opened only via the wallet button above. */}
-        {showPrivateCard && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowPrivateCard(false)}>
-            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-              <div style={{width:30,height:3,background:"#e8e8e8",borderRadius:2,margin:"12px auto 0",flexShrink:0}}/>
-              <div style={{padding:"10px 16px 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-                <ProfileIcon id="briefcase" size={18} color="#111"/>
-                <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>Private Car Info</div>
-                <button onClick={()=>setShowPrivateCard(false)} style={{width:28,height:28,borderRadius:"50%",border:"none",background:"#f3f3f3",color:"#111",fontSize:15,cursor:"pointer"}}>✕</button>
-              </div>
-              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-                <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0"}}>
-                  <div style={{fontSize:11,color:"#111",fontWeight:700,marginBottom:8}}>🔒 Only visible to you.</div>
-                  {carPrivatePhotos.length>0 && (
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:carPlate||carRegDate||carMileage||carPrivateNotes?10:0}}>
-                      {carPrivatePhotos.map(p=>(
-                        <div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#f0e6c8"}}>
-                          <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {carPlate && (
-                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
-                      <span style={{fontSize:12,color:"#111"}}>License Plate</span>
-                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{carPlate}</span>
-                    </div>
-                  )}
-                  {carRegDate && (
-                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
-                      <span style={{fontSize:12,color:"#111"}}>Registration Date</span>
-                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{new Date(carRegDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>
-                    </div>
-                  )}
-                  {carMileage && (
-                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:(carPrivateNotes?"1px solid #f2f2f2":"none")}}>
-                      <span style={{fontSize:12,color:"#111"}}>Current Mileage</span>
-                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{Number(carMileage).toLocaleString()} mi</span>
-                    </div>
-                  )}
-                  {carPrivateNotes && (
-                    <div style={{padding:"8px 0 0"}}>
-                      <div style={{fontSize:12,color:"#111",marginBottom:4}}>Other Notes</div>
-                      <div style={{fontSize:13,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carPrivateNotes}</div>
-                    </div>
-                  )}
-                  {!(carPlate||carRegDate||carMileage||carPrivateNotes||carPrivatePhotos.length>0) && (
-                    <div style={{fontSize:13,color:"#111",textAlign:"center",padding:"10px 0"}}>No private info added yet — add it from Edit Car.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      );
-    }
-
-    /* editcar sub — dedicated Edit Car tab: avatar (custom SVG or uploaded
-       photo), color, name, model, mods. Reached only from My Garage's
-       "Edit Car" button — this is the sole place the car can be named/edited. */
-    if(subPanel==="editcar"){
-      const editBannerBg = carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css;
-      return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {/* Own header removed — the shared TopBar shows back/Save while this
-            page is open (see <TopBar/>). */}
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
-
-          <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Edit Car</div>
-          {/* Avatar mode — custom SVG avatar or an uploaded photo of the real car */}
-          <div style={SEC}>CAR AVATAR</div>
-          <div style={{display:"flex",gap:8,marginBottom:12}}>
-            {[["avatar","🎨","Custom Avatar"],["photo","📷","Upload Photo"]].map(([id,ic,label])=>(
-              <button key={id} onClick={()=>setCarAvatarMode(id)} style={{
-                flex:1,padding:"10px 8px",borderRadius:12,cursor:"pointer",fontFamily:F,textAlign:"center",
-                border:"1.5px solid "+(carAvatarMode===id?OR:"#ebebeb"),
-                background:carAvatarMode===id?OR+"0f":"#f8f8f8",
-              }}>
-                <div style={{fontSize:20,marginBottom:2}}>{ic}</div>
-                <div style={{fontSize:12,fontWeight:700,color:carAvatarMode===id?OR:"#111"}}>{label}</div>
-              </button>
-            ))}
-          </div>
-
-          {carAvatarMode==="avatar" ? (
-            <div style={{...CARD,padding:0,overflow:"hidden",marginBottom:14}}>
-              <div style={{background:editBannerBg,padding:"14px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <CarSVG color={carColor} mods={carMods} size={140} styleId={carBodyStyle}/>
-              </div>
-            </div>
-          ) : (
-            <div style={{...CARD,padding:0,overflow:"hidden",marginBottom:14,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-              <div style={{width:"100%",background:editBannerBg,padding:"14px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-                <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{width:280,height:280,maxWidth:"100%",borderRadius:28,overflow:"hidden",border:"1.5px dashed "+(carAvatarPhoto?"transparent":"rgba(255,255,255,0.6)"),background:carAvatarPhoto?"transparent":"rgba(255,255,255,0.15)",cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  {carAvatarPhoto ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:48,color:"#fff"}}>+</span>}
-                </button>
-                <input ref={carAvatarPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,1024,0.85).then(url=>{if(url)setCarAvatarPhoto(url);});e.target.value="";}}/>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{padding:"7px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>{carAvatarPhoto?"Replace Photo":"Upload Photo"}</button>
-                  {carAvatarPhoto && <button onClick={()=>setCarAvatarPhoto(null)} style={{padding:"7px 14px",borderRadius:20,background:"rgba(255,255,255,0.9)",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
-                </div>
-              </div>
-              {!carAvatarPhoto && <div style={{fontSize:11,color:"#111",textAlign:"center",padding:"8px 10px"}}>Uploaded photo appears wherever your car avatar shows up.</div>}
-            </div>
-          )}
-
-          {/* Appearance editor — Banner / Body Style / Color / Brand / Mods all
-              live behind one toggle instead of five stacked sections, so you
-              can flip between them without scrolling away from the avatar
-              preview above, which updates live as you change any of them. */}
-          <div style={{display:"flex",gap:5,marginBottom:12,overflowX:"auto"}}>
-            {[["banner","Banner"],["bodystyle","Body Style"],["color","Color"],["brand","Brand"],["mods","Mods"]].map(([id,label])=>(
-              <button key={id} onClick={()=>setCarEditTab(id)} style={{
-                flexShrink:0,padding:"7px 13px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:700,
-                border:"1.5px solid "+(carEditTab===id?OR:"#ebebeb"),
-                background:carEditTab===id?OR+"0f":"#f8f8f8",
-                color:carEditTab===id?OR:"#111",
-              }}>{label}</button>
-            ))}
-          </div>
-
-          {carEditTab==="banner" && (
-            <div style={{...CARD,marginBottom:14}}>
-              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>SELECT A BANNER</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <button onClick={()=>carBannerPhotoRef.current?.click()} style={{
-                  height:56,borderRadius:12,cursor:"pointer",position:"relative",overflow:"hidden",
-                  border:carBannerPhoto?"2.5px solid "+OR:"1.5px dashed "+OR+"66",
-                  background:carBannerPhoto?"url("+carBannerPhoto+") center/cover no-repeat":OR+"08",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                }}>
-                  {!carBannerPhoto && <span style={{fontSize:12,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:16}}>📤</span>Upload Photo</span>}
-                  {carBannerPhoto && <span style={{position:"absolute",bottom:4,left:6,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>Your Photo</span>}
-                  {carBannerPhoto && <span style={{position:"absolute",top:4,right:5,fontSize:12,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
-                </button>
-                {CAR_BANNERS.map(b=>(
-                  <button key={b.id} onClick={()=>{setCarBannerPreset(b.id);setCarBannerPhoto(null);}} style={{
-                    height:56,borderRadius:12,border:(!carBannerPhoto&&carBannerPreset===b.id)?"2.5px solid "+OR:"1.5px solid #ebebeb",
-                    background:b.css,cursor:"pointer",position:"relative",overflow:"hidden",
-                  }}>
-                    <span style={{position:"absolute",bottom:4,left:6,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>{b.label}</span>
-                    {(!carBannerPhoto&&carBannerPreset===b.id) && <span style={{position:"absolute",top:4,right:5,fontSize:12,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
-                  </button>
-                ))}
-              </div>
-              <input ref={carBannerPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,1440,0.82).then(url=>{if(url)setCarBannerPhoto(url);});e.target.value="";}}/>
-              {carBannerPhoto && <button onClick={()=>setCarBannerPhoto(null)} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:12}}>Remove Uploaded Photo</button>}
-            </div>
-          )}
-
-          {carEditTab==="bodystyle" && (
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
-              {CAR_BODY_STYLES.map(s=>(
-                <button key={s.id} onClick={()=>{setCarBodyStyle(s.id);setCarModel(s.label);setCarSaved(false);}} style={{
-                  display:"flex",flexDirection:"column",alignItems:"center",padding:"6px 3px 5px",borderRadius:10,cursor:"pointer",fontFamily:F,
-                  border:"1.5px solid "+(carBodyStyle===s.id?OR:"#ebebeb"),
-                  background:carBodyStyle===s.id?OR+"0f":"#f8f8f8",
-                }}>
-                  <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-                    <CarSVG color={carColor} mods={{}} size={46} styleId={s.id}/>
-                  </div>
-                  <div style={{fontSize:9.5,fontWeight:700,color:carBodyStyle===s.id?OR:"#111",marginTop:2,textAlign:"center",lineHeight:1.15}}>{s.label}</div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {carEditTab==="color" && (
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
-              {CAR_COLORS.map(c=><button key={c} onClick={()=>{setCarColor(c);setCarSaved(false);}} style={{width:28,height:28,borderRadius:"50%",background:c,border:"none",cursor:"pointer",outline:carColor===c?"3px solid "+OR:"none",outlineOffset:2}}/>)}
-            </div>
-          )}
-
-          {carEditTab==="brand" && (
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
-              <button onClick={()=>{setCarBrand(null);setCarSaved(false);}} style={TAG(carBrand===null)}>None</button>
-              {CAR_BRANDS.map(b=>(
-                <button key={b.id} onClick={()=>{setCarBrand(b.id);setCarSaved(false);}} style={{
-                  padding:"6px 11px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,
-                  border:"1.5px solid "+(carBrand===b.id?b.color:"#ebebeb"),
-                  background:carBrand===b.id?b.color+"1a":"#f8f8f8",
-                  color:carBrand===b.id?b.color:"#111",
-                }}>{b.name}</button>
-              ))}
-            </div>
-          )}
-
-          {carEditTab==="mods" && (
-            <div style={{marginBottom:14}}>
-              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:6}}>MODS — {activeModCat}</div>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
-                {Object.keys(CAR_MODS).map(c=><button key={c} onClick={()=>setActiveModCat(c)} style={{...TAG(activeModCat===c),flexShrink:0,fontSize:12,padding:"4px 9px"}}>{c}</button>)}
-              </div>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
-                {(CAR_MODS[activeModCat]||[]).map(o=><button key={o} onClick={()=>{setCarMods(m=>({...m,[activeModCat]:o}));setCarSaved(false);}} style={TAG(carMods[activeModCat]===o)}>{o}</button>)}
-              </div>
-            </div>
-          )}
-
-          <div style={SEC}>NAME</div>
-          <input value={carName} onChange={e=>{setCarName(e.target.value);setCarSaved(false);}} placeholder="Name your ride…" style={{...INP,marginBottom:14}}/>
-
-          {/* Bio — free-text build/mod description, shown publicly on the car
-              details page above Photos. Distinct from the private info below. */}
-          <div style={SEC}>BIO</div>
-          <textarea value={carBio} onChange={e=>{setCarBio(e.target.value);setCarSaved(false);}} placeholder="Describe the mods you've done, the build story, or anything else you want shown on your car's page…" rows={4} style={{...INP,resize:"none",marginBottom:14}}/>
-
-          {/* Home avatar display — name/model text on the home hero is opt-in */}
-          <div style={SEC}>HOME AVATAR WINDOW</div>
-          <button onClick={()=>setCarShowInfoHome(v=>!v)} style={{...CARD,display:"flex",alignItems:"center",gap:12,cursor:"pointer",border:"1px solid #ebebeb",width:"100%",textAlign:"left",fontFamily:F}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Show name &amp; model</div>
-              <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Display your car's name and model as text under the avatar on the home page.</div>
-            </div>
-            <div style={{width:40,height:23,borderRadius:20,background:carShowInfoHome?OR:"#e0e0e0",position:"relative",flexShrink:0,transition:"background 0.15s"}}>
-              <div style={{position:"absolute",top:2,left:carShowInfoHome?19:2,width:19,height:19,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.3)",transition:"left 0.15s"}}/>
-            </div>
-          </button>
-
-          {/* Private car info — plate, registration, mileage, and any other
-              handy details. Never shown publicly; kept strictly for the
-              owner's own quick reference on their phone. Tinted (instead of
-              the plain white every other card on this page uses) so it's
-              obvious at a glance that this section is handled differently. */}
-          <div style={SEC}>PRIVATE CAR INFO</div>
-          <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0",marginBottom:14}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,color:"#111"}}>
-              <span style={{fontSize:14}}>🔒</span>
-              <span style={{fontSize:12,fontWeight:700,color:"#111"}}>Only visible to you — never shown on your car's page or profile.</span>
-            </div>
-            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>LICENSE PLATE</div>
-            <input value={carPlate} onChange={e=>{setCarPlate(e.target.value);setCarSaved(false);}} placeholder="e.g. 8ABC123" style={{...INP,marginBottom:12}}/>
-            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>REGISTRATION DATE</div>
-            <input type="date" value={carRegDate} onChange={e=>{setCarRegDate(e.target.value);setCarSaved(false);}} style={{...INP,marginBottom:12}}/>
-            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>CURRENT MILEAGE</div>
-            <input type="number" inputMode="numeric" value={carMileage} onChange={e=>{setCarMileage(e.target.value);setCarSaved(false);}} placeholder="e.g. 42500" style={{...INP,marginBottom:12}}/>
-            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>OTHER NOTES</div>
-            <textarea value={carPrivateNotes} onChange={e=>{setCarPrivateNotes(e.target.value);setCarSaved(false);}} placeholder="VIN, insurance info, service reminders, anything else handy to have on hand…" rows={3} style={{...INP,resize:"none",marginBottom:12}}/>
-            {/* Snapshots of things like your insurance card or registration —
-                tapping + brings up your device's normal choice between taking
-                a new photo with the camera or picking an existing one. */}
-            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>PHOTOS — INSURANCE CARD, ETC.</div>
-            {PhotoGallery(carPrivatePhotos, setCarPrivatePhotos, carPrivatePhotoRef, 6)}
-          </div>
-        </div>
-      </div>
-    );}
-
-    /* dashcam sub */
-    if(subPanel==="history") {
-      const fmt2 = s => {
-        const m=Math.floor(s/60), sec=s%60;
-        return m>0 ? m+"m "+sec+"s" : sec+"s";
-      };
-      // Simulated path colors for variety
-      const PATH_COLORS = ["#f97316","#6366f1","#22c55e","#a855f7","#ef4444","#14b8a6","#f59e0b","#ec4899"];
-
-      // Calendar — merged in from the old Dashcam tab: marks any date with
-      // either a logged trip or recorded footage (current month only).
-      // Tapping a date with exactly one trip jumps straight into that trip's
-      // detail view (nav/stops + any footage); a date with several trips (or
-      // footage but no trip) expands a short list below the calendar instead.
-      const tripByDate = {};
-      tripHistory.forEach(t=>{ (tripByDate[t.date]=tripByDate[t.date]||[]).push(t); });
-      const clipByDate = {};
-      clips.forEach(c=>{ (clipByDate[c.date]=clipByDate[c.date]||[]).push(c); });
-      const calToday=new Date();
-      const calDim=new Date(calToday.getFullYear(),calToday.getMonth()+1,0).getDate();
-      const calFd=new Date(calToday.getFullYear(),calToday.getMonth(),1).getDay();
-      const calMl=calToday.toLocaleDateString("en-US",{month:"long",year:"numeric"});
-      const calDk=d=>new Date(calToday.getFullYear(),calToday.getMonth(),d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
-      const onCalDateTap = (key) => {
-        const dayTrips = tripByDate[key]||[];
-        if(dayTrips.length===1){ setSelTrip({...dayTrips[0], path:undefined}); return; }
-        setSelCalDate(prev => prev===key ? null : key);
-      };
-
-      historySection = (
-        <div>
-          {/* Header */}
-          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
-            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>🛤️ Drive History</div>
-            <div style={{fontSize:13,fontWeight:700,color:OR}}>{tripHistory.length} trip{tripHistory.length!==1?"s":""}</div>
-          </div>
-
-          {selTrip ? (
-            /* ── Trip detail view ── */
-            <div>
-              {/* Map with simulated route highlight */}
-              <div style={{position:"relative",height:220,flexShrink:0,background:"#e5e3df",overflow:"hidden"}}>
-                <iframe
-                  title="Trip Map"
-                  style={{width:"100%",height:"100%",border:"none",display:"block"}}
-                  src={"https://maps.google.com/maps?q="+encodeURIComponent(selTrip.startAddr||"San Diego, CA")+"&z=13&output=embed"}
-                  loading="lazy"
-                />
-                {/* Route highlight overlay — SVG polyline simulating a trip path */}
-                <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 400 300" preserveAspectRatio="none">
-                  <defs>
-                    <filter id="glow">
-                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                    </filter>
-                  </defs>
-                  {/* Simulated trip path — a curved route across the map */}
-                  <polyline
-                    points={selTrip.path || "60,240 90,200 130,170 160,140 200,120 240,100 280,90 320,85 350,80"}
-                    fill="none"
-                    stroke={PATH_COLORS[selTrip.id%PATH_COLORS.length]}
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    filter="url(#glow)"
-                    opacity="0.85"
-                  />
-                  {/* Start dot */}
-                  <circle cx={60} cy={240} r={7} fill="#22c55e" stroke="#fff" strokeWidth="2"/>
-                  {/* End dot */}
-                  <circle cx={350} cy={80} r={7} fill="#ef4444" stroke="#fff" strokeWidth="2"/>
-                </svg>
-                {/* Legend */}
-                <div style={{position:"absolute",top:10,left:10,display:"flex",flexDirection:"column",gap:4}}>
-                  <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"3px 8px"}}>
-                    <div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/>
-                    <span style={{fontSize:10,color:"#fff",fontWeight:700}}>Start</span>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"3px 8px"}}>
-                    <div style={{width:6,height:6,borderRadius:"50%",background:"#ef4444"}}/>
-                    <span style={{fontSize:10,color:"#fff",fontWeight:700}}>End</span>
-                  </div>
-                </div>
-                {/* Back from detail */}
-                <button onClick={()=>setSelTrip(null)} style={{position:"absolute",top:10,right:10,padding:"5px 10px",borderRadius:20,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>← All Trips</button>
-              </div>
-
-              {/* Trip stats */}
-              <div style={{padding:"14px 16px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-                <div style={{fontSize:17,fontWeight:900,color:"#111",marginBottom:2}}>{selTrip.date} · {selTrip.time}</div>
-                <div style={{fontSize:13,color:"#111",marginBottom:12}}>{selTrip.startAddr} → {selTrip.endAddr}</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                  {[
-                    {ic:"🛣️", val:selTrip.dist+" mi", label:"Distance"},
-                    {ic:"⏱️", val:fmt2(selTrip.dur||0), label:"Duration"},
-                    {ic:"⭐", val:"+"+selTrip.pts+" pts", label:"Earned"},
-                    ...(selTrip.avgSpeed!=null ? [{ic:"⚡", val:selTrip.avgSpeed+" mph", label:"Avg Speed"}] : []),
-                    ...(selTrip.maxSpeed!=null ? [{ic:"🚀", val:selTrip.maxSpeed+" mph", label:"Top Speed"}] : []),
-                    ...(selTrip.lights!=null ? [{ic:"🚦", val:selTrip.lights, label:"Green Lights"}] : []),
-                  ].map(s=>(
-                    <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,padding:"10px",textAlign:"center",border:"1px solid #ebebeb"}}>
-                      <div style={{fontSize:20,marginBottom:3}}>{s.ic}</div>
-                      <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{s.val}</div>
-                      <div style={{fontSize:10,color:"#111",marginTop:2}}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Linked clip if any */}
-              {clips.find(c=>c.date===selTrip.date) && (
-                <div style={{padding:"12px 16px",flexShrink:0}}>
-                  <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>DASHCAM FOOTAGE</div>
-                  {clips.filter(c=>c.date===selTrip.date).slice(0,2).map(clip=>(
-                    <div key={clip.id} style={{background:"#111",borderRadius:10,overflow:"hidden",marginBottom:8}}>
-                      <video src={clip.url} controls style={{width:"100%",display:"block",maxHeight:160,background:"#000"}}/>
-                      <div style={{padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:11,color:"#aaa",flex:1}}>{clip.time} · {clip.dist} mi</span>
-                        <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"4px 8px",borderRadius:20,background:"#222",color:"#aaa",border:"none",fontSize:11,cursor:"pointer"}}>⬇</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ── Calendar + trip list ── */
-            <div style={{padding:"10px 14px 7px"}}>
-              {/* Calendar */}
-              <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>{calMl.toUpperCase()}</div>
-              <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",marginBottom:14}}>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:"#f0f0f0",borderBottom:"1px solid #ebebeb",borderRadius:"12px 12px 0 0"}}>
-                  {["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{padding:"6px 0",textAlign:"center",fontSize:11,fontWeight:700,color:"#111"}}>{d}</div>)}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
-                  {Array.from({length:calFd}).map((_,i)=><div key={"e"+i} style={{minHeight:36}}/>)}
-                  {Array.from({length:calDim}).map((_,i)=>{
-                    const day=i+1, key=calDk(day);
-                    const dayTrips=tripByDate[key]||[], dayClips=clipByDate[key]||[];
-                    const isT=day===calToday.getDate(), isSel=selCalDate===key;
-                    return (
-                      <button key={day} onClick={()=>onCalDateTap(key)}
-                        style={{minHeight:36,padding:"4px 2px",background:isSel?OR:isT?OR+"11":"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                        <span style={{fontSize:13,fontWeight:isT||isSel?800:400,color:isSel?"#fff":isT?OR:"#333"}}>{day}</span>
-                        {(dayTrips.length>0||dayClips.length>0) && (
-                          <div style={{display:"flex",gap:2,marginTop:1}}>
-                            {dayTrips.length>0 && <span style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":OR,display:"block"}}/>}
-                            {dayClips.length>0 && <span style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":"#6366f1",display:"block"}}/>}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Selected date — multiple trips to choose from, or footage
-                  with no logged trip that day */}
-              {selCalDate && (() => {
-                const dayTrips = tripByDate[selCalDate]||[];
-                const dayClips = clipByDate[selCalDate]||[];
-                if(dayTrips.length===0 && dayClips.length===0) return (
-                  <div style={{textAlign:"center",padding:"16px",color:"#111",fontSize:13}}>No activity on {selCalDate}</div>
-                );
-                return (
-                  <div style={{marginBottom:14}}>
-                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
-                    {/* Each trip gets the same mini route-map card as the
-                        main list below — a picture of the road taken, not
-                        just a text row — so browsing by calendar date shows
-                        the same map + distance + footage history. */}
-                    {dayTrips.map(trip=>{
-                      const color=PATH_COLORS[trip.id%PATH_COLORS.length];
-                      const hasClip=clips.some(c=>c.date===trip.date);
-                      return (
-                        <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{
-                          width:"100%",background:"#fff",borderRadius:14,border:"1px solid #ebebeb",
-                          marginBottom:8,overflow:"hidden",cursor:"pointer",fontFamily:F,textAlign:"left",
-                          boxShadow:"0 2px 8px rgba(0,0,0,0.05)",padding:0,
-                        }}>
-                          <div style={{height:90,position:"relative",background:"#e5e3df",overflow:"hidden"}}>
-                            <iframe
-                              title={"calmap"+trip.id}
-                              style={{width:"100%",height:"180px",border:"none",display:"block",marginTop:"-45px",pointerEvents:"none"}}
-                              src={"https://maps.google.com/maps?q="+encodeURIComponent(trip.startAddr||"San Diego, CA")+"&z=12&output=embed"}
-                              loading="lazy"
-                            />
-                            <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 300 100" preserveAspectRatio="none">
-                              <polyline points="20,80 50,65 85,52 120,42 160,35 200,30 240,28 270,25" fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.9"/>
-                              <circle cx={20} cy={80} r={5} fill="#22c55e" stroke="#fff" strokeWidth="1.5"/>
-                              <circle cx={270} cy={25} r={5} fill="#ef4444" stroke="#fff" strokeWidth="1.5"/>
-                            </svg>
-                            {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#fff"}}>📹</div>}
-                          </div>
-                          <div style={{padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-                            <div style={{width:7,height:26,borderRadius:4,background:color,flexShrink:0}}/>
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{trip.time} · {trip.startAddr}</div>
-                              <div style={{fontSize:11,color:"#111"}}>{trip.dist} mi · +{trip.pts} pts{hasClip?" · 📹 footage":""}</div>
-                            </div>
-                            <div style={{fontSize:16,color:"#111"}}>›</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {dayTrips.length===0 && dayClips.map(clip=>(
-                      <div key={clip.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
-                        <div style={{background:"#111",position:"relative",cursor:"pointer",height:80}} onClick={()=>setPlayingClip(p=>p===clip.id?null:clip.id)}>
-                          <video src={clip.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.55,display:"block",pointerEvents:"none"}}/>
-                          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
-                              {playingClip===clip.id?"⏸":"▶"}
-                            </div>
-                          </div>
-                        </div>
-                        {playingClip===clip.id && <video src={clip.url} controls autoPlay style={{width:"100%",maxHeight:200,display:"block",background:"#000"}}/>}
-                        <div style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{clip.time}</div>
-                            <div style={{fontSize:11,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
-                          </div>
-                          <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,cursor:"pointer"}}>⬇</button>
-                          <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer"}}>🗑</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              {/* Dashcam enable prompt — the actual "Record in Background"
-                  auto-record toggle now lives in Drive Mode Settings (the ⚙️
-                  inside Drive mode), not here, so it's reachable without
-                  leaving Drive mode. */}
-              {!dashcamConsent ? (
-                <div style={{background:"#fff8f0",border:"1px solid #fde8d8",borderRadius:12,padding:"14px",marginBottom:16,textAlign:"center"}}>
-                  <div style={{fontSize:28,marginBottom:6}}>📹</div>
-                  <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:4}}>Enable Dashcam</div>
-                  <div style={{fontSize:12,color:"#111",lineHeight:1.6,marginBottom:12}}>Automatically record video of your drives once you're moving over 5 mph. Footage stays on this device and is only viewable here.</div>
-                  <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");}} style={{width:"100%",padding:"11px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>
-                    I Agree — Enable Dashcam
-                  </button>
-                </div>
-              ) : (
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",marginBottom:16}}>
-                  <div style={{fontSize:12,color:"#111",lineHeight:1.6}}>The camera preview and auto-record settings for Dashcam now live in <b>Drive Mode Settings</b> (tap ⚙️ inside Drive mode).</div>
-                </div>
-              )}
-
-              {tripHistory.length===0 ? (
-                <div style={{textAlign:"center",padding:"52px 20px",color:"#111"}}>
-                  <div style={{fontSize:50,marginBottom:12}}>🛤️</div>
-                  <div style={{fontSize:16,fontWeight:700,color:"#111",marginBottom:6}}>No trips yet</div>
-                  <div style={{fontSize:13,lineHeight:1.7,marginBottom:20}}>Drives record automatically once you're moving over 5 mph — open the map and every trip will appear here with speed, duration, and route.</div>
-                  <button onClick={()=>go("drive")} style={{padding:"10px 22px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:7}}><DPadIcon id="map" color="#fff" size={14}/> Open Map</button>
-                </div>
-              ) : (
-                <>
-                  {/* Summary stats strip */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-                    {[
-                      {ic:"🛣️", val:(tripHistory.reduce((a,t)=>a+parseFloat(t.dist||0),0)).toFixed(1)+" mi", label:"Total Miles"},
-                      {ic:"⏱️", val:Math.floor(tripHistory.reduce((a,t)=>a+(t.dur||0),0)/60)+"m", label:"Drive Time"},
-                      {ic:"⭐", val:tripHistory.reduce((a,t)=>a+(t.pts||0),0)+" pts", label:"Pts Earned"},
-                      ...(tripHistory.some(t=>t.avgSpeed!=null) ? [{ic:"⚡", val:Math.round(tripHistory.filter(t=>t.avgSpeed!=null).reduce((a,t)=>a+t.avgSpeed,0)/tripHistory.filter(t=>t.avgSpeed!=null).length)+" mph", label:"Avg Speed"}] : []),
-                      ...(tripHistory.some(t=>t.lights!=null) ? [{ic:"🚦", val:tripHistory.reduce((a,t)=>a+(t.lights||0),0), label:"Green Lights"}] : []),
-                    ].map(s=>(
-                      <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid #ebebeb"}}>
-                        <div style={{fontSize:18,marginBottom:2}}>{s.ic}</div>
-                        <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{s.val}</div>
-                        <div style={{fontSize:9,color:"#111",marginTop:1}}>{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Trip cards */}
-                  {tripHistory.map((trip,idx)=>{
-                    const color=PATH_COLORS[idx%PATH_COLORS.length];
-                    const hasClip=clips.some(c=>c.date===trip.date);
-                    return (
-                      <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{
-                        width:"100%",background:"#fff",borderRadius:14,border:"1px solid #ebebeb",
-                        marginBottom:10,overflow:"hidden",cursor:"pointer",fontFamily:F,textAlign:"left",
-                        boxShadow:"0 2px 8px rgba(0,0,0,0.05)",padding:0,
-                      }}>
-                        {/* Mini map with SVG route */}
-                        <div style={{height:100,position:"relative",background:"#e5e3df",overflow:"hidden"}}>
-                          <iframe
-                            title={"map"+trip.id}
-                            style={{width:"100%",height:"200px",border:"none",display:"block",marginTop:"-50px",pointerEvents:"none"}}
-                            src={"https://maps.google.com/maps?q="+encodeURIComponent(trip.startAddr||"San Diego, CA")+"&z=12&output=embed"}
-                            loading="lazy"
-                          />
-                          {/* Highlighted route SVG overlay */}
-                          <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 300 100" preserveAspectRatio="none">
-                            <defs>
-                              <filter id={"g"+idx}>
-                                <feGaussianBlur stdDeviation="2" result="b"/>
-                                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                              </filter>
-                            </defs>
-                            <polyline
-                              points={"20,80 50,65 85,52 120,42 160,35 200,30 240,28 270,25"}
-                              fill="none" stroke={color} strokeWidth="4"
-                              strokeLinecap="round" strokeLinejoin="round"
-                              filter={"url(#g"+idx+")"} opacity="0.9"
-                            />
-                            <circle cx={20} cy={80} r={5} fill="#22c55e" stroke="#fff" strokeWidth="1.5"/>
-                            <circle cx={270} cy={25} r={5} fill="#ef4444" stroke="#fff" strokeWidth="1.5"/>
-                          </svg>
-                          {/* Date badge */}
-                          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#fff",fontWeight:700}}>{trip.date}</div>
-                          {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#111"}}>📹</div>}
-                        </div>
-                        {/* Trip info */}
-                        <div style={{padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
-                          <div style={{width:8,height:28,borderRadius:4,background:color,flexShrink:0}}/>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:2}}>{trip.time} · {trip.startAddr}</div>
-                            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                              <span style={{fontSize:11,color:"#111"}}>🛣️ {trip.dist} mi</span>
-                              <span style={{fontSize:11,color:"#111"}}>⏱ {fmt2(trip.dur||0)}</span>
-                              {trip.avgSpeed!=null && <span style={{fontSize:11,color:"#111"}}>⚡ {trip.avgSpeed} mph</span>}
-                              <span style={{fontSize:11,color:OR}}>+{trip.pts} pts</span>
-                            </div>
-                          </div>
-                          <div style={{fontSize:16,color:"#111"}}>›</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </>
-              )}
-
-              {dashcamConsent && (
-                <button onClick={()=>{setDashcamConsent(false);memStore.removeItem("sl_dashcamConsent");if(dashOn)stopDrive();}} style={{width:"100%",marginTop:6,padding:"10px",borderRadius:10,background:"transparent",border:"1px solid #fde8d8",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
-                  Revoke Dashcam Access
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-
     /* following sub — people you follow */
     if(subPanel==="following") return (
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -5159,7 +4246,6 @@ export default function SonoLane() {
           ))}
         </div>
         <QuickUserSheet/>
-        <ProfileViewSheet/>
       </div>
     );
 
@@ -5207,7 +4293,6 @@ export default function SonoLane() {
           })}
         </div>
         <QuickUserSheet/>
-        <ProfileViewSheet/>
       </div>
     );
 
@@ -5381,7 +4466,6 @@ export default function SonoLane() {
             from the + Quick Create menu on any Profile subPanel. */}
         <CallOverlay/>
         <WalkieTalkieSheet/>
-        <ProfileViewSheet/>
       </div>
     );
 
@@ -5534,22 +4618,6 @@ export default function SonoLane() {
             </div>
           </div>
 
-          {/* Start Drive button — style + accent color */}
-          <div style={SEC}>START DRIVE BUTTON</div>
-          <div style={{...CARD,marginBottom:14}}>
-            <div style={{display:"flex",gap:8,marginBottom:12}}>
-              {[["flag","Flag"],["solid","Solid"],["outline","Outline"]].map(([id,label])=>(
-                <button key={id} onClick={()=>setStartDriveStyle(id)} style={{flex:1,padding:"9px 4px",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,border:startDriveStyle===id?"1.5px solid "+OR:"1px solid #ebebeb",background:startDriveStyle===id?OR+"10":"#fff",color:startDriveStyle===id?OR:"#555"}}>{label}</button>
-              ))}
-            </div>
-            <div style={{fontSize:11,color:"#111",marginBottom:8,fontWeight:700,letterSpacing:0.6}}>ACCENT COLOR</div>
-            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-              {["#000000",OR,"#6366f1","#22c55e","#a855f7","#ec4899","#14b8a6","#ffffff"].map(c=>(
-                <button key={c} onClick={()=>setStartDriveColor(c)} title={c} style={{width:32,height:32,borderRadius:"50%",background:c,border:startDriveColor===c?"3px solid #111":"3px solid transparent",boxShadow:"0 0 0 1.5px #ebebeb",cursor:"pointer",padding:0}}/>
-              ))}
-            </div>
-          </div>
-
           {/* Drive Mode Settings (Startup Sound, Widgets, and Drive mode's
               own voice toggle) now live only inside Drive mode itself — the
               small ⚙️ at the end of its apps bar — instead of being
@@ -5580,92 +4648,7 @@ export default function SonoLane() {
        full-screen page now (BACK_PAGES entry "settings") instead of opening
        inline on top of the Profile dashboard — own title row removed since
        the shared TopBar shows back + "Settings" while this page is open. */
-    if(subPanel==="settings") return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
-
-          <button onClick={()=>setSubPanel("edit")} style={{width:"100%",padding:"9px",borderRadius:9,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:12}}>Edit full profile →</button>
-
-          {/* AI — Co-Pilot picker, plus the voice-control setting for
-              everywhere OUTSIDE Drive mode. Drive mode has its own separate
-              voice toggle in its own Settings sheet. */}
-          <div style={SEC}>AI</div>
-          <div style={{...CARD,marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
-              <div style={{flex:1,paddingRight:10}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Say "Sono" to Wake</div>
-                <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Keep voice control on everywhere outside Drive mode, so you can talk to your Co-Pilot hands-free without tapping the mic first. This setting saves.</div>
-              </div>
-              <button onClick={()=>setSayWakeEnabled(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:sayWakeEnabled?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
-                <div style={{position:"absolute",top:2,left:sayWakeEnabled?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
-              </button>
-            </div>
-            <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>Select Co-Pilot</div>
-            <div style={{fontSize:12,color:"#111",marginBottom:10,lineHeight:1.5}}>Choose who talks back when you say "Sono" or tap the car avatar while driving.</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {AI_PALS.map(p=>(
-                <button key={p.id} onClick={()=>setAiPalId(p.id)} style={{
-                  display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
-                  cursor:"pointer",fontFamily:F,textAlign:"left",
-                  border:"1.5px solid "+(aiPalId===p.id?p.color:"#ebebeb"),
-                  background:aiPalId===p.id?p.color+"0f":"#f8f8f8",
-                }}>
-                  <div style={{width:34,height:34,borderRadius:"50%",background:p.color+"22",border:"1.5px solid "+p.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CompassStar size={19} color={p.color}/></div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:700,color:aiPalId===p.id?p.color:"#111"}}>{p.name}</div>
-                    <div style={{fontSize:11,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.desc}</div>
-                  </div>
-                  {aiPalId===p.id && <div style={{width:18,height:18,borderRadius:"50%",background:p.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>✓</div>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Lanes — used to live in its own separate "Lanes Settings" sheet
-              (reached only from a gear icon in the chat list's user bar);
-              moved here so every setting in the app lives in the one place
-              people already expect to find settings (Jakob's Law), instead
-              of Lanes having its own hidden second Settings page. */}
-          <div style={SEC}>LANES</div>
-          <div style={{...CARD,marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
-              <div style={{flex:1,paddingRight:10}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Show online status</div>
-                <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Let others see the "● Online" indicator next to your name in Lanes.</div>
-              </div>
-              <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
-                <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
-              </button>
-            </div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,paddingBottom:14,borderBottom:"1px solid #ebebeb"}}>
-              <div style={{flex:1,paddingRight:10}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Lanes notifications</div>
-                <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Get badge alerts for new messages and activity in Lanes.</div>
-              </div>
-              <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
-                <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
-              </button>
-            </div>
-            <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:2}}>📌 Pinning chats</div>
-            <div style={{fontSize:12,color:"#111",lineHeight:1.5}}>Tap the pin icon next to any lane or direct message in the Lanes list to keep it at the top.</div>
-          </div>
-
-          <div style={SEC}>STATS</div>
-          <div style={CARD}>
-            {[["⭐",pts,"Points"],["event",events.length,"Events"],["road",routes.length,"Routes"],["👥",friends.length,"Friends"],["📹",clips.length,"Clips"]].map(([ic,v,l])=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <span style={{fontSize:13,color:"#111",display:"flex",alignItems:"center",gap:5}}>{ic==="event"||ic==="road"?<DPadIcon id={ic} color={DPAD_COLORS[ic]} size={12}/>:ic} {l}</span>
-                <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{v}</span>
-              </div>
-            ))}
-          </div>
-
-          {isSupabaseConfigured && (
-            <button onClick={()=>supabase.auth.signOut()} style={{width:"100%",padding:"11px",borderRadius:9,background:"#fff",border:"1px solid #ef444444",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:14}}>Log Out</button>
-          )}
-        </div>
-      </div>
-    );
+    if(subPanel==="settings") return renderSettingsBody();
 
     /* my events sub */
     if(subPanel==="myevents") {
@@ -5695,7 +4678,7 @@ export default function SonoLane() {
                   <button onClick={e=>{e.stopPropagation();openEditEvent(ev);}} title="Edit event" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
                 )}
               </div>
-              {ev.authorId!=="me" && <div style={{fontSize:12,color:"#8a8f98",marginBottom:4}}>Posted by {ev.authorName||"a driver"}</div>}
+              {ev.authorId!=="me" && <div onClick={e=>{e.stopPropagation();openAuthorProfile(ev.authorId,ev.authorName);}} style={{fontSize:12,color:"#8a8f98",marginBottom:4,cursor:"pointer"}}>Posted by {ev.authorName||"a driver"}</div>}
               {ev.date && <div style={{fontSize:12,color:"#111",fontWeight:600,marginBottom:5}}>📅 {new Date(ev.date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>}
               {ev.address && (
                 <button onClick={e=>{e.stopPropagation();openMaps(ev.address);}} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:6,fontFamily:F}}>
@@ -5744,8 +4727,8 @@ export default function SonoLane() {
         </div>
         {/* Flyer overlay (reuse global flyerEvent) */}
         {flyerEvent && (
-          <div onClick={()=>setFlyerEvent(null)} style={{position:"fixed",inset:0,zIndex:800,background:"rgba(0,0,0,0.7)",animation:"scrimIn 0.18s ease",display:"flex",alignItems:"flex-end"}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"92vh",background:"#fff",borderRadius:"22px 22px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div onClick={()=>setFlyerEvent(null)} style={{position:"fixed",inset:0,zIndex:800,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"92vh",background:"#fff",borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
               <div style={{height:200,position:"relative",overflow:"hidden",flexShrink:0,background:flyerEvent.photos?.length?"#111":"linear-gradient(160deg,"+(EV_COLORS[flyerEvent.type]||OR)+","+(EV_COLORS[flyerEvent.type]||OR)+"55,#111)"}}>
                 {flyerEvent.photos?.length>0 && <img src={flyerEvent.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
                 {!flyerEvent.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:62}}>{flyerEvent.icon}</div>}
@@ -5760,7 +4743,7 @@ export default function SonoLane() {
                     <button onClick={()=>openEditEvent(flyerEvent)} title="Edit event" style={{width:30,height:30,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:15,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
                   )}
                 </div>
-                {flyerEvent.authorId!=="me" && <div style={{fontSize:13,color:"#8a8f98",marginBottom:6}}>Posted by {flyerEvent.authorName||"a driver"}</div>}
+                {flyerEvent.authorId!=="me" && <div onClick={e=>{e.stopPropagation();openAuthorProfile(flyerEvent.authorId,flyerEvent.authorName);}} style={{fontSize:13,color:"#8a8f98",marginBottom:6,cursor:"pointer"}}>Posted by {flyerEvent.authorName||"a driver"}</div>}
                 {flyerEvent.date && <div style={{fontSize:13,color:"#111",fontWeight:600,marginBottom:8}}>📅 {new Date(flyerEvent.date+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"})}</div>}
                 {flyerEvent.address && (
                   <button onClick={()=>openMaps(flyerEvent.address)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:"#f0fdf4",border:"1.5px solid #22c55e33",cursor:"pointer",fontFamily:F,marginBottom:12,textAlign:"left"}}>
@@ -5783,8 +4766,8 @@ export default function SonoLane() {
         )}
         {/* Create event sheet */}
         {showEvent && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeEventSheet}>
-            <div style={{background:"#fff",borderRadius:"22px 22px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeEventSheet}>
+            <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{editingEventId?"Edit Event":"⚡ Create Event"}</div>
@@ -5899,52 +4882,8 @@ export default function SonoLane() {
           </button>
         </div>
 
-        {/* ── Start Drive — style + accent color changeable from Edit Profile
-             (see the START DRIVE BUTTON section there). "flag" is the
-             original racing-sticker look; "solid" and "outline" are plainer
-             alternatives that lean fully on the chosen accent color. ── */}
-        {startDriveStyle==="solid" ? (
-          <button onClick={()=>{playStartupSound(startupSound);go("drive");}} style={{
-            margin:"14px 16px 0",width:"calc(100% - 32px)",padding:"16px 0",border:"none",borderRadius:14,cursor:"pointer",fontFamily:F,
-            background:startDriveColor,flexShrink:0,
-          }}>
-            <span style={{fontSize:18,fontWeight:900,letterSpacing:0.5,textTransform:"uppercase",color:"#fff"}}>▶ Start Drive</span>
-          </button>
-        ) : startDriveStyle==="outline" ? (
-          <button onClick={()=>{playStartupSound(startupSound);go("drive");}} style={{
-            margin:"14px 16px 0",width:"calc(100% - 32px)",padding:"14px 0",border:"2.5px solid "+startDriveColor,borderRadius:14,cursor:"pointer",fontFamily:F,
-            background:"#fff",flexShrink:0,
-          }}>
-            <span style={{fontSize:18,fontWeight:900,letterSpacing:0.5,textTransform:"uppercase",color:startDriveColor}}>▶ Start Drive</span>
-          </button>
-        ) : (
-          <button onClick={()=>{playStartupSound(startupSound);go("drive");}} style={{
-            width:"100%",padding:"14px 0",marginTop:14,border:"none",cursor:"pointer",fontFamily:F,
-            display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexShrink:0,
-            background:"#fff",overflow:"hidden",
-          }}>
-            <div style={{
-              flex:1,height:20,transform:"skewX(-18deg)",
-              backgroundColor:"#000",
-              backgroundImage:"linear-gradient(45deg,#fff 25%,transparent 25%),linear-gradient(-45deg,#fff 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#fff 75%),linear-gradient(-45deg,transparent 75%,#fff 75%)",
-              backgroundSize:"10px 10px",
-              backgroundPosition:"0 0,0 5px,5px -5px,-5px 0px",
-            }}/>
-            <span style={{
-              flexShrink:0,padding:"7px 22px",borderRadius:9,
-              background:"#f0f0f0",border:"2.5px solid "+startDriveColor,
-              fontSize:24,fontWeight:900,fontStyle:"italic",letterSpacing:1,textTransform:"uppercase",
-              color:startDriveColor,
-            }}>Start Drive</span>
-            <div style={{
-              flex:1,height:20,transform:"skewX(18deg)",
-              backgroundColor:"#000",
-              backgroundImage:"linear-gradient(45deg,#fff 25%,transparent 25%),linear-gradient(-45deg,#fff 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#fff 75%),linear-gradient(-45deg,transparent 75%,#fff 75%)",
-              backgroundSize:"10px 10px",
-              backgroundPosition:"0 0,0 5px,5px -5px,-5px 0px",
-            }}/>
-          </button>
-        )}
+        {/* Start Drive button removed from Profile — the bottom nav's center
+             star-in-square button is the one way into Drive mode now. */}
 
         {/* ── Profile header ── */}
         <div style={{padding:"14px 16px 12px",display:"flex",gap:12,alignItems:"center",flexShrink:0}}>
@@ -5958,8 +4897,7 @@ export default function SonoLane() {
                 border:"1.5px solid #ececec",padding:0,
                 display:"flex",alignItems:"center",justifyContent:"center",
                 overflow:"hidden",flexShrink:0,
-                cursor:editMode?"pointer":"default",
-              }}>
+                cursor:editMode?"pointer":"default"}}>
               {profilePhoto
                 ? (<img src={profilePhoto} alt="profile" style={{width:"100%",height:"100%",objectFit:"cover"}}/>)
                 : <DefaultAvatar size={58} color="#111"/>}
@@ -6117,8 +5055,8 @@ export default function SonoLane() {
           {/* Choosing what to add to an empty Top 3 slot — a real friend, or
               the AI Co-Pilot (only offered once, and only if not already in). */}
           {showTop3Chooser && (
-            <div onClick={()=>setShowTop3Chooser(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}}>
-              <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18}}>
+            <div onClick={()=>setShowTop3Chooser(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}}>
                 <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
                 <div style={{fontSize:15,fontWeight:800,color:"#111",marginBottom:14}}>Add to Top 3</div>
                 <button onClick={()=>{setShowTop3Chooser(false);setSubPanel("friends");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",fontFamily:F,textAlign:"left",marginBottom:10}}>
@@ -6148,25 +5086,24 @@ export default function SonoLane() {
               `subPanel` itself as the toggle state, so every other link in
               the app that jumps straight to e.g. setSubPanel("routes")
               still lands here. Trophies moved into the Points detail page;
-              Settings is still reachable from the ☰ menu. */}
+              Settings is still reachable from the ☰ menu. Garage and
+              History moved out to their own dedicated Garage bottom-nav
+              tab (see GaragePanel) — only Radio/Routes/Events remain here. */}
           <div style={{display:"flex",margin:"0 -14px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb",overflowX:"auto"}}>
             {[
-              {id:"garage",        label:"Garage",   icon:<GarageDoorIcon size={22} color={subPanel==="garage"?OR:(carSaved?OR:"#8a8f98")}/>},
               {id:"radiostations", label:"Radio",    icon:<JukeboxIcon size={22} color={subPanel==="radiostations"?OR:"#8a8f98"}/>},
               {id:"routes",        label:"Routes",   icon:<DPadIcon id="road" color={subPanel==="routes"?OR:DPAD_COLORS.road} size={22}/>},
               {id:"myevents",      label:"Events",   icon:<DPadIcon id="event" color={subPanel==="myevents"?OR:DPAD_COLORS.event} size={22}/>},
-              {id:"history",       label:"History",  icon:<ProfileIcon id="history" size={22} color={subPanel==="history"?OR:"#8a8f98"}/>},
             ].map(t=>{
               const active = subPanel===t.id;
               // Tapping the already-active tab is a no-op now, not a close —
-              // one of these five is always open, same as a normal tab bar
-              // (nothing to collapse back to once Garage opens by default).
+              // one of these three is always open, same as a normal tab bar
+              // (nothing to collapse back to once My Routes opens by default).
               return (
-                <button key={t.id} onClick={()=>setSubPanel(t.id)} style={{
+                <button key={t.id} onClick={()=>{vibrate();setSubPanel(t.id);}} style={{
                   flex:"1 0 auto",minWidth:52,display:"flex",flexDirection:"column",alignItems:"center",gap:5,
                   padding:"10px 4px 8px",background:active?OR+"10":"none",border:"none",
-                  borderBottom:"2px solid "+(active?OR:"transparent"),cursor:"pointer",fontFamily:F,
-                }}>
+                  borderBottom:"2px solid "+(active?OR:"transparent"),cursor:"pointer",fontFamily:F}}>
                   {t.icon}
                   <span style={{fontSize:9,fontWeight:active?800:600,color:active?OR:"#8a8f98",whiteSpace:"nowrap"}}>{t.label}</span>
                 </button>
@@ -6177,10 +5114,8 @@ export default function SonoLane() {
           {/* Whichever tile is toggled on shows its content right here,
               below the row — same content each page always had, just
               inline on the home screen now instead of its own full page. */}
-          {subPanel==="garage" && <div style={{margin:"14px -14px 0"}}>{garageSection}</div>}
           {subPanel==="routes" && <div style={{margin:"14px -14px 0"}}>{routesSection}</div>}
           {subPanel==="myevents" && <div style={{margin:"14px -14px 0"}}>{myeventsSection}</div>}
-          {subPanel==="history" && <div style={{margin:"14px -14px 0"}}>{historySection}</div>}
           {subPanel==="radiostations" && <div style={{margin:"14px -14px 0"}}>{radiostationsSection}</div>}
         </div>
       </div>
@@ -6189,6 +5124,1089 @@ export default function SonoLane() {
 
   /* ── FEED ── */
   const FEED_CATS = ["All","Following","scenic","hike","commute","home","road trip","bike"];
+  // My Garage — its own dedicated bottom-nav tab (previously an inline
+  // toggle section on Profile). One continuous scrolling page: a big
+  // scrollable car-avatar carousel, Driving Stats, Shared Garages, then
+  // Drive History + Dashcam footage (previously Profile's separate
+  // History tab) — all always visible here now instead of behind their
+  // own toggles, per how Garage was asked to work. Car Details/Edit
+  // Car/Shared Garage detail are still their own full-screen sub-pages
+  // (subPanel-driven, same mechanism Profile sub-pages use), just living
+  // under this panel instead of under Profile now.
+  const GaragePanel = useStablePanel(() => {
+    // Private car info opens from a wallet button at the bottom of the
+    // car page instead of always sitting inline on the page.
+    const [showPrivateCard, setShowPrivateCard] = useState(false);
+    // Confirm-before-delete for a car in the garage — {id,name} of the car
+    // pending deletion, or null. Deleting a car wipes its photos/details,
+    // so this is a deliberate extra tap rather than an instant ✕.
+    const [confirmDeleteCar, setConfirmDeleteCar] = useState(null);
+
+    // Renders a Shared Garage vehicle's real car avatar — the same uploaded
+    // photo or CarSVG a member picked from their own garage — inside a
+    // circle tile, falling back to a plain 🚘 for older entries that were
+    // only ever given a typed name (no avatar data attached).
+    const VehicleAvatar = ({ v, size=40 }) => (
+      <div style={{width:size,height:size,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",fontSize:size*0.45,flexShrink:0}}>
+        {v.avatarMode==="photo" && v.avatarPhoto
+          ? <img src={v.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          : v.color
+            ? <CarSVG color={v.color} mods={v.mods||{}} size={size-12} styleId={v.bodyStyle||"sedan"}/>
+            : "🚘"}
+      </div>
+    );
+
+    // Reusable photo-gallery grid — used for the garage's exterior/interior
+    // shots. Tap the dashed "+" tile to upload (multi-select), tap the ×
+    // on a thumbnail to remove it.
+    const PhotoGallery = (photos, setPhotos, fileRef, max=12) => {
+      // One empty slot shown at a time — uploading a photo fills it and adds
+      // a fresh empty slot right after, growing one at a time until `max`
+      // photos are filled. Small galleries (car's 4 exterior/interior slots)
+      // still get the shadowed grid-tile look, just without pre-showing all
+      // the unfilled slots up front.
+      const showAllSlots = max<=4;
+      const cols = showAllSlots ? 2 : 3;
+      const emptyCount = photos.length<max ? 1 : 0;
+      const slotShadow = showAllSlots ? "0 1px 4px rgba(0,0,0,0.08)" : "none";
+      return (
+      <>
+        <div style={{display:"grid",gridTemplateColumns:"repeat("+cols+",1fr)",gap:8,marginBottom:8}}>
+          {photos.map(p=>(
+            <div key={p.id} style={{position:"relative",aspectRatio:"1",borderRadius:10,overflow:"hidden",background:"#f5f5f5",boxShadow:slotShadow}}>
+              <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+              <button onClick={()=>setPhotos(ps=>ps.filter(x=>x.id!==p.id))} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+            </div>
+          ))}
+          {Array.from({length:emptyCount}).map((_,i)=>(
+            <button key={"empty"+i} onClick={()=>fileRef.current?.click()} style={{aspectRatio:"1",borderRadius:10,border:"1.5px dashed #ddd",background:"#f8f8f8",boxShadow:slotShadow,fontSize:26,color:"#bbb",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          ))}
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{
+          Array.from(e.target.files||[]).slice(0,Math.max(0,max-photos.length)).forEach(f=>{
+            readImageCompressed(f).then(url=>{ if(url) setPhotos(p=>[...p,{id:Date.now()+Math.random(),url}]); });
+          });
+          e.target.value="";
+        }}/>
+      </>
+      );
+    };
+
+    /* garage sub — big scrollable car-avatar carousel (every saved car, up
+       to MAX_CARS, currently 3). Tap a card to make it active and open its
+       full detail view (banner, photos, bio); tap the small ★ badge to
+       just switch which one displays without leaving this page. "Add
+       Another Car" is a ＋ Quick Create option now, not a tile here. */
+    const myGarageCards = [
+      {key:"active", id:activeCarId, name:carName, model:carModel, color:carColor, mods:carMods, bodyStyle:carBodyStyle, avatarMode:carAvatarMode, avatarPhoto:carAvatarPhoto, saved:carSaved, isActive:true},
+      ...myCars.map(car=>({key:car.id, id:car.id, name:car.name, model:car.model, color:car.color, mods:car.mods, bodyStyle:car.bodyStyle, avatarMode:car.avatarMode, avatarPhoto:car.avatarPhoto, saved:car.saved, isActive:false})),
+    ];
+
+    if(subPanel==="sharedgarage") {
+      const g = sharedGarages.find(x=>x.id===selSharedGarage);
+      if(!g) { setSubPanel(null); return null; }
+      const myVehicle = g.vehicles.find(v=>v.ownerId==="me");
+      const members = g.memberIds.map(id=>friends.find(f=>f.id===id)).filter(Boolean);
+      const invitableFriends = friends.filter(f=>!g.memberIds.includes(f.id));
+      return (
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          {/* Own header removed — the shared TopBar shows back/Group Chat
+              while this page is open (see <TopBar/>). */}
+          <div style={{padding:"10px 14px 0",flexShrink:0,display:"flex",alignItems:"center",gap:8}}>
+            <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              {g.photo ? <img src={g.photo} alt="" style={{width:22,height:22,borderRadius:"50%",objectFit:"cover",verticalAlign:"middle",marginRight:6}}/> : "🚗 "}
+              {g.name}
+            </div>
+            <button onClick={()=>{setEditGarageDraft({name:g.name,bio:g.bio||"",photo:g.photo||null});setShowEditGarage(true);}} title="Edit garage" style={{width:30,height:30,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
+          </div>
+          <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"12px 14px 7px"}}>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:12}}>{g.vehicles.length} VEHICLE{g.vehicles.length===1?"":"S"} · {members.length+1} MEMBER{members.length===0?"":"S"}</div>
+            {g.bio && g.bio.trim() && <div style={{fontSize:13,color:"#111",lineHeight:1.5,marginBottom:14}}>{g.bio}</div>}
+
+            {/* Car avatar window grid — same visual language as the MY CARS
+                grid on the Profile/Garage page: a bordered rounded tile per
+                person with a circular avatar window, name, and status line. */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
+              {/* Your vehicle tile */}
+              {myVehicle ? (
+                <div style={{position:"relative"}}>
+                  <button onClick={()=>{setShareCarId(myVehicle.sourceCarId||null);setNewVehicle({name:myVehicle.name,bio:myVehicle.bio});setShowAddVehicle(true);}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"1.5px solid "+OR+"44",background:"#fff9f5",cursor:"pointer",fontFamily:F}}>
+                    <VehicleAvatar v={myVehicle} size={72}/>
+                    <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:8,textAlign:"center",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{myVehicle.name}</div>
+                    <div style={{fontSize:11,color:OR,fontWeight:700,marginTop:2}}>· You</div>
+                  </button>
+                  <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,vehicles:x.vehicles.filter(v=>v.id!==myVehicle.id)}:x))} title="Remove your vehicle" style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"#fff",border:"1px solid #ebebeb",color:"#ef4444",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                </div>
+              ) : (
+                <button onClick={()=>{setShareCarId(null);setNewVehicle({name:"",bio:""});setShowAddVehicle(true);}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"2px dashed #ddd",background:"#fafafa",cursor:"pointer",fontFamily:F}}>
+                  <div style={{width:72,height:72,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,color:"#ccc"}}>＋</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#111",marginTop:8,textAlign:"center"}}>Share Your Car</div>
+                  <div style={{fontSize:10,color:"#111",marginTop:2,textAlign:"center"}}>· You</div>
+                </button>
+              )}
+
+              {/* Member tiles — tapping opens a Call/Text action sheet
+                  instead of always-visible inline buttons. */}
+              {members.map(fr=>{
+                const v = g.vehicles.find(x=>x.ownerId===fr.id);
+                return (
+                  <button key={fr.id} onClick={()=>setGarageMemberAction(fr)} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"18px 10px 14px",borderRadius:16,border:"1.5px solid #ebebeb",background:"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                    {v ? <VehicleAvatar v={v} size={72}/> : <FriendAvatar fr={fr} size={72} fontSize={26}/>}
+                    <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:8,textAlign:"center",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v ? v.name : fr.name}</div>
+                    <div style={{fontSize:11,color:"#111",marginTop:2,textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{v ? fr.name : "Invited · pending"}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Invite more friends */}
+            {invitableFriends.length>0 && (
+              <div style={{marginTop:18}}>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>INVITE MORE FRIENDS</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {invitableFriends.map(fr=>(
+                    <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
+                      <FriendAvatar fr={fr} size={30} fontSize={11}/>
+                      <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                      <button onClick={()=>{
+                        setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:[...x.memberIds,fr.id]}:x));
+                        setTimeout(()=>{
+                          const car = SAMPLE_GARAGE_CARS[Math.floor(Math.random()*SAMPLE_GARAGE_CARS.length)];
+                          setSharedGarages(gs=>gs.map(x=>x.id===g.id ? {...x,vehicles:[...x.vehicles,{id:"v_"+Date.now(),ownerId:fr.id,ownerName:fr.name,ownerInitials:fr.initials,ownerColor:fr.color,name:car.name,bio:car.bio,color:car.color,bodyStyle:car.bodyStyle}]} : x));
+                          setNotifications(n=>[{id:Date.now(),icon:"🚗",text:fr.name+" joined "+g.name+" and added their "+car.name+".",ts:"now",read:false},...n]);
+                        }, 1800);
+                      }} style={{padding:"6px 12px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Invite</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Member action sheet — tap a member's tile to Call or Text them.
+              Text opens the Lanes room with lanesGarageOrigin set so the
+              back button from that room returns here, not the Lanes list. */}
+          {garageMemberAction && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setGarageMemberAction(null)}>
+              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,paddingBottom:26}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                  <FriendAvatar fr={garageMemberAction} size={44} fontSize={16}/>
+                  <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{garageMemberAction.name}</div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setCallingFriend({friend:garageMemberAction,status:"ringing",secs:0});setGarageMemberAction(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#22c55e11",color:"#22c55e"}}>📞 Call</button>
+                  <button onClick={()=>{const fr=garageMemberAction;setGarageMemberAction(null);setActiveChan(fr.id);go("create",{lanesRoom:true,lanesGarageOrigin:{garageId:g.id}});}} style={{flex:1,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:800,background:"#5865f211",color:"#5865f2"}}>💬 Text</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Garage sheet — photo, name, bio, and members (remove). */}
+          {showEditGarage && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowEditGarage(false)}>
+              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Edit Garage</div>
+
+                <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
+                  <button onClick={()=>garagePhotoRef.current?.click()} style={{width:80,height:80,borderRadius:"50%",background:editGarageDraft.photo?"transparent":"#f3f3f3",border:"1.5px solid #ebebeb",cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                    {editGarageDraft.photo ? <img src={editGarageDraft.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:24,color:"#ccc"}}>🚗</span>}
+                  </button>
+                  <input ref={garagePhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,800,0.85).then(url=>{if(url)setEditGarageDraft(d=>({...d,photo:url}));});e.target.value="";}}/>
+                </div>
+                <div style={{textAlign:"center",marginBottom:16}}>
+                  <button onClick={()=>garagePhotoRef.current?.click()} style={{padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>{editGarageDraft.photo?"Replace Photo":"Upload Photo"}</button>
+                  {editGarageDraft.photo && <button onClick={()=>setEditGarageDraft(d=>({...d,photo:null}))} style={{marginLeft:8,padding:"6px 14px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
+                </div>
+
+                <input value={editGarageDraft.name} onChange={e=>setEditGarageDraft(d=>({...d,name:e.target.value}))} placeholder="Garage name" style={{...INP,marginBottom:8}}/>
+                <textarea value={editGarageDraft.bio} onChange={e=>setEditGarageDraft(d=>({...d,bio:e.target.value.slice(0,140)}))} placeholder="Short bio — what this garage/crew is about" maxLength={140} style={{...INP,minHeight:70,resize:"vertical",marginBottom:4}}/>
+                <div style={{fontSize:10,color:"#bbb",textAlign:"right",marginBottom:12}}>{editGarageDraft.bio.length}/140</div>
+
+                {members.length>0 && (
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MEMBERS</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {members.map(fr=>(
+                        <div key={fr.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:"1px solid #ebebeb"}}>
+                          <FriendAvatar fr={fr} size={30} fontSize={11}/>
+                          <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                          <button onClick={()=>setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,memberIds:x.memberIds.filter(id=>id!==fr.id),vehicles:x.vehicles.filter(v=>v.ownerId!==fr.id)}:x))} title="Remove member" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{
+                    if(!editGarageDraft.name.trim())return;
+                    setSharedGarages(gs=>gs.map(x=>x.id===g.id?{...x,name:editGarageDraft.name.trim(),bio:editGarageDraft.bio.trim(),photo:editGarageDraft.photo}:x));
+                    setShowEditGarage(false);
+                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
+                  <button onClick={()=>setShowEditGarage(false)} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showAddVehicle && (() => {
+            // Every saved car in your garage (the active one + parked ones from
+            // myCars) that you can post here as-is, avatar and all — picking one
+            // fills the name/bio below with its real data, but they stay
+            // editable, and typing over the name clears the pick so a fully
+            // custom manual entry still works same as before.
+            const myGarageCars = [
+              {id:activeCarId, name:carName||carModel, model:carModel, color:carColor, bodyStyle:carBodyStyle, mods:carMods, avatarMode:carAvatarMode, avatarPhoto:carAvatarPhoto, bio:carBio, saved:carSaved},
+              ...myCars.map(c=>({id:c.id, name:c.name||c.model, model:c.model, color:c.color, bodyStyle:c.bodyStyle, mods:c.mods, avatarMode:c.avatarMode, avatarPhoto:c.avatarPhoto, bio:c.bio, saved:c.saved})),
+            ].filter(c=>c.saved);
+            const picked = myGarageCars.find(c=>c.id===shareCarId);
+            return (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowAddVehicle(false);setShareCarId(null);}}>
+              <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Share a Car From Your Garage</div>
+                <div style={{fontSize:12,color:"#111",marginBottom:14}}>Pick one of your saved car avatars, or type one in manually below.</div>
+                {myGarageCars.length>0 && (
+                  <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:6,marginBottom:16}}>
+                    {myGarageCars.map(car=>(
+                      <button key={car.id} onClick={()=>{setShareCarId(car.id);setNewVehicle({name:car.name,bio:car.bio||""});}} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 8px",borderRadius:14,border:shareCarId===car.id?"1.5px solid "+OR:"1.5px solid #ebebeb",background:shareCarId===car.id?OR+"08":"#fff",cursor:"pointer",fontFamily:F,flexShrink:0,minWidth:76}}>
+                        <VehicleAvatar v={car} size={48}/>
+                        <div style={{fontSize:11,fontWeight:700,color:"#111",marginTop:6,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{car.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input value={newVehicle.name} onChange={e=>{setShareCarId(null);setNewVehicle(v=>({...v,name:e.target.value}));}} placeholder="e.g. '20 Civic Type R" style={{...INP,marginBottom:8}}/>
+                <textarea value={newVehicle.bio} onChange={e=>setNewVehicle(v=>({...v,bio:e.target.value}))} placeholder="Short bio — mods, story, whatever you want the crew to know" style={{...INP,minHeight:70,resize:"vertical",marginBottom:14}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{
+                    if(!newVehicle.name.trim())return;
+                    setSharedGarages(gs=>gs.map(x=>x.id===g.id?{
+                      ...x,
+                      vehicles:[
+                        ...x.vehicles.filter(v=>v.ownerId!=="me"),
+                        {id:"v_me_"+Date.now(), ownerId:"me", ownerName:userName||"You", ownerInitials:"ME", ownerColor:OR,
+                         name:newVehicle.name.trim(), bio:newVehicle.bio.trim()||"No bio yet.",
+                         avatarMode:picked?.avatarMode, avatarPhoto:picked?.avatarPhoto, color:picked?.color, bodyStyle:picked?.bodyStyle, mods:picked?.mods, sourceCarId:picked?.id},
+                      ]}:x));
+                    setNewVehicle({name:"",bio:""});setShareCarId(null);setShowAddVehicle(false);
+                  }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Save</button>
+                  <button onClick={()=>{setShowAddVehicle(false);setShareCarId(null);}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
+                </div>
+              </div>
+            </div>
+            );
+          })()}
+          <CallOverlay/>
+        </div>
+      );
+    }
+
+    if(subPanel==="car") {
+      const bannerBg = carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css;
+      return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {/* Own header removed — the shared TopBar switches to back(left)/
+            edit(right) buttons while this page is open (see <TopBar/>). */}
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 7px"}}>
+
+          {/* Hero — customizable banner (upload or premade) behind either the custom SVG avatar or an uploaded car photo. Banner is edited from the Edit Car menu. */}
+          <div style={{background:bannerBg,padding:"28px 20px 20px",display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
+            {!carBannerPhoto && <div style={{position:"absolute",bottom:0,left:"50%",transform:"translateX(-50%)",width:"70%",height:40,background:carColor+"33",filter:"blur(20px)",borderRadius:"50%"}}/>}
+            <div style={{position:"relative",zIndex:1}}>
+              {carAvatarMode==="photo" && carAvatarPhoto
+                ? <img src={carAvatarPhoto} alt="" style={{width:150,height:150,borderRadius:20,objectFit:"cover",border:"3px solid rgba(255,255,255,0.85)",boxShadow:"0 6px 20px rgba(0,0,0,0.4)"}}/>
+                : <CarSVG color={carColor} mods={carMods} size={200} styleId={carBodyStyle}/>}
+            </div>
+            <div style={{marginTop:10,textAlign:"center",zIndex:1}}>
+              <div style={{fontSize:20,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{carName || CAR_BRANDS.find(b=>b.id===carBrand)?.name || "My Car"}</div>
+              {(carName || carModel) && <div style={{fontSize:13,color:"#ddd",marginTop:2,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{(carName && carBrand) ? (CAR_BRANDS.find(b=>b.id===carBrand)?.name+" ") : ""}{carModel} · {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length} mods</div>}
+            </div>
+            {/* Private car info — opens from this wallet button on the car
+                avatar window instead of always sitting inline on the page.
+                Same data, edited from Edit Car, only ever visible to you. */}
+            <button onClick={()=>setShowPrivateCard(true)} title="Private Car Info" style={{position:"absolute",bottom:10,right:10,width:38,height:38,borderRadius:"50%",background:"rgba(0,0,0,0.55)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>
+              <ProfileIcon id="briefcase" size={18} color="#fff"/>
+            </button>
+          </div>
+
+          {Object.values(carMods).filter(v=>v&&v!=="None"&&v!=="Stock").length>0&&(
+            <div style={{padding:"12px 16px 0",display:"flex",gap:5,flexWrap:"wrap"}}>
+              {Object.entries(carMods).filter(([,v])=>v&&v!=="None"&&v!=="Stock").map(([k,v])=>(
+                <div key={k} style={{background:OR+"15",border:"1px solid "+OR+"33",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,color:OR}}>{k}: {v}</div>
+              ))}
+            </div>
+          )}
+
+          <div style={{padding:"14px 16px 0"}}>
+            {/* Bio — build story / mod description, set from Edit Car. Shown
+                right above Photos, only when the owner has written one. */}
+            {carBio && carBio.trim() && (<>
+              <div style={SEC}>BIO</div>
+              <div style={{...CARD,fontSize:14,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carBio}</div>
+            </>)}
+
+            <div style={SEC}>PHOTOS</div>
+            <div style={{fontSize:12,color:"#111",fontWeight:700,marginBottom:6}}>EXTERIOR (UP TO 4)</div>
+            {PhotoGallery(carExteriorPhotos, setCarExteriorPhotos, carExteriorPhotoRef, 4)}
+            <div style={{fontSize:12,color:"#111",fontWeight:700,marginTop:10,marginBottom:6}}>INTERIOR (UP TO 4)</div>
+            {PhotoGallery(carInteriorPhotos, setCarInteriorPhotos, carInteriorPhotoRef, 4)}
+            {routes.length>0&&<>
+              <div style={SEC}>RECENT ROUTES</div>
+              {routes.slice(0,3).map(r=>(
+                <div key={r.id} style={{...CARD,display:"flex",alignItems:"center",gap:10,padding:"10px 12px"}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{r.title}</div>
+                    <div style={{fontSize:11,color:"#111"}}>{r.type}{r.distance?" · "+r.distance:""}</div>
+                  </div>
+                  <button onClick={()=>startRouteDirections(r)} title="Get Directions" style={{padding:"4px 10px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>🧭</button>
+                </div>
+              ))}
+            </>}
+
+            {/* Private car info is no longer shown inline on this page at
+                all — the only way to open it is the briefcase button on the
+                car avatar banner above. Same data, edited from Edit Car,
+                only ever visible to you on your own device. */}
+          </div>
+        </div>
+
+        {/* Private car info sheet — only visible to the owner here on their
+            own device; never shown on posts, the home hero, or anywhere else
+            public. Opened only via the wallet button above. */}
+        {showPrivateCard && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowPrivateCard(false)}>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:30,height:3,background:"#e8e8e8",borderRadius:2,margin:"12px auto 0",flexShrink:0}}/>
+              <div style={{padding:"10px 16px 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+                <ProfileIcon id="briefcase" size={18} color="#111"/>
+                <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111"}}>Private Car Info</div>
+                <button onClick={()=>setShowPrivateCard(false)} style={{width:28,height:28,borderRadius:"50%",border:"none",background:"#f3f3f3",color:"#111",fontSize:15,cursor:"pointer"}}>✕</button>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
+                <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0"}}>
+                  <div style={{fontSize:11,color:"#111",fontWeight:700,marginBottom:8}}>🔒 Only visible to you.</div>
+                  {carPrivatePhotos.length>0 && (
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:carPlate||carRegDate||carMileage||carPrivateNotes?10:0}}>
+                      {carPrivatePhotos.map(p=>(
+                        <div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",background:"#f0e6c8"}}>
+                          <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {carPlate && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
+                      <span style={{fontSize:12,color:"#111"}}>License Plate</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{carPlate}</span>
+                    </div>
+                  )}
+                  {carRegDate && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f2f2f2"}}>
+                      <span style={{fontSize:12,color:"#111"}}>Registration Date</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{new Date(carRegDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>
+                    </div>
+                  )}
+                  {carMileage && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:(carPrivateNotes?"1px solid #f2f2f2":"none")}}>
+                      <span style={{fontSize:12,color:"#111"}}>Current Mileage</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{Number(carMileage).toLocaleString()} mi</span>
+                    </div>
+                  )}
+                  {carPrivateNotes && (
+                    <div style={{padding:"8px 0 0"}}>
+                      <div style={{fontSize:12,color:"#111",marginBottom:4}}>Other Notes</div>
+                      <div style={{fontSize:13,color:"#111",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{carPrivateNotes}</div>
+                    </div>
+                  )}
+                  {!(carPlate||carRegDate||carMileage||carPrivateNotes||carPrivatePhotos.length>0) && (
+                    <div style={{fontSize:13,color:"#111",textAlign:"center",padding:"10px 0"}}>No private info added yet — add it from Edit Car.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      );
+    }
+
+    if(subPanel==="editcar"){
+      const editBannerBg = carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css;
+      return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {/* Own header removed — the shared TopBar shows back/Save while this
+            page is open (see <TopBar/>). */}
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"14px 16px 32px"}}>
+
+          <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Edit Car</div>
+          {/* Avatar mode — custom SVG avatar or an uploaded photo of the real car */}
+          <div style={SEC}>CAR AVATAR</div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {[["avatar","🎨","Custom Avatar"],["photo","📷","Upload Photo"]].map(([id,ic,label])=>(
+              <button key={id} onClick={()=>setCarAvatarMode(id)} style={{
+                flex:1,padding:"10px 8px",borderRadius:12,cursor:"pointer",fontFamily:F,textAlign:"center",
+                border:"1.5px solid "+(carAvatarMode===id?OR:"#ebebeb"),
+                background:carAvatarMode===id?OR+"0f":"#f8f8f8"}}>
+                <div style={{fontSize:20,marginBottom:2}}>{ic}</div>
+                <div style={{fontSize:12,fontWeight:700,color:carAvatarMode===id?OR:"#111"}}>{label}</div>
+              </button>
+            ))}
+          </div>
+
+          {carAvatarMode==="avatar" ? (
+            <div style={{...CARD,padding:0,overflow:"hidden",marginBottom:14}}>
+              <div style={{background:editBannerBg,padding:"14px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <CarSVG color={carColor} mods={carMods} size={140} styleId={carBodyStyle}/>
+              </div>
+            </div>
+          ) : (
+            <div style={{...CARD,padding:0,overflow:"hidden",marginBottom:14,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+              <div style={{width:"100%",background:editBannerBg,padding:"14px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+                <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{width:280,height:280,maxWidth:"100%",borderRadius:28,overflow:"hidden",border:"1.5px dashed "+(carAvatarPhoto?"transparent":"rgba(255,255,255,0.6)"),background:carAvatarPhoto?"transparent":"rgba(255,255,255,0.15)",cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {carAvatarPhoto ? <img src={carAvatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <span style={{fontSize:48,color:"#fff"}}>+</span>}
+                </button>
+                <input ref={carAvatarPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,1024,0.85).then(url=>{if(url)setCarAvatarPhoto(url);});e.target.value="";}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>carAvatarPhotoRef.current?.click()} style={{padding:"7px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>{carAvatarPhoto?"Replace Photo":"Upload Photo"}</button>
+                  {carAvatarPhoto && <button onClick={()=>setCarAvatarPhoto(null)} style={{padding:"7px 14px",borderRadius:20,background:"rgba(255,255,255,0.9)",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>Remove</button>}
+                </div>
+              </div>
+              {!carAvatarPhoto && <div style={{fontSize:11,color:"#111",textAlign:"center",padding:"8px 10px"}}>Uploaded photo appears wherever your car avatar shows up.</div>}
+            </div>
+          )}
+
+          {/* Appearance editor — Banner / Body Style / Color / Brand / Mods all
+              live behind one toggle instead of five stacked sections, so you
+              can flip between them without scrolling away from the avatar
+              preview above, which updates live as you change any of them. */}
+          <div style={{display:"flex",gap:5,marginBottom:12,overflowX:"auto"}}>
+            {[["banner","Banner"],["bodystyle","Body Style"],["color","Color"],["brand","Brand"],["mods","Mods"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setCarEditTab(id)} style={{
+                flexShrink:0,padding:"7px 13px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:700,
+                border:"1.5px solid "+(carEditTab===id?OR:"#ebebeb"),
+                background:carEditTab===id?OR+"0f":"#f8f8f8",
+                color:carEditTab===id?OR:"#111"}}>{label}</button>
+            ))}
+          </div>
+
+          {carEditTab==="banner" && (
+            <div style={{...CARD,marginBottom:14}}>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>SELECT A BANNER</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>carBannerPhotoRef.current?.click()} style={{
+                  height:56,borderRadius:12,cursor:"pointer",position:"relative",overflow:"hidden",
+                  border:carBannerPhoto?"2.5px solid "+OR:"1.5px dashed "+OR+"66",
+                  background:carBannerPhoto?"url("+carBannerPhoto+") center/cover no-repeat":OR+"08",
+                  display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {!carBannerPhoto && <span style={{fontSize:12,fontWeight:700,color:OR,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:16}}>📤</span>Upload Photo</span>}
+                  {carBannerPhoto && <span style={{position:"absolute",bottom:4,left:6,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>Your Photo</span>}
+                  {carBannerPhoto && <span style={{position:"absolute",top:4,right:5,fontSize:12,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                </button>
+                {CAR_BANNERS.map(b=>(
+                  <button key={b.id} onClick={()=>{setCarBannerPreset(b.id);setCarBannerPhoto(null);}} style={{
+                    height:56,borderRadius:12,border:(!carBannerPhoto&&carBannerPreset===b.id)?"2.5px solid "+OR:"1.5px solid #ebebeb",
+                    background:b.css,cursor:"pointer",position:"relative",overflow:"hidden"}}>
+                    <span style={{position:"absolute",bottom:4,left:6,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>{b.label}</span>
+                    {(!carBannerPhoto&&carBannerPreset===b.id) && <span style={{position:"absolute",top:4,right:5,fontSize:12,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.7)"}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+              <input ref={carBannerPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;readImageCompressed(f,1440,0.82).then(url=>{if(url)setCarBannerPhoto(url);});e.target.value="";}}/>
+              {carBannerPhoto && <button onClick={()=>setCarBannerPhoto(null)} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginTop:12}}>Remove Uploaded Photo</button>}
+            </div>
+          )}
+
+          {carEditTab==="bodystyle" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
+              {CAR_BODY_STYLES.map(s=>(
+                <button key={s.id} onClick={()=>{setCarBodyStyle(s.id);setCarModel(s.label);setCarSaved(false);}} style={{
+                  display:"flex",flexDirection:"column",alignItems:"center",padding:"6px 3px 5px",borderRadius:10,cursor:"pointer",fontFamily:F,
+                  border:"1.5px solid "+(carBodyStyle===s.id?OR:"#ebebeb"),
+                  background:carBodyStyle===s.id?OR+"0f":"#f8f8f8"}}>
+                  <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+                    <CarSVG color={carColor} mods={{}} size={46} styleId={s.id}/>
+                  </div>
+                  <div style={{fontSize:9.5,fontWeight:700,color:carBodyStyle===s.id?OR:"#111",marginTop:2,textAlign:"center",lineHeight:1.15}}>{s.label}</div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {carEditTab==="color" && (
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+              {CAR_COLORS.map(c=><button key={c} onClick={()=>{setCarColor(c);setCarSaved(false);}} style={{width:28,height:28,borderRadius:"50%",background:c,border:"none",cursor:"pointer",outline:carColor===c?"3px solid "+OR:"none",outlineOffset:2}}/>)}
+            </div>
+          )}
+
+          {carEditTab==="brand" && (
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+              <button onClick={()=>{setCarBrand(null);setCarSaved(false);}} style={TAG(carBrand===null)}>None</button>
+              {CAR_BRANDS.map(b=>(
+                <button key={b.id} onClick={()=>{setCarBrand(b.id);setCarSaved(false);}} style={{
+                  padding:"6px 11px",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:800,
+                  border:"1.5px solid "+(carBrand===b.id?b.color:"#ebebeb"),
+                  background:carBrand===b.id?b.color+"1a":"#f8f8f8",
+                  color:carBrand===b.id?b.color:"#111"}}>{b.name}</button>
+              ))}
+            </div>
+          )}
+
+          {carEditTab==="mods" && (
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:6}}>MODS — {activeModCat}</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                {Object.keys(CAR_MODS).map(c=><button key={c} onClick={()=>setActiveModCat(c)} style={{...TAG(activeModCat===c),flexShrink:0,fontSize:12,padding:"4px 9px"}}>{c}</button>)}
+              </div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                {(CAR_MODS[activeModCat]||[]).map(o=><button key={o} onClick={()=>{setCarMods(m=>({...m,[activeModCat]:o}));setCarSaved(false);}} style={TAG(carMods[activeModCat]===o)}>{o}</button>)}
+              </div>
+            </div>
+          )}
+
+          <div style={SEC}>NAME</div>
+          <input value={carName} onChange={e=>{setCarName(e.target.value);setCarSaved(false);}} placeholder="Name your ride…" style={{...INP,marginBottom:14}}/>
+
+          {/* Bio — free-text build/mod description, shown publicly on the car
+              details page above Photos. Distinct from the private info below. */}
+          <div style={SEC}>BIO</div>
+          <textarea value={carBio} onChange={e=>{setCarBio(e.target.value);setCarSaved(false);}} placeholder="Describe the mods you've done, the build story, or anything else you want shown on your car's page…" rows={4} style={{...INP,resize:"none",marginBottom:14}}/>
+
+          {/* Home avatar display — name/model text on the home hero is opt-in */}
+          <div style={SEC}>HOME AVATAR WINDOW</div>
+          <button onClick={()=>setCarShowInfoHome(v=>!v)} style={{...CARD,display:"flex",alignItems:"center",gap:12,cursor:"pointer",border:"1px solid #ebebeb",width:"100%",textAlign:"left",fontFamily:F}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Show name &amp; model</div>
+              <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Display your car's name and model as text under the avatar on the home page.</div>
+            </div>
+            <div style={{width:40,height:23,borderRadius:20,background:carShowInfoHome?OR:"#e0e0e0",position:"relative",flexShrink:0,transition:"background 0.15s"}}>
+              <div style={{position:"absolute",top:2,left:carShowInfoHome?19:2,width:19,height:19,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.3)",transition:"left 0.15s"}}/>
+            </div>
+          </button>
+
+          {/* Private car info — plate, registration, mileage, and any other
+              handy details. Never shown publicly; kept strictly for the
+              owner's own quick reference on their phone. Tinted (instead of
+              the plain white every other card on this page uses) so it's
+              obvious at a glance that this section is handled differently. */}
+          <div style={SEC}>PRIVATE CAR INFO</div>
+          <div style={{...CARD,background:"#fdf8ec",border:"1px solid #eeddb0",marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,color:"#111"}}>
+              <span style={{fontSize:14}}>🔒</span>
+              <span style={{fontSize:12,fontWeight:700,color:"#111"}}>Only visible to you — never shown on your car's page or profile.</span>
+            </div>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>LICENSE PLATE</div>
+            <input value={carPlate} onChange={e=>{setCarPlate(e.target.value);setCarSaved(false);}} placeholder="e.g. 8ABC123" style={{...INP,marginBottom:12}}/>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>REGISTRATION DATE</div>
+            <input type="date" value={carRegDate} onChange={e=>{setCarRegDate(e.target.value);setCarSaved(false);}} style={{...INP,marginBottom:12}}/>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>CURRENT MILEAGE</div>
+            <input type="number" inputMode="numeric" value={carMileage} onChange={e=>{setCarMileage(e.target.value);setCarSaved(false);}} placeholder="e.g. 42500" style={{...INP,marginBottom:12}}/>
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>OTHER NOTES</div>
+            <textarea value={carPrivateNotes} onChange={e=>{setCarPrivateNotes(e.target.value);setCarSaved(false);}} placeholder="VIN, insurance info, service reminders, anything else handy to have on hand…" rows={3} style={{...INP,resize:"none",marginBottom:12}}/>
+            {/* Snapshots of things like your insurance card or registration —
+                tapping + brings up your device's normal choice between taking
+                a new photo with the camera or picking an existing one. */}
+            <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.5,marginBottom:4}}>PHOTOS — INSURANCE CARD, ETC.</div>
+            {PhotoGallery(carPrivatePhotos, setCarPrivatePhotos, carPrivatePhotoRef, 6)}
+          </div>
+        </div>
+      </div>
+    );}
+
+      const fmt2 = s => {
+        const m=Math.floor(s/60), sec=s%60;
+        return m>0 ? m+"m "+sec+"s" : sec+"s";
+      };
+      // Simulated path colors for variety
+      const PATH_COLORS = ["#f97316","#6366f1","#22c55e","#a855f7","#ef4444","#14b8a6","#f59e0b","#ec4899"];
+
+      // Calendar — merged in from the old Dashcam tab: marks any date with
+      // either a logged trip or recorded footage (current month only).
+      // Tapping a date with exactly one trip jumps straight into that trip's
+      // detail view (nav/stops + any footage); a date with several trips (or
+      // footage but no trip) expands a short list below the calendar instead.
+      const tripByDate = {};
+      tripHistory.forEach(t=>{ (tripByDate[t.date]=tripByDate[t.date]||[]).push(t); });
+      const clipByDate = {};
+      clips.forEach(c=>{ (clipByDate[c.date]=clipByDate[c.date]||[]).push(c); });
+      const calToday=new Date();
+      const calDim=new Date(calToday.getFullYear(),calToday.getMonth()+1,0).getDate();
+      const calFd=new Date(calToday.getFullYear(),calToday.getMonth(),1).getDay();
+      const calMl=calToday.toLocaleDateString("en-US",{month:"long",year:"numeric"});
+      const calDk=d=>new Date(calToday.getFullYear(),calToday.getMonth(),d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+      const onCalDateTap = (key) => {
+        const dayTrips = tripByDate[key]||[];
+        if(dayTrips.length===1){ setSelTrip({...dayTrips[0], path:undefined}); return; }
+        setSelCalDate(prev => prev===key ? null : key);
+      };
+
+    return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {/* Own header removed — the shared TopBar shows the "+"/☰
+            buttons and "My Garage" title while this page is open
+            (see <TopBar/>). */}
+        <div ref={setScroll} style={{flex:1,overflowY:"auto",padding:"0 0 7px"}}>
+        <div style={{padding:"16px 0 7px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",margin:"0 14px 10px"}}>
+            <span style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2}}>MY CARS</span>
+            <span style={{fontSize:11,color:"#999",fontWeight:700}}>{1+myCars.length}/{MAX_CARS}</span>
+          </div>
+          {/* Big scrollable avatar carousel — one large window per car
+              instead of the old small 2-up grid, so the avatar itself
+              (the thing you're actually here to look at) is the focus. */}
+          <div style={{display:"flex",gap:14,overflowX:"auto",padding:"4px 14px 14px",scrollSnapType:"x proximity"}}>
+            {myGarageCards.map(c=>(
+              <div key={c.key} style={{position:"relative",flexShrink:0,width:158,scrollSnapAlign:"start"}}>
+                <button onClick={()=>{if(!c.isActive)switchToCar(c.id);setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"22px 12px 16px",borderRadius:20,border:c.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:c.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                  <div style={{width:118,height:118,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:10,flexShrink:0}}>
+                    {c.avatarMode==="photo" && c.avatarPhoto
+                      ? <img src={c.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                      : <CarSVG color={c.color} mods={c.mods} size={102} styleId={c.bodyStyle}/>}
+                  </div>
+                  {c.name && <div style={{fontSize:15,fontWeight:800,color:"#111",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{c.name}</div>}
+                  <div style={{fontSize:12,color:"#111",marginTop:c.name?3:0}}>{c.saved?"✓ saved":c.model}</div>
+                </button>
+                {c.isActive ? (
+                  <div title="Displayed at the top of your profile" style={{position:"absolute",top:8,left:8,width:26,height:26,borderRadius:"50%",background:OR,color:"#fff",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.25)"}}>★</div>
+                ) : (
+                  <button onClick={e=>{e.stopPropagation();switchToCar(c.id);}} title="Display This Car" style={{position:"absolute",top:8,left:8,width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ccc",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>★</button>
+                )}
+                <button onClick={e=>{e.stopPropagation();setConfirmDeleteCar({id:c.id,name:c.name||c.model||"this car"});}} title="Delete car" style={{position:"absolute",top:8,right:8,width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ef4444",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Confirm before deleting a car — wipes its photos/details, so a
+              deliberate extra step rather than an instant delete. */}
+          {confirmDeleteCar && (
+            <div onClick={()=>setConfirmDeleteCar(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}}>
+                <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+                <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:6}}>Delete {confirmDeleteCar.name}?</div>
+                <div style={{fontSize:13,color:"#111",lineHeight:1.6,marginBottom:16}}>This removes it from your garage for good, including its photos and details. This can't be undone.</div>
+                <button onClick={()=>{deleteCar(confirmDeleteCar.id);setConfirmDeleteCar(null);}} style={{width:"100%",padding:"13px",borderRadius:12,background:"#ef4444",color:"#fff",border:"none",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:F,marginBottom:10}}>Delete Car</button>
+                <button onClick={()=>setConfirmDeleteCar(null)} style={{width:"100%",padding:"12px",borderRadius:12,background:"transparent",color:"#111",border:"1px solid #ebebeb",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F}}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{padding:"14px 16px 0"}}>
+          <div style={SEC}>DRIVING STATS</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:4}}>
+              {[
+                {icKind:"profile",ic:"car",   label:"Total Mileage",val:totalMiles.toFixed(1),unit:"mi driven"},
+                {icKind:"profile",ic:"history",label:"Total Drives",val:tripHistory.length,unit:"recorded"},
+                {icKind:"dpad",   ic:"road",   dc:DPAD_COLORS.road,  label:"Total Routes",val:routes.length,unit:"saved"},
+                {icKind:"profile",ic:"video",  label:"Dashcam Clips",val:clips.length,unit:"recorded"},
+                {icKind:"profile",ic:"star",   label:"Star Points",val:pts,unit:"earned"},
+                {icKind:"profile",ic:"trophy", pc:"#f5a623",         label:"Driver Level",val:"Lv "+Math.floor(pts/200),unit:"rank"},
+              ].map(s=>(
+                <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",padding:"12px 14px"}}>
+                  <div style={{marginBottom:6}}>{s.icKind==="dpad" ? <DPadIcon id={s.ic} color={s.dc} size={20}/> : <ProfileIcon id={s.ic} size={20} color={s.pc||"#8a8f98"}/>}</div>
+                  <div style={{fontSize:18,fontWeight:900,color:"#111",lineHeight:1}}>{s.val}</div>
+                  <div style={{fontSize:10,color:"#111",marginTop:3}}>{s.label}</div>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        <div style={{padding:"0 16px"}}>
+          {sharedGarages.length>0 && (
+            <>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,margin:"0 0 12px"}}>SHARED GARAGES</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+                {sharedGarages.map(g=>(
+                  <button key={g.id} onClick={()=>{setSelSharedGarage(g.id);setSubPanel("sharedgarage");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:"1.5px solid #ebebeb",background:"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:g.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚗</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
+                      <div style={{fontSize:12,color:"#111"}}>{g.vehicles.length} vehicle{g.vehicles.length===1?"":"s"} · {g.memberIds.length+1} member{g.memberIds.length===0?"":"s"}</div>
+                    </div>
+                    <span style={{fontSize:16,color:"#ccc"}}>›</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Drive History + Dashcam — previously Profile's own separate
+            History tab, folded in here since Garage is Drive History's
+            natural home and this whole page is meant to scroll as one. */}
+        <div>
+          {/* Header */}
+          <div style={{padding:"0 14px 10px",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111",display:"flex",alignItems:"center",gap:7}}><ProfileIcon id="history" size={18} color="#111"/>Drive History</div>
+            <div style={{fontSize:13,fontWeight:700,color:OR}}>{tripHistory.length} trip{tripHistory.length!==1?"s":""}</div>
+          </div>
+
+          {selTrip ? (
+            /* ── Trip detail view ── */
+            <div>
+              {/* Map with simulated route highlight */}
+              <div style={{position:"relative",height:220,flexShrink:0,background:"#e5e3df",overflow:"hidden"}}>
+                <iframe
+                  title="Trip Map"
+                  style={{width:"100%",height:"100%",border:"none",display:"block"}}
+                  src={"https://maps.google.com/maps?q="+encodeURIComponent(selTrip.startAddr||"San Diego, CA")+"&z=13&output=embed"}
+                  loading="lazy"
+                />
+                {/* Route highlight overlay — SVG polyline simulating a trip path */}
+                <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 400 300" preserveAspectRatio="none">
+                  <defs>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  {/* Simulated trip path — a curved route across the map */}
+                  <polyline
+                    points={selTrip.path || "60,240 90,200 130,170 160,140 200,120 240,100 280,90 320,85 350,80"}
+                    fill="none"
+                    stroke={PATH_COLORS[selTrip.id%PATH_COLORS.length]}
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#glow)"
+                    opacity="0.85"
+                  />
+                  {/* Start dot */}
+                  <circle cx={60} cy={240} r={7} fill="#22c55e" stroke="#fff" strokeWidth="2"/>
+                  {/* End dot */}
+                  <circle cx={350} cy={80} r={7} fill="#ef4444" stroke="#fff" strokeWidth="2"/>
+                </svg>
+                {/* Legend */}
+                <div style={{position:"absolute",top:10,left:10,display:"flex",flexDirection:"column",gap:4}}>
+                  <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"3px 8px"}}>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e"}}/>
+                    <span style={{fontSize:10,color:"#fff",fontWeight:700}}>Start</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"3px 8px"}}>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:"#ef4444"}}/>
+                    <span style={{fontSize:10,color:"#fff",fontWeight:700}}>End</span>
+                  </div>
+                </div>
+                {/* Back from detail */}
+                <button onClick={()=>setSelTrip(null)} style={{position:"absolute",top:10,right:10,padding:"5px 10px",borderRadius:20,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>← All Trips</button>
+              </div>
+
+              {/* Trip stats */}
+              <div style={{padding:"14px 16px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
+                <div style={{fontSize:17,fontWeight:900,color:"#111",marginBottom:2}}>{selTrip.date} · {selTrip.time}</div>
+                <div style={{fontSize:13,color:"#111",marginBottom:12}}>{selTrip.startAddr} → {selTrip.endAddr}</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {[
+                    {ic:"🛣️", val:selTrip.dist+" mi", label:"Distance"},
+                    {ic:"⏱️", val:fmt2(selTrip.dur||0), label:"Duration"},
+                    {ic:"⭐", val:"+"+selTrip.pts+" pts", label:"Earned"},
+                    ...(selTrip.avgSpeed!=null ? [{ic:"⚡", val:selTrip.avgSpeed+" mph", label:"Avg Speed"}] : []),
+                    ...(selTrip.maxSpeed!=null ? [{ic:"🚀", val:selTrip.maxSpeed+" mph", label:"Top Speed"}] : []),
+                    ...(selTrip.lights!=null ? [{ic:"🚦", val:selTrip.lights, label:"Green Lights"}] : []),
+                  ].map(s=>(
+                    <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,padding:"10px",textAlign:"center",border:"1px solid #ebebeb"}}>
+                      <div style={{fontSize:20,marginBottom:3}}>{s.ic}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#111"}}>{s.val}</div>
+                      <div style={{fontSize:10,color:"#111",marginTop:2}}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Linked clip if any */}
+              {clips.find(c=>c.date===selTrip.date) && (
+                <div style={{padding:"12px 16px",flexShrink:0}}>
+                  <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:8}}>DASHCAM FOOTAGE</div>
+                  {clips.filter(c=>c.date===selTrip.date).slice(0,2).map(clip=>(
+                    <div key={clip.id} style={{background:"#111",borderRadius:10,overflow:"hidden",marginBottom:8}}>
+                      <video src={clip.url} controls style={{width:"100%",display:"block",maxHeight:160,background:"#000"}}/>
+                      <div style={{padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:11,color:"#aaa",flex:1}}>{clip.time} · {clip.dist} mi</span>
+                        <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"4px 8px",borderRadius:20,background:"#222",color:"#aaa",border:"none",fontSize:11,cursor:"pointer"}}>⬇</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Calendar + trip list ── */
+            <div style={{padding:"10px 14px 7px"}}>
+              {/* Calendar */}
+              <div style={{fontSize:10,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:6}}>{calMl.toUpperCase()}</div>
+              <div style={{background:"#f8f8f8",borderRadius:12,border:"1px solid #ebebeb",marginBottom:14}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:"#f0f0f0",borderBottom:"1px solid #ebebeb",borderRadius:"12px 12px 0 0"}}>
+                  {["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{padding:"6px 0",textAlign:"center",fontSize:11,fontWeight:700,color:"#111"}}>{d}</div>)}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
+                  {Array.from({length:calFd}).map((_,i)=><div key={"e"+i} style={{minHeight:36}}/>)}
+                  {Array.from({length:calDim}).map((_,i)=>{
+                    const day=i+1, key=calDk(day);
+                    const dayTrips=tripByDate[key]||[], dayClips=clipByDate[key]||[];
+                    const isT=day===calToday.getDate(), isSel=selCalDate===key;
+                    return (
+                      <button key={day} onClick={()=>onCalDateTap(key)}
+                        style={{minHeight:36,padding:"4px 2px",background:isSel?OR:isT?OR+"11":"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                        <span style={{fontSize:13,fontWeight:isT||isSel?800:400,color:isSel?"#fff":isT?OR:"#333"}}>{day}</span>
+                        {(dayTrips.length>0||dayClips.length>0) && (
+                          <div style={{display:"flex",gap:2,marginTop:1}}>
+                            {dayTrips.length>0 && <span style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":OR,display:"block"}}/>}
+                            {dayClips.length>0 && <span style={{width:4,height:4,borderRadius:"50%",background:isSel?"#fff":"#6366f1",display:"block"}}/>}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selected date — multiple trips to choose from, or footage
+                  with no logged trip that day */}
+              {selCalDate && (() => {
+                const dayTrips = tripByDate[selCalDate]||[];
+                const dayClips = clipByDate[selCalDate]||[];
+                if(dayTrips.length===0 && dayClips.length===0) return (
+                  <div style={{textAlign:"center",padding:"16px",color:"#111",fontSize:13}}>No activity on {selCalDate}</div>
+                );
+                return (
+                  <div style={{marginBottom:14}}>
+                    <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1,marginBottom:8}}>{selCalDate}</div>
+                    {/* Each trip gets the same mini route-map card as the
+                        main list below — a picture of the road taken, not
+                        just a text row — so browsing by calendar date shows
+                        the same map + distance + footage history. */}
+                    {dayTrips.map(trip=>{
+                      const color=PATH_COLORS[trip.id%PATH_COLORS.length];
+                      const hasClip=clips.some(c=>c.date===trip.date);
+                      return (
+                        <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{
+                          width:"100%",background:"#fff",borderRadius:14,border:"1px solid #ebebeb",
+                          marginBottom:8,overflow:"hidden",cursor:"pointer",fontFamily:F,textAlign:"left",
+                          boxShadow:"0 2px 8px rgba(0,0,0,0.05)",padding:0}}>
+                          <div style={{height:90,position:"relative",background:"#e5e3df",overflow:"hidden"}}>
+                            <iframe
+                              title={"calmap"+trip.id}
+                              style={{width:"100%",height:"180px",border:"none",display:"block",marginTop:"-45px",pointerEvents:"none"}}
+                              src={"https://maps.google.com/maps?q="+encodeURIComponent(trip.startAddr||"San Diego, CA")+"&z=12&output=embed"}
+                              loading="lazy"
+                            />
+                            <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 300 100" preserveAspectRatio="none">
+                              <polyline points="20,80 50,65 85,52 120,42 160,35 200,30 240,28 270,25" fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.9"/>
+                              <circle cx={20} cy={80} r={5} fill="#22c55e" stroke="#fff" strokeWidth="1.5"/>
+                              <circle cx={270} cy={25} r={5} fill="#ef4444" stroke="#fff" strokeWidth="1.5"/>
+                            </svg>
+                            {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#fff"}}>📹</div>}
+                          </div>
+                          <div style={{padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:7,height:26,borderRadius:4,background:color,flexShrink:0}}/>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{trip.time} · {trip.startAddr}</div>
+                              <div style={{fontSize:11,color:"#111"}}>{trip.dist} mi · +{trip.pts} pts{hasClip?" · 📹 footage":""}</div>
+                            </div>
+                            <div style={{fontSize:16,color:"#111"}}>›</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {dayTrips.length===0 && dayClips.map(clip=>(
+                      <div key={clip.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
+                        <div style={{background:"#111",position:"relative",cursor:"pointer",height:80}} onClick={()=>setPlayingClip(p=>p===clip.id?null:clip.id)}>
+                          <video src={clip.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.55,display:"block",pointerEvents:"none"}}/>
+                          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                              {playingClip===clip.id?"⏸":"▶"}
+                            </div>
+                          </div>
+                        </div>
+                        {playingClip===clip.id && <video src={clip.url} controls autoPlay style={{width:"100%",maxHeight:200,display:"block",background:"#000"}}/>}
+                        <div style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{clip.time}</div>
+                            <div style={{fontSize:11,color:"#111"}}>{clip.dist} mi · {clip.sizeMB} MB</div>
+                          </div>
+                          <button onClick={()=>{const a=document.createElement("a");a.href=clip.url;a.download="drive_"+clip.id+(clip.ext||".webm");a.click();}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:12,cursor:"pointer"}}>⬇</button>
+                          <button onClick={()=>{URL.revokeObjectURL(clip.url);clipsDB.remove(clip.id);setClips(p=>p.filter(c=>c.id!==clip.id));if(playingClip===clip.id)setPlayingClip(null);}} style={{padding:"5px 9px",borderRadius:20,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#ef4444",fontSize:12,cursor:"pointer"}}>🗑</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Dashcam enable prompt — the actual "Record in Background"
+                  auto-record toggle now lives in Drive Mode Settings (the ⚙️
+                  inside Drive mode), not here, so it's reachable without
+                  leaving Drive mode. */}
+              {!dashcamConsent ? (
+                <div style={{background:"#fff8f0",border:"1px solid #fde8d8",borderRadius:12,padding:"14px",marginBottom:16,textAlign:"center"}}>
+                  <div style={{fontSize:28,marginBottom:6}}>📹</div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#111",marginBottom:4}}>Enable Dashcam</div>
+                  <div style={{fontSize:12,color:"#111",lineHeight:1.6,marginBottom:12}}>Automatically record video of your drives once you're moving over 5 mph. Footage stays on this device and is only viewable here.</div>
+                  <button onClick={()=>{setDashcamConsent(true);memStore.setItem("sl_dashcamConsent","1");}} style={{width:"100%",padding:"11px",borderRadius:11,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>
+                    I Agree — Enable Dashcam
+                  </button>
+                </div>
+              ) : (
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",marginBottom:16}}>
+                  <div style={{fontSize:12,color:"#111",lineHeight:1.6}}>The camera preview and auto-record settings for Dashcam now live in <b>Drive Mode Settings</b> (tap ⚙️ inside Drive mode).</div>
+                </div>
+              )}
+
+              {tripHistory.length===0 ? (
+                <div style={{textAlign:"center",padding:"52px 20px",color:"#111"}}>
+                  <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}><ProfileIcon id="history" size={50} color="#ccc"/></div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#111",marginBottom:6}}>No trips yet</div>
+                  <div style={{fontSize:13,lineHeight:1.7,marginBottom:20}}>Drives record automatically once you're moving over 5 mph — open the map and every trip will appear here with speed, duration, and route.</div>
+                  <button onClick={()=>{vibrate();go("drive");}} style={{padding:"10px 22px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:7}}><DPadIcon id="map" color="#fff" size={14}/> Open Map</button>
+                </div>
+              ) : (
+                <>
+                  {/* Summary stats strip */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+                    {[
+                      {ic:"🛣️", val:(tripHistory.reduce((a,t)=>a+parseFloat(t.dist||0),0)).toFixed(1)+" mi", label:"Total Miles"},
+                      {ic:"⏱️", val:Math.floor(tripHistory.reduce((a,t)=>a+(t.dur||0),0)/60)+"m", label:"Drive Time"},
+                      {ic:"⭐", val:tripHistory.reduce((a,t)=>a+(t.pts||0),0)+" pts", label:"Pts Earned"},
+                      ...(tripHistory.some(t=>t.avgSpeed!=null) ? [{ic:"⚡", val:Math.round(tripHistory.filter(t=>t.avgSpeed!=null).reduce((a,t)=>a+t.avgSpeed,0)/tripHistory.filter(t=>t.avgSpeed!=null).length)+" mph", label:"Avg Speed"}] : []),
+                      ...(tripHistory.some(t=>t.lights!=null) ? [{ic:"🚦", val:tripHistory.reduce((a,t)=>a+(t.lights||0),0), label:"Green Lights"}] : []),
+                    ].map(s=>(
+                      <div key={s.label} style={{background:"#f8f8f8",borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid #ebebeb"}}>
+                        <div style={{fontSize:18,marginBottom:2}}>{s.ic}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#111"}}>{s.val}</div>
+                        <div style={{fontSize:9,color:"#111",marginTop:1}}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Trip cards */}
+                  {tripHistory.map((trip,idx)=>{
+                    const color=PATH_COLORS[idx%PATH_COLORS.length];
+                    const hasClip=clips.some(c=>c.date===trip.date);
+                    return (
+                      <button key={trip.id} onClick={()=>setSelTrip({...trip,path:undefined})} style={{
+                        width:"100%",background:"#fff",borderRadius:14,border:"1px solid #ebebeb",
+                        marginBottom:10,overflow:"hidden",cursor:"pointer",fontFamily:F,textAlign:"left",
+                        boxShadow:"0 2px 8px rgba(0,0,0,0.05)",padding:0}}>
+                        {/* Mini map with SVG route */}
+                        <div style={{height:100,position:"relative",background:"#e5e3df",overflow:"hidden"}}>
+                          <iframe
+                            title={"map"+trip.id}
+                            style={{width:"100%",height:"200px",border:"none",display:"block",marginTop:"-50px",pointerEvents:"none"}}
+                            src={"https://maps.google.com/maps?q="+encodeURIComponent(trip.startAddr||"San Diego, CA")+"&z=12&output=embed"}
+                            loading="lazy"
+                          />
+                          {/* Highlighted route SVG overlay */}
+                          <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 300 100" preserveAspectRatio="none">
+                            <defs>
+                              <filter id={"g"+idx}>
+                                <feGaussianBlur stdDeviation="2" result="b"/>
+                                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                              </filter>
+                            </defs>
+                            <polyline
+                              points={"20,80 50,65 85,52 120,42 160,35 200,30 240,28 270,25"}
+                              fill="none" stroke={color} strokeWidth="4"
+                              strokeLinecap="round" strokeLinejoin="round"
+                              filter={"url(#g"+idx+")"} opacity="0.9"
+                            />
+                            <circle cx={20} cy={80} r={5} fill="#22c55e" stroke="#fff" strokeWidth="1.5"/>
+                            <circle cx={270} cy={25} r={5} fill="#ef4444" stroke="#fff" strokeWidth="1.5"/>
+                          </svg>
+                          {/* Date badge */}
+                          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#fff",fontWeight:700}}>{trip.date}</div>
+                          {hasClip && <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",borderRadius:20,padding:"2px 8px",fontSize:10,color:"#111"}}>📹</div>}
+                        </div>
+                        {/* Trip info */}
+                        <div style={{padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{width:8,height:28,borderRadius:4,background:color,flexShrink:0}}/>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:14,fontWeight:800,color:"#111",marginBottom:2}}>{trip.time} · {trip.startAddr}</div>
+                            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,color:"#111"}}>🛣️ {trip.dist} mi</span>
+                              <span style={{fontSize:11,color:"#111"}}>⏱ {fmt2(trip.dur||0)}</span>
+                              {trip.avgSpeed!=null && <span style={{fontSize:11,color:"#111"}}>⚡ {trip.avgSpeed} mph</span>}
+                              <span style={{fontSize:11,color:OR}}>+{trip.pts} pts</span>
+                            </div>
+                          </div>
+                          <div style={{fontSize:16,color:"#111"}}>›</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {dashcamConsent && (
+                <button onClick={()=>{setDashcamConsent(false);memStore.removeItem("sl_dashcamConsent");if(dashOn)stopDrive();}} style={{width:"100%",marginTop:6,padding:"10px",borderRadius:10,background:"transparent",border:"1px solid #fde8d8",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+                  Revoke Dashcam Access
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        </div>
+
+        {showCreateSharedGarage && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={()=>{setShowCreateSharedGarage(false);setNewGarageInvitees([]);}}>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
+              <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:4}}>Create a Shared Garage</div>
+              <div style={{fontSize:12,color:"#111",marginBottom:14}}>Invite friends to add their own vehicle, chat as a group, and call each other — all in one place.</div>
+              <input value={newSharedGarageName} onChange={e=>setNewSharedGarageName(e.target.value)} placeholder="e.g. The Crew's Builds" style={{...INP,marginBottom:14}}/>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:0.8,marginBottom:8}}>INVITE FRIENDS</div>
+              {friends.length===0 && <div style={{fontSize:13,color:"#111",marginBottom:14}}>Add some friends first to invite them.</div>}
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+                {friends.map(fr=>{
+                  const picked = newGarageInvitees.includes(fr.id);
+                  return (
+                    <button key={fr.id} onClick={()=>setNewGarageInvitees(p=>picked?p.filter(x=>x!==fr.id):[...p,fr.id])} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:picked?"1.5px solid "+OR:"1px solid #ebebeb",background:picked?OR+"08":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                      <FriendAvatar fr={fr} size={30} fontSize={11}/>
+                      <div style={{flex:1,fontSize:14,fontWeight:700,color:"#111"}}>{fr.name}</div>
+                      <div style={{width:18,height:18,borderRadius:5,border:picked?"none":"1.5px solid #ddd",background:picked?OR:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{picked?"✓":""}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{
+                  if(!newSharedGarageName.trim())return;
+                  const COLS=[OR,"#6366f1","#22c55e","#a855f7","#ec4899","#14b8a6"];
+                  const gid = "sg_"+Date.now();
+                  const laneId = "garage_"+gid;
+                  const invited = friends.filter(f=>newGarageInvitees.includes(f.id));
+                  const garage = {
+                    id:gid, name:newSharedGarageName.trim(),
+                    color:COLS[sharedGarages.length%COLS.length],
+                    memberIds:invited.map(f=>f.id),
+                    vehicles:[], laneId};
+                  setSharedGarages(g=>[...g,garage]);
+                  // Dedicated group chat lane — reuses the same Lanes chat plumbing as
+                  // every other lane; kept out of the sidebar lists via garageId.
+                  setCustomLanes(l=>[...l,{id:laneId,name:garage.name.toLowerCase().replace(/\s+/g,"-"),color:garage.color,desc:"Shared garage chat",visibility:"friends",authorId:"me",garageId:gid}]);
+                  invited.forEach((fr,i)=>{
+                    setTimeout(()=>{
+                      const car = SAMPLE_GARAGE_CARS[Math.floor(Math.random()*SAMPLE_GARAGE_CARS.length)];
+                      setSharedGarages(gs=>gs.map(x=>x.id===gid ? {...x,vehicles:[...x.vehicles,{id:"v_"+Date.now()+"_"+i,ownerId:fr.id,ownerName:fr.name,ownerInitials:fr.initials,ownerColor:fr.color,name:car.name,bio:car.bio,color:car.color,bodyStyle:car.bodyStyle}]} : x));
+                      setNotifications(n=>[{id:Date.now()+i,icon:"🚗",text:fr.name+" joined "+garage.name+" and added their "+car.name+".",ts:"now",read:false},...n]);
+                    }, 1600+i*900);
+                  });
+                  setNewSharedGarageName("");setNewGarageInvitees([]);setShowCreateSharedGarage(false);
+                  setSelSharedGarage(gid);setSubPanel("sharedgarage");
+                }} style={{flex:1,padding:"12px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Create</button>
+                <button onClick={()=>{setShowCreateSharedGarage(false);setNewGarageInvitees([]);}} style={{padding:"12px 14px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",cursor:"pointer",fontFamily:F}}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <CallOverlay/>
+      </div>
+    );
+  });
+
+
   const FeedPanel = useStablePanel(() => {
     // Multi-select category filter — tap "All" to reset, tap any other chip to
     // toggle it in/out of the active set (posts matching ANY selected chip show).
@@ -6234,8 +6252,7 @@ export default function SonoLane() {
       setNewPost({
         title: post.title||"", body: post.body||"", type: post.type||"scenic",
         distance: post.distance||"", stops: post.stops?.length ? [...post.stops,""] : ["",""],
-        highlights: post.highlights||"",
-      });
+        highlights: post.highlights||""});
       setPostPhotos(post.photos||[]);
       setPostSavedRoute(null);
       setPostRouteMode("new");
@@ -6256,8 +6273,7 @@ export default function SonoLane() {
         highlights: newPost.highlights,
         photos: postPhotos,
         fromSaved: !!saved,
-        savedRouteName: saved?.title,
-      };
+        savedRouteName: saved?.title};
       if(editingPostId){
         setPosts(p=>p.map(x=>x.id===editingPostId?{...x,...postData}:x));
         // Already reached the shared feed (has a real Supabase row)? Keep
@@ -6281,30 +6297,20 @@ export default function SonoLane() {
     };
     return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      {/* Header — matches the Events page: page symbol + name + Routes/Events
-          toggle, My Routes / Create on their own row underneath */}
+      {/* Header — the title/+ row and category chips both moved out: the
+          "+" only lives in the shared TopBar now, category filtering moved
+          to the filter side panel (opened from the TopBar's filter icon),
+          and the search box moved down here from the TopBar so the TopBar
+          can show a plain title + filter icon instead. */}
       <div style={{padding:"10px 14px 8px",borderBottom:"1px solid #ebebeb",flexShrink:0,background:"#fff"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:17,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="road" color={DPAD_COLORS.road} size={16}/> Routes</div>
-          </div>
-          {/* Routes/Events toggle — now lives up here since the main nav moved to the bottom */}
-          <div style={{display:"flex",gap:4,background:"#f3f3f3",borderRadius:40,padding:4,flexShrink:0}}>
-            <button onClick={()=>setDiscoverTab("routes")} title="Routes" style={{padding:"14px 22px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="routes"?"#fff":"transparent",boxShadow:discoverTab==="routes"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
-              <DPadIcon id="road" color={discoverTab==="routes"?DPAD_COLORS.road:"#999"} size={28}/>
-            </button>
-            <button onClick={()=>setDiscoverTab("events")} title="Events" style={{padding:"14px 22px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="events"?"#fff":"transparent",boxShadow:discoverTab==="events"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
-              <DPadIcon id="event" color={discoverTab==="events"?DPAD_COLORS.event:"#999"} size={28}/>
-            </button>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2}}>
-          {FEED_CATS.map(c=>(
-            <button key={c} onClick={()=>toggleFeedCat(c)} style={{...TAG(feedCats.includes(c)),whiteSpace:"nowrap",flexShrink:0,fontSize:12,padding:"4px 10px"}}>{c==="Following"?"👥 Following":c}</button>
-          ))}
-        </div>
+        <input
+          value={feedSearch}
+          onChange={e=>setFeedSearch(e.target.value)}
+          placeholder="Search routes…"
+          style={{width:"100%",boxSizing:"border-box",padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
+        />
         {/* Radius indicator — set in Profile Settings */}
-        {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
+        {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:8}}>
           <span style={{fontSize:11,color:"#111"}}>📍</span>
           <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
           <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
@@ -6347,7 +6353,7 @@ export default function SonoLane() {
                 )}
               </div>
               <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:2}}>{post.title}</div>
-              {post.authorId!=="me" && <div style={{fontSize:12,color:"#8a8f98",marginBottom:post.body?5:6}}>Posted by {post.authorName||"a driver"}</div>}
+              {post.authorId!=="me" && <div onClick={e=>{e.stopPropagation();openAuthorProfile(post.authorId,post.authorName);}} style={{fontSize:12,color:"#8a8f98",marginBottom:post.body?5:6,cursor:"pointer"}}>Posted by {post.authorName||"a driver"}</div>}
               {post.body && <div style={{fontSize:14,color:"#111",lineHeight:1.6,marginBottom:6}}>{post.body}</div>}
               {post.highlights && <div style={{fontSize:13,color:"#111",fontStyle:"italic",marginBottom:6}}>✨ {post.highlights}</div>}
               {post.stops?.length>0 && (
@@ -6371,15 +6377,13 @@ export default function SonoLane() {
                       title:post.title, type:post.type,
                       distance:post.distance||"", stops:post.stops||[],
                       highlights:post.highlights||"", body:post.body||"",
-                      color:["#6366f1","#22c55e","#a855f7","#f97316","#ec4899"][s.length%5],
-                    }]);
+                      color:["#6366f1","#22c55e","#a855f7","#f97316","#ec4899"][s.length%5]}]);
                   }
                 }} style={{
                   padding:"5px 12px",borderRadius:20,fontSize:13,fontWeight:600,cursor:"pointer",
                   background:savedFromFeed.some(r=>r.feedId===post.id)?"#22c55e":"#f3f3f3",
                   color:savedFromFeed.some(r=>r.feedId===post.id)?"#fff":"#888",
-                  border:"none",fontFamily:F,
-                }}>
+                  border:"none",fontFamily:F}}>
                   {savedFromFeed.some(r=>r.feedId===post.id)?"✓ Saved":"🗺️ Save Route"}
                 </button>
               </div>
@@ -6417,7 +6421,7 @@ export default function SonoLane() {
                   {vr.fromSaved && <span style={{fontSize:11,color:"#6366f1",fontWeight:600}}>🗺️ {vr.savedRouteName}</span>}
                   {vr.distance && <span style={{fontSize:12,color:"#111"}}>{vr.distance}</span>}
                 </div>
-                {vr.authorId!=="me" && <div style={{fontSize:13,color:"#8a8f98",marginBottom:10}}>Posted by {vr.authorName||"a driver"}</div>}
+                {vr.authorId!=="me" && <div onClick={e=>{e.stopPropagation();openAuthorProfile(vr.authorId,vr.authorName);}} style={{fontSize:13,color:"#8a8f98",marginBottom:10,cursor:"pointer"}}>Posted by {vr.authorName||"a driver"}</div>}
                 {vr.body && <div style={{fontSize:15,color:"#111",lineHeight:1.7,marginBottom:10}}>{vr.body}</div>}
                 {vr.highlights && <div style={{fontSize:14,color:"#111",fontStyle:"italic",marginBottom:10}}>✨ {vr.highlights}</div>}
                 {vr.stops?.length>0 && (
@@ -6441,8 +6445,8 @@ export default function SonoLane() {
       {/* Create Route Post sheet — doubles as the Edit Route sheet whenever
           editingPostId is set (opened via a route card's pencil). */}
       {showPost && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closePostSheet}>
-          <div style={{background:"#fff",borderRadius:"22px 22px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"94vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closePostSheet}>
+          <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"94vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
 
             {/* Header */}
             <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
@@ -6461,8 +6465,7 @@ export default function SonoLane() {
                 padding:"11px 14px",borderRadius:12,marginBottom:16,
                 background:postSavedRoute?"#fff9f5":OR+"0a",
                 border:"1.5px solid "+(postSavedRoute?OR:"#e0e0e0"),
-                cursor:"pointer",fontFamily:F,textAlign:"left",
-              }}>
+                cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                 <div style={{width:32,height:32,borderRadius:9,background:postSavedRoute?OR:"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
                   🗺️
                 </div>
@@ -6487,8 +6490,8 @@ export default function SonoLane() {
 
               {/* Route picker sheet */}
               {showRoutePicker && (
-                <div onClick={()=>setShowRoutePicker(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",animation:"scrimIn 0.18s ease",zIndex:900,display:"flex",alignItems:"flex-end"}}>
-                  <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"70vh",display:"flex",flexDirection:"column"}}>
+                <div onClick={()=>setShowRoutePicker(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:900,display:"flex",alignItems:"flex-end"}}>
+                  <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"70vh",display:"flex",flexDirection:"column"}}>
                     <div style={{padding:"10px 16px 12px",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
                       <div style={{width:28,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 10px"}}/>
                       <div style={{fontSize:16,fontWeight:800,color:"#111"}}>My Saved Routes</div>
@@ -6511,8 +6514,7 @@ export default function SonoLane() {
                           padding:"12px 14px",marginBottom:8,borderRadius:12,
                           border:"1.5px solid "+(postSavedRoute===r.id?OR:"#ebebeb"),
                           background:postSavedRoute===r.id?OR+"08":"#f8f8f8",
-                          cursor:"pointer",fontFamily:F,textAlign:"left",
-                        }}>
+                          cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                           <div style={{width:10,height:10,borderRadius:"50%",background:r.color||OR,flexShrink:0}}/>
                           <div style={{flex:1}}>
                             <div style={{fontSize:15,fontWeight:700,color:"#111"}}>{r.title}</div>
@@ -6542,8 +6544,7 @@ export default function SonoLane() {
                         }} style={{
                           flexShrink:0,width:80,height:80,borderRadius:10,overflow:"hidden",
                           position:"relative",border:"2px solid "+(attached?OR:"transparent"),
-                          cursor:"pointer",background:"#000",padding:0,
-                        }}>
+                          cursor:"pointer",background:"#000",padding:0}}>
                           <video src={c.url} muted style={{width:"100%",height:"100%",objectFit:"cover",opacity:0.7,display:"block",pointerEvents:"none"}}/>
                           <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                             <span style={{fontSize:attached?18:16,color:"#fff"}}>{attached?"✓":"📹"}</span>
@@ -6612,6 +6613,36 @@ export default function SonoLane() {
           </div>
         </div>
       )}
+
+      {/* Filter side panel — opened by the filter icon in the shared TopBar
+          (replacing the old inline category-chip row). Same feedCats/
+          toggleFeedCat state and multi-select behavior as before, just
+          presented as a slide-in-from-the-right panel instead. */}
+      {showFilterPanel && (
+        <div onClick={()=>setShowFilterPanel(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:650,display:"flex",justifyContent:"flex-end"}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:"78%",maxWidth:300,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"-4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
+            <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#111"}}>Filter Routes</div>
+              <button onClick={()=>setShowFilterPanel(false)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>✕</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"14px 18px"}}>
+              <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>CATEGORY</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {FEED_CATS.map(c=>(
+                  <button key={c} onClick={()=>toggleFeedCat(c)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"11px 14px",borderRadius:12,border:"1.5px solid "+(feedCats.includes(c)?OR:"#ebebeb"),background:feedCats.includes(c)?OR+"0c":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                    <span style={{fontSize:14,fontWeight:700,color:feedCats.includes(c)?OR:"#111"}}>{c==="Following"?"👥 Following":c}</span>
+                    {feedCats.includes(c) && <span style={{color:OR,fontWeight:800}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #ebebeb",flexShrink:0}}>
+              <button onClick={()=>{toggleFeedCat("All");}} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:8}}>Reset</button>
+              <button onClick={()=>setShowFilterPanel(false)} style={{width:"100%",padding:"12px",borderRadius:10,background:OR,border:"none",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     );
   });
@@ -6649,30 +6680,20 @@ export default function SonoLane() {
 
     return (
       <div style={{flex:1,display:"flex",flexDirection:"column",background:"#f8f8f8",overflow:"hidden"}}>
-        {/* Header */}
+        {/* Header — the title/+ row and category chips both moved out: the
+            "+" only lives in the shared TopBar now, category filtering
+            moved to the filter side panel (opened from the TopBar's filter
+            icon), and the search box moved down here from the TopBar so
+            the TopBar can show a plain title + filter icon instead. */}
         <div style={{padding:"10px 14px 8px",background:"#fff",borderBottom:"1px solid #ebebeb",flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:17,fontWeight:900,color:"#111",display:"flex",alignItems:"center",gap:7}}><DPadIcon id="event" color={DPAD_COLORS.event} size={16}/> Events</div>
-            </div>
-            {/* Routes/Events toggle — now lives up here since the main nav moved to the bottom */}
-            <div style={{display:"flex",gap:4,background:"#f3f3f3",borderRadius:40,padding:4,flexShrink:0}}>
-              <button onClick={()=>setDiscoverTab("routes")} title="Routes" style={{padding:"14px 22px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="routes"?"#fff":"transparent",boxShadow:discoverTab==="routes"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
-                <DPadIcon id="road" color={discoverTab==="routes"?DPAD_COLORS.road:"#999"} size={28}/>
-              </button>
-              <button onClick={()=>setDiscoverTab("events")} title="Events" style={{padding:"14px 22px",borderRadius:36,border:"none",cursor:"pointer",fontFamily:F,background:discoverTab==="events"?"#fff":"transparent",boxShadow:discoverTab==="events"?"0 1px 3px rgba(0,0,0,0.15)":"none",display:"flex",alignItems:"center"}}>
-                <DPadIcon id="event" color={discoverTab==="events"?DPAD_COLORS.event:"#999"} size={28}/>
-              </button>
-            </div>
-          </div>
-          {/* Category filter */}
-          <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:6}}>
-            {["All","Following",...Object.keys(EV_ICONS)].map(t=>(
-              <button key={t} onClick={()=>toggleEvFilter(t)} style={{...TAG(evFilters.includes(t)),whiteSpace:"nowrap",flexShrink:0,fontSize:12,padding:"4px 10px",background:evFilters.includes(t)?(EV_COLORS[t]||OR):"#f3f3f3"}}>{t==="All"?"All":t==="Following"?"👥 Following":EV_ICONS[t]+" "+t}</button>
-            ))}
-          </div>
+          <input
+            value={evSearch}
+            onChange={e=>setEvSearch(e.target.value)}
+            placeholder="Search events…"
+            style={{width:"100%",boxSizing:"border-box",padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
+          />
           {/* Radius indicator — set in Profile Settings */}
-          {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:2,paddingBottom:2}}>
+          {radiusActive&&<div style={{display:"flex",alignItems:"center",gap:4,paddingTop:8}}>
             <span style={{fontSize:11,color:"#111"}}>📍</span>
             <span style={{fontSize:11,color:"#111"}}>{appRadius} mi radius</span>
             <button onClick={()=>{setRadiusDraft(appRadius ?? RADIUS_MAX);setShowRadiusPage(true);}} style={{fontSize:11,color:OR,fontWeight:700,background:"none",border:"none",cursor:"pointer",fontFamily:F}}>Change</button>
@@ -6734,7 +6755,7 @@ export default function SonoLane() {
                       <button onClick={e=>{e.stopPropagation();openEditEvent(ev);}} title="Edit event" style={{width:26,height:26,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
                     )}
                   </div>
-                  {ev.authorId!=="me" && <div style={{fontSize:12,color:"#8a8f98",marginBottom:4}}>Posted by {ev.authorName||"a driver"}</div>}
+                  {ev.authorId!=="me" && <div onClick={e=>{e.stopPropagation();openAuthorProfile(ev.authorId,ev.authorName);}} style={{fontSize:12,color:"#8a8f98",marginBottom:4,cursor:"pointer"}}>Posted by {ev.authorName||"a driver"}</div>}
                   {ev.date && <div style={{fontSize:12,color:"#111",fontWeight:600,marginBottom:5}}>📅 {new Date(ev.date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>}
                   {ev.address && (
                     <button onClick={e=>{e.stopPropagation();openMaps(ev.address);}} style={{display:"flex",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:8,fontFamily:F}}>
@@ -6759,8 +6780,8 @@ export default function SonoLane() {
 
         {/* Flyer overlay */}
         {flyerEvent && (
-          <div onClick={()=>setFlyerEvent(null)} style={{position:"fixed",inset:0,zIndex:800,background:"rgba(0,0,0,0.7)",animation:"scrimIn 0.18s ease",display:"flex",alignItems:"flex-end"}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"92vh",background:"#fff",borderRadius:"22px 22px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div onClick={()=>setFlyerEvent(null)} style={{position:"fixed",inset:0,zIndex:800,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxHeight:"92vh",background:"#fff",borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
               <div style={{height:210,position:"relative",overflow:"hidden",flexShrink:0,background:flyerEvent.photos?.length?"#111":"linear-gradient(160deg,"+(EV_COLORS[flyerEvent.type]||OR)+","+(EV_COLORS[flyerEvent.type]||OR)+"55,#111)"}}>
                 {flyerEvent.photos?.length>0 && <img src={flyerEvent.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
                 {!flyerEvent.photos?.length && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:66}}>{flyerEvent.icon}</div>}
@@ -6775,7 +6796,7 @@ export default function SonoLane() {
                     <button onClick={()=>openEditEvent(flyerEvent)} title="Edit event" style={{width:32,height:32,borderRadius:"50%",background:"#f3f3f3",border:"none",color:"#111",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✎</button>
                   )}
                 </div>
-                {flyerEvent.authorId!=="me" && <div style={{fontSize:13,color:"#8a8f98",marginBottom:8}}>Posted by {flyerEvent.authorName||"a driver"}</div>}
+                {flyerEvent.authorId!=="me" && <div onClick={e=>{e.stopPropagation();openAuthorProfile(flyerEvent.authorId,flyerEvent.authorName);}} style={{fontSize:13,color:"#8a8f98",marginBottom:8,cursor:"pointer"}}>Posted by {flyerEvent.authorName||"a driver"}</div>}
                 {flyerEvent.date && <div style={{fontSize:13,color:"#111",fontWeight:600,marginBottom:10}}>📅 {new Date(flyerEvent.date+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"})}</div>}
                 {flyerEvent.address && (
                   <button onClick={()=>openMaps(flyerEvent.address)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:13,background:"#f0fdf4",border:"1.5px solid #22c55e33",cursor:"pointer",fontFamily:F,marginBottom:14,textAlign:"left"}}>
@@ -6804,8 +6825,8 @@ export default function SonoLane() {
 
         {/* Create event sheet */}
         {showEvent && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeEventSheet}>
-            <div style={{background:"#fff",borderRadius:"22px 22px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeEventSheet}>
+            <div style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90%",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:32,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{fontSize:17,fontWeight:800,color:"#111"}}>{editingEventId?"Edit Event":"⚡ Create Event"}</div>
@@ -6838,17 +6859,53 @@ export default function SonoLane() {
             </div>
           </div>
         )}
+
+        {/* Filter side panel — opened by the filter icon in the shared
+            TopBar (replacing the old inline category-chip row). Same
+            evFilters/toggleEvFilter state and multi-select behavior as
+            before, just presented as a slide-in-from-the-right panel. */}
+        {showFilterPanel && (
+          <div onClick={()=>setShowFilterPanel(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:650,display:"flex",justifyContent:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:"78%",maxWidth:300,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"-4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
+              <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+                <div style={{fontSize:16,fontWeight:800,color:"#111"}}>Filter Events</div>
+                <button onClick={()=>setShowFilterPanel(false)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>✕</button>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:"14px 18px"}}>
+                <div style={{fontSize:11,color:"#111",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>CATEGORY</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {["All","Following",...Object.keys(EV_ICONS)].map(t=>(
+                    <button key={t} onClick={()=>toggleEvFilter(t)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"11px 14px",borderRadius:12,border:"1.5px solid "+(evFilters.includes(t)?(EV_COLORS[t]||OR):"#ebebeb"),background:evFilters.includes(t)?(EV_COLORS[t]||OR)+"0c":"#fff",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                      <span style={{fontSize:14,fontWeight:700,color:evFilters.includes(t)?(EV_COLORS[t]||OR):"#111"}}>{t==="All"?"All":t==="Following"?"👥 Following":EV_ICONS[t]+" "+t}</span>
+                      {evFilters.includes(t) && <span style={{color:EV_COLORS[t]||OR,fontWeight:800}}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{padding:"12px 18px",borderTop:"1px solid #ebebeb",flexShrink:0}}>
+                <button onClick={()=>{toggleEvFilter("All");}} style={{width:"100%",padding:"10px",borderRadius:10,background:"#f3f3f3",border:"1px solid #ebebeb",color:"#111",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:8}}>Reset</button>
+                <button onClick={()=>setShowFilterPanel(false)} style={{width:"100%",padding:"12px",borderRadius:10,background:OR,border:"none",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Apply</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   });
 
-  /* ── DISCOVER — Routes feed + Events feed on one page; the Routes/Events
-       toggle itself lives at the top of each page's own header (see the
-       segmented control next to the title in FeedPanel/MapPanel below),
-       now that the main Lanes/SonoLane/Discover nav moved to the bottom. ── */
-  const DiscoverPanel = useStablePanel(() => (
-    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      {discoverTab==="routes" ? <FeedPanel/> : <MapPanel/>}
+  /* Routes (FeedPanel) and Events (MapPanel) are now registered directly as
+     their own top-level bottom-bar tabs — see PANELS below — instead of
+     living behind one combined "Discover" panel with an internal toggle. */
+
+  /* ── RADIO PANEL — third stop in the Discover sequence (Routes → Events →
+     Radio), reached by the tab strip under the shared TopBar or by swiping
+     left past Events. Used to only be reachable as a pop-up sheet (see
+     renderNearbyStationsSection, extracted from the old MusicModal "nearby"
+     tab) — same content, now a real page like Routes/Events instead of an
+     overlay. Kept dark-themed since that content was designed dark. ── */
+  const RadioPanel = useStablePanel(() => (
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#0d0d0d"}}>
+      {renderNearbyStationsSection()}
     </div>
   ));
 
@@ -6948,8 +7005,7 @@ export default function SonoLane() {
               : curFriend.initials,
             color: r.sender_id === currentUserId ? OR : curFriend.color,
             ts: new Date(r.created_at).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-            isVoice: false, voiceSeconds: 0,
-          }));
+            isVoice: false, voiceSeconds: 0}));
           if (!mapped.length) return m;
           return { ...m, [curFriend.id]: [...(m[curFriend.id]||[]), ...mapped] };
         });
@@ -6968,8 +7024,7 @@ export default function SonoLane() {
         user:userName||"You",
         initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
         color:OR, ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-        isVoice, voiceSeconds:voiceSecs,
-      };
+        isVoice, voiceSeconds:voiceSecs};
       if(activeChan==="notes"){
         setTLines(p=>[...p, text.trim()]);
       } else if(curCityLane){
@@ -7083,8 +7138,7 @@ export default function SonoLane() {
           initials:userName?userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():"?",
           color:OR,
           ts:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
-          isVoice:true, voiceSeconds:secs||1, audioUrl,
-        };
+          isVoice:true, voiceSeconds:secs||1, audioUrl};
         setLaneMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),msg]}));
         if(!wasLaneChat) setFriendMsgs(m=>({...m,[laneId]:[...(m[laneId]||[]),msg]})); // friend DM — keep both stores in sync, like text messages
         if(laneRecStream.current){ laneRecStream.current.getTracks().forEach(t=>t.stop()); laneRecStream.current = null; }
@@ -7112,80 +7166,66 @@ export default function SonoLane() {
 
     const allMsgs = activeChan==="notes"||activeChan==="notifications"||activeChan==="sono" ? [] : (friendMsgs[activeChan]||laneMsgs[activeChan]||[]);
 
+    // ── Bubble rail — Lanes is more of an open AI chat room now: opening the
+    // tab lands straight in Nova's room instead of a chat list, and this
+    // bubble rail (Nova first, then "the rest") sits up top on BOTH the
+    // browse view and the open room, instead of being a list-page-only
+    // header. "Chats" and "Lanes" are category bubbles now (replacing the
+    // old Chats/Lanes/Radio pill row below the bubbles) — tapping either
+    // switches to the browse view filtered to that category; tapping Nova,
+    // "You", or any pinned individual jumps straight into that room.
+    // SonoLane Radio's pill was removed entirely — Radio is its own real
+    // page now (see RadioPanel), reachable from Discover/Profile instead.
+    const bubbleRail = (
+      <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0,background:"#2f3136",borderBottom:"1px solid #26282c"}}>
+        <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+          <div style={{width:52,height:52,borderRadius:"50%",background:pal.color+"22",border:"2px solid "+(activeChan==="sono"&&lanesView==="room"?pal.color:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <CompassStar size={24} color={pal.color}/>
+          </div>
+          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{pal.name}</span>
+        </button>
+        <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+          <div style={{position:"relative"}}>
+            <FriendAvatar fr={{photo:profilePhoto,color:OR,initials:myInitials}} size={52} fontSize={19} style={{border:"2px solid "+(activeChan==="notifications"&&lanesView==="room"?OR:"#4f545c")}}/>
+            {unreadNotifs>0 && <div style={{position:"absolute",top:-2,right:-2,minWidth:18,height:18,borderRadius:9,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 4px",border:"2px solid #2f3136",boxSizing:"border-box"}}>{unreadNotifs}</div>}
+          </div>
+          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>You</span>
+        </button>
+        <button onClick={()=>{vibrate();setLanesListTab("chats");setLanesView("list");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+          <div style={{width:52,height:52,borderRadius:"50%",background:(lanesView==="list"&&lanesListTab==="chats")?OR+"22":"#40444b",border:"2px solid "+((lanesView==="list"&&lanesListTab==="chats")?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💬</div>
+          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>Chats</span>
+        </button>
+        <button onClick={()=>{vibrate();setLanesListTab("lanes");setLanesView("list");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+          <div style={{width:52,height:52,borderRadius:"50%",background:(lanesView==="list"&&lanesListTab==="lanes")?OR+"22":"#40444b",border:"2px solid "+((lanesView==="list"&&lanesListTab==="lanes")?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#8e9297",fontWeight:700}}>#</div>
+          <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>Lanes</span>
+        </button>
+        {friends.filter(fr=>pinnedChans.includes(fr.id)).map(fr=>(
+          <button key={fr.id} onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+            <FriendAvatar fr={fr} size={52} fontSize={19} style={{border:"2px solid "+(activeChan===fr.id&&lanesView==="room"?OR:"#4f545c")}}/>
+            <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{fr.name.split(" ")[0]}</span>
+          </button>
+        ))}
+        {sidebarCustomLanes.filter(lane=>pinnedChans.includes(lane.id)).map(lane=>(
+          <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
+            <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px solid "+(activeChan===lane.id&&lanesView==="room"?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:lane.color||"#8e9297",fontWeight:700}}>#</div>
+            <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{lane.name}</span>
+          </button>
+        ))}
+      </div>
+    );
+
     return (
-      <div style={{flex:1,display:"flex",flexDirection:"row",overflow:"hidden",background:"#36393f",position:"relative"}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#36393f",position:"relative"}}>
+        {bubbleRail}
 
-        {/* ── Chat list — its own full page now (was a fixed 196px sidebar
-            always shown alongside the chat). Tapping any chat switches
-            lanesView to "room"; the shared TopBar becomes that room's back
-            button to return here. ── */}
+        {/* ── Chat list — the browse view for Chats/Lanes, reached by
+            tapping those bubbles above instead of being the Lanes tab's
+            default landing screen. Tapping any chat switches lanesView to
+            "room"; the shared TopBar becomes that room's back button to
+            return here. ── */}
         {lanesView==="list" && (
-        <div style={{width:"100%",background:"#2f3136",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden"}}>
-          {/* The "Lanes" icon+title used to live here as its own header row —
-              it's now the shared TopBar's centered title instead (see
-              <TopBar/>), so this page starts straight at its own content. */}
-
-          {/* Quick-access bubbles — "You" (notifications) and your AI pal
-              are always here, pinned first and second respectively, since
-              they're the two chats everyone always has; anything else you
-              tap 📌 Pin on below shows up here right after them. Both used
-              to also have their own rows in the Chats list below — those
-              were removed so each chat lives in exactly one place instead
-              of two (Law of Uniform Connectedness / avoiding duplication).
-              Starting something new (a Lane, a Shared Garage, a Radio
-              Channel) moved to the ＋ up in the header / Profile, instead of
-              competing for space in a row about chats you already have
-              (Law of Proximity: different kind of action, doesn't belong in
-              this group anymore). */}
-          <div style={{display:"flex",gap:14,padding:"12px 14px 10px",overflowX:"auto",flexShrink:0}}>
-            <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-              <div style={{position:"relative"}}>
-                <FriendAvatar fr={{photo:profilePhoto,color:OR,initials:myInitials}} size={52} fontSize={19} style={{border:"2px solid "+(activeChan==="notifications"&&lanesView==="room"?OR:"#4f545c")}}/>
-                {unreadNotifs>0 && <div style={{position:"absolute",top:-2,right:-2,minWidth:18,height:18,borderRadius:9,background:"#ed4245",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 4px",border:"2px solid #2f3136",boxSizing:"border-box"}}>{unreadNotifs}</div>}
-              </div>
-              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>You</span>
-            </button>
-            <button onClick={()=>{setActiveChan("sono");setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-              <div style={{width:52,height:52,borderRadius:"50%",background:pal.color+"22",border:"2px solid "+(activeChan==="sono"&&lanesView==="room"?pal.color:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <CompassStar size={24} color={pal.color}/>
-              </div>
-              <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{pal.name}</span>
-            </button>
-            {friends.filter(fr=>pinnedChans.includes(fr.id)).map(fr=>(
-              <button key={fr.id} onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-                <FriendAvatar fr={fr} size={52} fontSize={19} style={{border:"2px solid "+(activeChan===fr.id&&lanesView==="room"?OR:"#4f545c")}}/>
-                <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{fr.name.split(" ")[0]}</span>
-              </button>
-            ))}
-            {sidebarCustomLanes.filter(lane=>pinnedChans.includes(lane.id)).map(lane=>(
-              <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,flexShrink:0,width:58}}>
-                <div style={{width:52,height:52,borderRadius:"50%",background:"#40444b",border:"2px solid "+(activeChan===lane.id&&lanesView==="room"?OR:"#4f545c"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:lane.color||"#8e9297",fontWeight:700}}>#</div>
-                <span style={{fontSize:10,color:"#8e9297",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:58}}>{lane.name}</span>
-              </button>
-            ))}
-          </div>
-          {/* Section pills — Chats (your friends, the main list) / Lanes
-              (public + your own) / Radio (SonoLane Radio's saved stations
-              and your own host registration, same content as Profile's
-              Radio Stations page) — a toggle row instead of always-stacked
-              section headers. Chats opens by default so your personal DMs
-              are what you see first, like a normal messaging inbox.
-              Notifications used to be a third pill here; it's the "You"
-              chat now instead (see the Chats list above) — Law of Uniform
-              Connectedness: activity about you reads as a conversation with
-              you, not a separate inbox. */}
-          <div style={{display:"flex",gap:8,padding:"2px 14px 12px",flexShrink:0,overflowX:"auto"}}>
-            {[["chats","Chats"],["lanes","Lanes"],["radio","SonoLane Radio"]].map(([id,label])=>(
-              <button key={id} onClick={()=>setLanesListTab(id)} style={{
-                padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:F,
-                fontSize:13,fontWeight:700,whiteSpace:"nowrap",flexShrink:0,
-                background:lanesListTab===id?"#fff":"#40444b",
-                color:lanesListTab===id?"#111":"#dcddde",
-              }}>{label}</button>
-            ))}
-          </div>
-
-          <div style={{flex:1,overflowY:"auto",padding:"0 8px 8px"}}>
+        <div style={{width:"100%",flex:1,background:"#2f3136",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"8px 8px 8px"}}>
 
             {/* Chats — friends' DMs, filtered by the "Find users…" search in
                 the shared TopBar (see laneUserSearch). Bigger avatars, one
@@ -7211,8 +7251,7 @@ export default function SonoLane() {
                     <button onClick={()=>{setActiveChan(fr.id);setLanesView("room");}} style={{
                       flex:1,minWidth:0,display:"flex",alignItems:"center",gap:12,
                       padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
-                      background:(activeChan===fr.id&&lanesView==="room")?"#3a3d42":"transparent",
-                    }}>
+                      background:(activeChan===fr.id&&lanesView==="room")?"#3a3d42":"transparent"}}>
                       <div style={{position:"relative",flexShrink:0}}>
                         <FriendAvatar fr={fr} size={54} fontSize={19}/>
                         <div style={{position:"absolute",bottom:1,right:1,width:13,height:13,borderRadius:"50%",background:"#23a55a",border:"2.5px solid #2f3136"}}/>
@@ -7242,8 +7281,7 @@ export default function SonoLane() {
                 <button key={lane.id} onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
                   width:"100%",display:"flex",alignItems:"center",gap:6,
                   padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                  background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent",marginBottom:1,
-                }}>
+                  background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent",marginBottom:1}}>
                   <span style={{fontSize:11}}>🌐</span>
                   <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
                   {!lane.host && <span style={{fontSize:9,color:"#5b5e66"}}>you</span>}
@@ -7260,8 +7298,7 @@ export default function SonoLane() {
                   <button onClick={()=>{setActiveChan(lane.id);setLanesView("room");}} style={{
                     flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,
                     padding:"5px 7px",borderRadius:4,border:"none",cursor:"pointer",fontFamily:F,
-                    background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent",
-                  }}>
+                    background:(activeChan===lane.id&&lanesView==="room")?"#42464d":"transparent"}}>
                     <span style={{fontSize:12,color:lane.color||"#8e9297"}}>#</span>
                     <span style={{flex:1,fontSize:13,fontWeight:activeChan===lane.id?700:400,color:activeChan===lane.id?"#fff":"#8e9297",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lane.name}</span>
                     <span style={{fontSize:10,color:"#5b5e66",flexShrink:0}} title={lane.visibility==="public"?"Public":"Friends only"}>{lane.visibility==="public"?"🌐":"👥"}</span>
@@ -7270,17 +7307,6 @@ export default function SonoLane() {
                 </div>
               ))}
             </>)}
-
-            {/* SonoLane Radio — same Radio Stations content as Profile
-                (saved stations + your own host registration), reachable
-                right from Lanes now instead of needing a trip to Profile.
-                dark:true keeps it on Lanes' own dark background instead of
-                dropping a white card onto it. */}
-            {lanesListTab==="radio" && (
-              <div style={{margin:"6px 0 0"}}>
-                {renderRadioStationsSection(true)}
-              </div>
-            )}
 
           </div>
         </div>
@@ -7298,7 +7324,7 @@ export default function SonoLane() {
           <div style={{padding:"9px 14px",borderBottom:"1px solid #202225",flexShrink:0,display:"flex",alignItems:"center",gap:8,background:"#36393f"}}>
             {curCityLane ? (
               <>
-                <span style={{fontSize:16}}>📡</span>
+                <WalkieTalkieIcon size={16} color="#fff"/>
                 <div style={{flex:1}}>
                   <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{curCityLane.name}</div>
                   <div style={{fontSize:11,color:"#72767d"}}>{curCityLane.desc} · Freeway Lane</div>
@@ -7405,7 +7431,7 @@ export default function SonoLane() {
             {(curCityLane||curCustomLane||curFriend)&&(<>
               {allMsgs.length===0&&(
                 <div style={{textAlign:"center",color:"#4f545c",paddingTop:40}}>
-                  {curCityLane&&<><div style={{fontSize:30,marginBottom:6}}>📡</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:13,color:"#4f545c",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
+                  {curCityLane&&<><div style={{marginBottom:6,display:"flex",justifyContent:"center"}}><WalkieTalkieIcon size={30} color="#4f545c"/></div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>{curLane.name}{curLane.city?" — "+curLane.city:""}</div><div style={{fontSize:13,color:"#4f545c",lineHeight:1.6}}>Hold the mic button below to broadcast a voice message to everyone on this lane.</div></>}
                   {curCustomLane&&<><div style={{fontSize:30,marginBottom:6}}>{curCustomLane.garageId?"🚗":"🛣️"}</div><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>#{curLane.name}</div><div style={{fontSize:13,color:"#4f545c"}}>{curCustomLane.garageId ? "Your Shared Garage's group chat." : curCustomLane.host ? "A public lane hosted by "+curCustomLane.host+"." : curCustomLane.visibility==="public" ? "Your public lane — anyone can join." : "Your friends-only lane."} Hold mic to voice message.</div></>}
                   {curFriend&&<><FriendAvatar fr={curFriend} size={44} fontSize={16} style={{margin:"0 auto 8px"}}/><div style={{fontSize:15,fontWeight:700,color:"#72767d",marginBottom:3}}>Start a DM with {curFriend.name}</div></>}
                 </div>
@@ -7581,8 +7607,8 @@ export default function SonoLane() {
 
         {/* Create Lane sheet */}
         {showCreateLane&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",animation:"scrimIn 0.18s ease",zIndex:800,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowCreateLane(false)}>
-            <div style={{background:"#2f3136",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:800,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowCreateLane(false)}>
+            <div style={{background:"#2f3136",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
               <div style={{width:30,height:3,background:"#40444b",borderRadius:2,margin:"0 auto 16px"}}/>
               <div style={{fontSize:16,fontWeight:800,color:"#fff",marginBottom:4}}>Create a Lane</div>
               <div style={{fontSize:12,color:"#72767d",marginBottom:14}}>Lanes are your own private or shared CB channels.</div>
@@ -7626,10 +7652,10 @@ export default function SonoLane() {
   // Maps is the default app and also sits in this bar, per the CarPlay-style
   // reference layout: a wide main app + a stack of glanceable widgets beside it.
   const DRIVE_APPS = [
-    {id:"map",     icon:"🗺️", label:"Maps"},
+    {id:"map",     icon:<MapPinIcon size={19} color="#fff"/>, label:"Maps"},
     {id:"radio",   icon:<JukeboxIcon size={19} color="#fff"/>, label:"SonoLane Radio"},
-    {id:"cbradio", icon:"📡", label:"CB Radio"},
-    {id:"agent",   icon:"⭐", label:"Sono"},
+    {id:"cbradio", icon:<WalkieTalkieIcon size={19} color="#fff"/>, label:"CB Radio"},
+    {id:"agent",   icon:<CompassStar size={19}/>, label:"Sono"},
   ];
   const DrivePanel = useStablePanel(() => {
     const isPortrait = driveOrientation==="portrait";
@@ -7779,9 +7805,8 @@ export default function SonoLane() {
                         <button key={lane.id} onClick={()=>setDriveCbLane(lane.id)} style={{
                           width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px",
                           marginBottom:7,borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,
-                          background:"#1a1a1a",textAlign:"left",
-                        }}>
-                          <div style={{width:40,height:40,borderRadius:10,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📡</div>
+                          background:"#1a1a1a",textAlign:"left"}}>
+                          <div style={{width:40,height:40,borderRadius:10,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><WalkieTalkieIcon size={18} color={lane.color}/></div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
                               <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>{lane.name}</span>
@@ -7815,7 +7840,7 @@ export default function SonoLane() {
                     <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"16px 20px"}}>
                       <div style={{position:"relative",width:88,height:88,marginBottom:14}}>
                         <div style={{position:"absolute",inset:0,borderRadius:"50%",background:(laneObj?.color||OR)+"22",animation:"pulse 1.6s infinite"}}/>
-                        <div style={{position:"absolute",inset:10,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>📡</div>
+                        <div style={{position:"absolute",inset:10,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center"}}><WalkieTalkieIcon size={32} color="#fff"/></div>
                       </div>
                       <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:4,textAlign:"center"}}>Connected — ready to talk</div>
                       <div style={{fontSize:11,color:"#555",fontWeight:700}}>🎧 {riders} riders connected</div>
@@ -7824,7 +7849,7 @@ export default function SonoLane() {
                     <div style={{flex:1,overflowY:"auto",padding:"10px 12px"}}>
                       {updates.length===0 ? (
                         <div style={{textAlign:"center",color:"#555",paddingTop:20}}>
-                          <div style={{fontSize:22,marginBottom:6}}>📡</div>
+                          <div style={{marginBottom:6,display:"flex",justifyContent:"center"}}><WalkieTalkieIcon size={22} color="#555"/></div>
                           <div style={{fontSize:12}}>No recent updates on this lane.</div>
                         </div>
                       ) : updates.map(u=>(
@@ -7846,7 +7871,7 @@ export default function SonoLane() {
                         onTouchStart={e=>{e.preventDefault();setCbRecording(true);setCbTimer(0);cbTimerRef.current=setInterval(()=>setCbTimer(t=>t+1),1000);}}
                         onTouchEnd={e=>{e.preventDefault();clearInterval(cbTimerRef.current);setCbRecording(false);setCbTimer(0);broadcastOnLane(driveCbLane);}}
                         style={{width:"100%",padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,background:cbRecording?"#ed4245":"#23a55a",color:"#fff",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                        {cbRecording ? (<><span style={{width:6,height:6,borderRadius:"50%",background:"#fff",animation:"pulse 0.5s infinite",display:"block"}}/>{"Broadcasting… "+cbTimer+"s"}</>) : (<><span>📡</span>{"Hold to Talk"}</>)}
+                        {cbRecording ? (<><span style={{width:6,height:6,borderRadius:"50%",background:"#fff",animation:"pulse 0.5s infinite",display:"block"}}/>{"Broadcasting… "+cbTimer+"s"}</>) : (<><WalkieTalkieIcon size={16} color="#fff"/>{"Hold to Talk"}</>)}
                       </button>
                     </div>
                   )}
@@ -7874,7 +7899,7 @@ export default function SonoLane() {
             )}
 
             {/* Persistent overlay controls, on top of whichever app is showing */}
-            <button onClick={()=>go("profile")} style={{position:"absolute",top:10,right:10,width:32,height:32,borderRadius:"50%",background:"#1a1a1a",border:"none",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,zIndex:3,boxShadow:"0 2px 6px rgba(0,0,0,0.4)"}}>
+            <button onClick={()=>{vibrate();go("routes");}} style={{position:"absolute",top:10,right:10,width:32,height:32,borderRadius:"50%",background:"#1a1a1a",border:"none",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,zIndex:3,boxShadow:"0 2px 6px rgba(0,0,0,0.4)"}}>
               ←
             </button>
             {dashOn && (
@@ -7989,8 +8014,8 @@ export default function SonoLane() {
             live here now instead of on the Profile Edit page, so every
             Drive-mode setting can be reached without leaving Drive mode. */}
         {showWidgetSettings && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",animation:"scrimIn 0.18s ease",zIndex:590,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowWidgetSettings(false)}>
-            <div style={{background:"#1a1a1a",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:590,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowWidgetSettings(false)}>
+            <div style={{background:"#1a1a1a",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:30,height:3,background:"#333",borderRadius:2,margin:"0 auto 14px"}}/>
               <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:12}}>Drive Mode Settings</div>
 
@@ -8008,8 +8033,7 @@ export default function SonoLane() {
                       display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
                       cursor:"pointer",fontFamily:F,textAlign:"left",
                       border:"1.5px solid "+(startupSound===key?OR:"#333"),
-                      background:startupSound===key?OR+"22":"#242424",
-                    }}>
+                      background:startupSound===key?OR+"22":"#242424"}}>
                       <div style={{width:30,height:30,borderRadius:"50%",background:startupSound===key?OR+"33":"#1a1a1a",border:"1.5px solid "+(startupSound===key?OR+"66":"#333"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
                         {key==="none"?"🔇":key==="engine"?"🏎":key==="digital"?"🔔":key==="warm"?"🎶":"🎵"}
                       </div>
@@ -8024,10 +8048,10 @@ export default function SonoLane() {
               {driveSettingsTab==="widgets" && (<>
                 {[["1","Top",widget1,widget1OnlyOn],["2","Mid",widget2,widget2OnlyOn],["3","Bottom",widget3,widget3OnlyOn]].map(([slot,label,w,onlyOn])=>(
                   <button key={slot} onClick={()=>{setShowWidgetSettings(false);setWidgetEditFrom("drive");setWidgetEdit(slot);}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px",borderRadius:12,background:"#242424",border:"none",cursor:"pointer",fontFamily:F,marginBottom:8,textAlign:"left"}}>
-                    <div style={{fontSize:20}}>{w==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={18}/>:w==="weather"?"☀️":w==="music"?"🎵":w==="spotify"?"🎧":w==="cbradio"?"📡":w==="points"?"⭐":w==="friends"?"👥":w==="topfriends"?"👥":w==="dashcam"?"📹":"＋"}</div>
+                    <div style={{fontSize:20}}>{w==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={18}/>:w==="cbradio"?<WalkieTalkieIcon size={18} color="currentColor"/>:w==="weather"?"☀️":w==="music"?"🎵":w==="spotify"?"🎧":w==="points"?"⭐":w==="friends"?"👥":w==="topfriends"?"👥":w==="dashcam"?"📹":"＋"}</div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:11,color:"#8e9297",fontWeight:700}}>{label.toUpperCase()}</div>
-                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textTransform:"capitalize"}}>{w}{onlyOn?" · only when on":""}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textTransform:"capitalize"}}>{w==="none"?"Off · tap to activate":w+(onlyOn?" · only when on":"")}</div>
                     </div>
                     <span style={{color:"#8e9297",fontSize:18}}>›</span>
                   </button>
@@ -8077,7 +8101,7 @@ export default function SonoLane() {
   const RadiusPage = useStablePanel(() => {
     if (!showRadiusPage) return null;
     return (
-      <div style={{position:"fixed",inset:0,background:"#fff",zIndex:750,display:"flex",flexDirection:"column",animation:"pageInUp 0.34s cubic-bezier(0.34,1.35,0.64,1)"}}>
+      <div style={{position:"fixed",inset:0,background:"#fff",zIndex:750,display:"flex",flexDirection:"column"}}>
         <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
           <button onClick={()=>setShowRadiusPage(false)} title="Back" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:"#111",fontSize:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
           <div style={{flex:1,fontSize:16,fontWeight:800,color:"#111",textAlign:"center",marginRight:44}}>Discovery Radius</div>
@@ -8129,8 +8153,8 @@ export default function SonoLane() {
       ? supaFriendResults.filter(p=>!friends.some(f=>f.id===p.id))
       : (()=>{const dir=[...SAMPLE_PEOPLE,...followersList].filter((p,i,arr)=>arr.findIndex(x=>x.id===p.id)===i); return dir.filter(p=>(p.name.toLowerCase().includes(q) || (p.handle||"").toLowerCase().includes(q)) && !friends.some(f=>f.id===p.id));})();
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeSheet}>
-        <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}} onClick={closeSheet}>
+        <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
           <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
           <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:14}}>Add a Friend</div>
           <input autoFocus value={addFriendSearch} onChange={e=>setAddFriendSearch(e.target.value)} placeholder="🔍 Search by name or username" style={{...INP,marginBottom:12}}/>
@@ -8184,6 +8208,28 @@ export default function SonoLane() {
     const [dragging, setDragging] = useState(false);
     const dragStartYRef = useRef(null);
     const closeSheet = () => { setShowMusic(false); setActiveCbLane(null); };
+    // Horizontal swipe-right-to-close — only while on the "nearby" tab,
+    // since that's the page reached by swiping left past Events (Routes →
+    // Events → SonoLane Radio). This sheet is a fixed full-screen overlay
+    // rendered OUTSIDE the main page's swipeContainerRef, so the app-wide
+    // swipe system (onSwipeStart/onSwipeEnd near `go`) never sees gestures
+    // that start on it — this tracks the same "deliberate horizontal drag"
+    // gesture locally, scoped to just this sheet.
+    const radioSwipeRef = useRef(null);
+    const onRadioSwipeStart = (e) => {
+      if(musicTab!=="nearby") { radioSwipeRef.current=null; return; }
+      const t = e.touches ? e.touches[0] : e;
+      radioSwipeRef.current = {x:t.clientX, y:t.clientY};
+    };
+    const onRadioSwipeEnd = (e) => {
+      const start = radioSwipeRef.current;
+      radioSwipeRef.current = null;
+      if(!start || musicTab!=="nearby") return;
+      const t = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = t.clientX-start.x, dy = t.clientY-start.y;
+      if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)*1.4) return;
+      if(dx > 0){ vibrate(); closeSheet(); } // swipe right → back to Events
+    };
     const onDragStart = (e) => { dragStartYRef.current = e.touches?e.touches[0].clientY:e.clientY; setDragging(true); };
     const onDragMove = (e) => {
       if(dragStartYRef.current==null) return;
@@ -8216,19 +8262,20 @@ export default function SonoLane() {
     };
 
     const TABS = [
-      {id:"lanes",   icon:"📡", label:"CB Radio"},
+      {id:"lanes",   icon:<WalkieTalkieIcon size={21} color="#fff"/>, label:"CB Radio"},
       {id:"music",   icon:"🎵", label:"My Music"},
-      {id:"nearby",  icon:<JukeboxIcon size={21} color="#fff"/>, label:"Nearby Stations"},
     ];
 
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",animation:"scrimIn 0.18s ease",zIndex:600,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={closeSheet}>
-      <div onClick={e=>e.stopPropagation()} style={{
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:600,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={closeSheet}>
+      <div onClick={e=>e.stopPropagation()}
+        onTouchStart={onRadioSwipeStart} onTouchEnd={onRadioSwipeEnd}
+        onMouseDown={onRadioSwipeStart} onMouseUp={onRadioSwipeEnd}
+        style={{
         background:"#0d0d0d",borderRadius:"20px 20px 0 0",height:"86vh",maxHeight:"86vh",
         display:"flex",flexDirection:"column",overflow:"hidden",
         transform:"translateY("+dragY+"px)",transition:dragging?"none":"transform 0.25s ease",
-        boxShadow:"0 -8px 30px rgba(0,0,0,0.5)",
-      }}>
+        boxShadow:"0 -8px 30px rgba(0,0,0,0.5)"}}>
 
         {/* Drag handle + header — swipe down to close, like a pop-up tab */}
         <div
@@ -8263,9 +8310,8 @@ export default function SonoLane() {
                 <button key={lane.id} onClick={()=>setActiveCbLane(lane.id)} style={{
                   width:"100%",display:"flex",alignItems:"center",gap:12,padding:"14px",
                   marginBottom:8,borderRadius:14,border:"none",cursor:"pointer",fontFamily:F,
-                  background:"#181818",textAlign:"left",
-                }}>
-                  <div style={{width:48,height:48,borderRadius:12,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📡</div>
+                  background:"#181818",textAlign:"left"}}>
+                  <div style={{width:48,height:48,borderRadius:12,background:lane.color+"22",border:"1.5px solid "+lane.color+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><WalkieTalkieIcon size={22} color={lane.color}/></div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
                       <span style={{fontSize:16,fontWeight:800,color:"#fff"}}>{lane.name}</span>
@@ -8310,7 +8356,7 @@ export default function SonoLane() {
               <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 24px"}}>
                 <div style={{position:"relative",width:120,height:120,marginBottom:18}}>
                   <div style={{position:"absolute",inset:0,borderRadius:"50%",background:(laneObj?.color||OR)+"22",animation:"pulse 1.6s infinite"}}/>
-                  <div style={{position:"absolute",inset:14,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:42}}>📡</div>
+                  <div style={{position:"absolute",inset:14,borderRadius:"50%",background:"linear-gradient(135deg,"+(laneObj?.color||OR)+",#000)",display:"flex",alignItems:"center",justifyContent:"center"}}><WalkieTalkieIcon size={42} color="#fff"/></div>
                 </div>
                 <div style={{fontSize:17,fontWeight:800,color:"#fff",marginBottom:4}}>Connected — ready to talk</div>
                 <div style={{fontSize:13,color:"#666",textAlign:"center",lineHeight:1.6,marginBottom:6}}>You're live on {laneObj?.name}. Hold the button below to broadcast.</div>
@@ -8326,7 +8372,7 @@ export default function SonoLane() {
                 </div>
                 {updates.length===0 ? (
                   <div style={{textAlign:"center",color:"#444",paddingTop:30}}>
-                    <div style={{fontSize:26,marginBottom:6}}>📡</div>
+                    <div style={{marginBottom:6,display:"flex",justifyContent:"center"}}><WalkieTalkieIcon size={26} color="#444"/></div>
                     <div style={{fontSize:13}}>No recent updates on this lane.</div>
                   </div>
                 ) : updates.map(u=>(
@@ -8349,7 +8395,7 @@ export default function SonoLane() {
                   onTouchStart={e=>{e.preventDefault();setCbRecording(true);setCbTimer(0);cbTimerRef.current=setInterval(()=>setCbTimer(t=>t+1),1000);}}
                   onTouchEnd={e=>{e.preventDefault();clearInterval(cbTimerRef.current);setCbRecording(false);setCbTimer(0);broadcastOnLane(activeCbLane);}}
                   style={{width:"100%",padding:"14px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:F,background:cbRecording?"#ed4245":"#23a55a",color:"#fff",fontSize:15,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {cbRecording ? (<><span style={{width:7,height:7,borderRadius:"50%",background:"#fff",animation:"pulse 0.5s infinite",display:"block"}}/>{"Broadcasting… "+cbTimer+"s"}</>) : (<><span>{"📡"}</span>{"Hold to Talk"}</>)}
+                  {cbRecording ? (<><span style={{width:7,height:7,borderRadius:"50%",background:"#fff",animation:"pulse 0.5s infinite",display:"block"}}/>{"Broadcasting… "+cbTimer+"s"}</>) : (<><WalkieTalkieIcon size={17} color="#fff"/>{"Hold to Talk"}</>)}
                 </button>
               </div>
             )}
@@ -8399,82 +8445,15 @@ export default function SonoLane() {
           </div>
         )}
 
-        {/* ── NEARBY STATIONS — full view (also hosts My Broadcast / registration) ── */}
-        {musicTab==="nearby" && (
-          <div style={{flex:1,overflowY:"auto",padding:"14px 16px 24px"}}>
-            <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>MY BROADCAST</div>
-            {isBroad ? (
-              <div style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:14,padding:"14px",display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-                <div style={{width:12,height:12,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0}}/>
-                <div style={{flex:1}}><div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:12,color:"#666"}}>Broadcasting live now</div></div>
-                <button onClick={()=>setIsBroad(false)} style={{padding:"6px 14px",borderRadius:20,background:"#2a2a2a",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
-              </div>
-            ) : radioHosts.length>0 ? (
-              <div style={{marginBottom:18}}>
-                {radioHosts.map((h,i)=>(
-                  <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{width:44,height:44,borderRadius:11,background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={20} color={OR}/></div>
-                    <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{h.name}</div><div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div></div>
-                    <button onClick={()=>{setBroadName(h.name);setIsBroad(true);}} style={{padding:"6px 12px",borderRadius:20,background:"#ef4444",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Go Live</button>
-                  </div>
-                ))}
-              </div>
-            ) : !showReg ? (
-              <button onClick={()=>setShowReg(true)} style={{width:"100%",padding:"14px",borderRadius:14,background:"transparent",border:"1.5px dashed #ef444466",color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><JukeboxIcon size={15} color="#ef4444"/>Register as Radio Host</button>
-            ) : null}
-
-            {showReg && (
-              <div style={{background:"#181818",borderRadius:14,padding:"16px",marginBottom:18}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:12}}>Host Registration</div>
-                <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
-                  {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
-                    <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#222",color:hostForm.genre===g?"#fff":"#666",border:"none",fontFamily:F}}>{g}</button>
-                  ))}
-                </div>
-                <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
-                <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",resize:"none",marginBottom:12}}/>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
-                  <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#222",border:"1px solid #333",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
-                </div>
-              </div>
-            )}
-
-            <div style={{fontSize:11,color:"#555",fontWeight:700,letterSpacing:1.2,marginBottom:10}}>
-              {radiusActive ? "RADIO HOSTS · "+appRadius+" MI" : "ALL RADIO HOSTS"}
-            </div>
-            {radioHosts.length===0 ? (
-              <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
-                <div style={{marginBottom:10,display:"flex",justifyContent:"center"}}><JukeboxIcon size={38} color="#444"/></div>
-                <div style={{fontSize:15,fontWeight:700,color:"#666",marginBottom:6}}>No stations nearby yet</div>
-                <div style={{fontSize:13,color:"#444",marginBottom:14}}>Be the first to register a station above.</div>
-              </div>
-            ) : radioHosts.map((h,i)=>(
-              <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:48,height:48,borderRadius:12,background:OR+"22",border:"1.5px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={22} color={OR}/></div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{h.name}</div>
-                  <div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div>
-                  {h.bio && <div style={{fontSize:12,color:"#444",marginTop:3}}>{h.bio}</div>}
-                </div>
-                <button onClick={()=>toggleSavedStation(h.name)} title={savedStations.includes(h.name)?"Remove from saved stations":"Save station"} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#555",fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
-                {isBroad&&broadName===h.name
-                  ? (<div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/><span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span></div>)
-                  : (<button style={{padding:"6px 12px",borderRadius:20,background:"#2a2a2a",color:"#888",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Listen</button>)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Bottom 3-button nav ── */}
+        {/* ── Bottom nav ── (Nearby Stations moved out to its own real page —
+            see renderNearbyStationsSection/RadioPanel — so only CB Radio and
+            My Music remain here.) */}
         {!activeCbLane && (
           <div style={{flexShrink:0,display:"flex",borderTop:"1px solid #1f1f1f",background:"#0d0d0d",paddingBottom:"env(safe-area-inset-bottom, 4px)"}}>
             {TABS.map(t=>(
               <button key={t.id} onClick={()=>switchTab(t.id)} style={{
                 flex:1,padding:"10px 4px 8px",border:"none",cursor:"pointer",fontFamily:F,
-                background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-              }}>
+                background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                 <span style={{fontSize:21,opacity:musicTab===t.id?1:0.4}}>{t.icon}</span>
                 <span style={{fontSize:11,fontWeight:musicTab===t.id?800:500,color:musicTab===t.id?OR:"#555"}}>{t.label}</span>
                 {musicTab===t.id && <div style={{width:16,height:2,borderRadius:1,background:OR,marginTop:1}}/>}
@@ -8499,8 +8478,8 @@ export default function SonoLane() {
       setWidgetEditFrom(null);
     };
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",animation:"scrimIn 0.18s ease",zIndex:600,display:"flex",alignItems:"flex-end"}} onClick={closePicker}>
-        <div style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:600,display:"flex",alignItems:"flex-end"}} onClick={closePicker}>
+        <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18}} onClick={e=>e.stopPropagation()}>
           <div style={{width:30,height:3,background:"#e8e8e8",borderRadius:2,margin:"0 auto 14px"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
             <button onClick={closePicker} style={{fontSize:20,background:"none",border:"none",color:"#111",cursor:"pointer",padding:0}}>←</button>
@@ -8512,7 +8491,7 @@ export default function SonoLane() {
               return (
                 <button key={id} onClick={()=>{if(widgetEdit==="1")setWidget1(id);else if(widgetEdit==="2")setWidget2(id);else setWidget3(id);}}
                   style={{padding:"14px 10px",borderRadius:12,border:"2px solid "+(cur===id?OR:"#ebebeb"),background:cur===id?OR+"08":"#f8f8f8",cursor:"pointer",textAlign:"left",fontFamily:F}}>
-                  <div style={{marginBottom:4}}>{id==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={22}/>:<span style={{fontSize:24}}>{ic}</span>}</div>
+                  <div style={{marginBottom:4}}>{id==="routes"?<DPadIcon id="road" color={DPAD_COLORS.road} size={22}/>:id==="cbradio"?<WalkieTalkieIcon size={22} color={cur===id?OR:"#111"}/>:<span style={{fontSize:24}}>{ic}</span>}</div>
                   <div style={{fontSize:13,fontWeight:700,color:cur===id?OR:"#111"}}>{label}</div>
                 </button>
               );
@@ -8540,15 +8519,22 @@ export default function SonoLane() {
   });
 
   /* ── RENDER ── */
-  const PANELS = {profile:ProfilePanel,discover:DiscoverPanel,create:CreatePanel,drive:DrivePanel};
-  const ActivePanel = PANELS[panel] || ProfilePanel;
+  const PANELS = {profile:ProfilePanel, routes:FeedPanel, events:MapPanel, radio:RadioPanel, create:CreatePanel, drive:DrivePanel, garage:GaragePanel};
+  const ActivePanel = PANELS[panel] || FeedPanel;
 
-  // Top page-switcher — Lanes / Garage / Discover — replaces the old dpad.
-  // Highlights the current page, jumps directly on tap, hidden during Drive mode.
+  // Bottom tab bar — 5 slots: Discover (Routes/Events/SonoLane Radio, still
+  // swipeable between themselves), My Garage, a center star-in-square
+  // button that jumps straight into Drive mode, then Lanes, Profile.
+  // Highlights the current page, jumps directly on tap (no swipe-to-switch
+  // between these five anymore — see SWIPE_PANELS/onSwipeEnd above), hidden
+  // during Drive mode. Discover's own id is still "routes" (so go(it.id)
+  // lands on the same Routes→Events→Radio sequence as before) — activeIds
+  // is what lets it also highlight while Events is the one actually open.
   const TOPNAV_ITEMS = [
-    {id:"create",   label:"Lanes",    iconId:"chat"},
-    {id:"profile",  label:"SonoLane", iconId:"profile"},
-    {id:"discover", label:"Discover", iconId: discoverTab==="events" ? "event" : "road"},
+    {id:"routes",  label:"Discover", iconId:"road",   activeIds:["routes","events","radio"]},
+    {id:"garage",  label:"Garage",   iconId:"garage"},
+    {id:"create",  label:"Lanes",    iconId:"chat"},
+    {id:"profile", label:"SonoLane", iconId:"profile"},
   ];
   // A slim, icon-only bottom tab bar — matching how Instagram/Mastodon/most
   // social apps do theirs (no per-tab background pill, no text labels, thin
@@ -8562,20 +8548,33 @@ export default function SonoLane() {
   // currently-open page's own nav bar tints, not the app globally.
   const TopNav = () => {
     const onLanes = panel==="create";
+    const renderTab = it => {
+      const active = it.activeIds ? it.activeIds.includes(panel) : panel===it.id;
+      const color = active ? DPAD_COLORS[it.iconId] : (onLanes?"#72767d":"#9a9a9a");
+      return (
+        <button key={it.id} onClick={()=>go(it.id)} title={it.label} style={{
+          flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+          padding:"4px",border:"none",background:"transparent",cursor:"pointer",fontFamily:F}}>
+          {it.id==="profile" ? <CompassStar size={25} color={color}/> : it.iconId==="garage" ? <GarageDoorIcon size={25} color={color}/> : <DPadIcon id={it.iconId} color={color} size={25}/>}
+        </button>
+      );
+    };
     return (
-    <div style={{flexShrink:0,display:"flex",padding:"9px 8px",paddingBottom:"calc(9px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
-      {TOPNAV_ITEMS.map(it=>{
-        const active = panel===it.id;
-        const color = active ? DPAD_COLORS[it.iconId] : (onLanes?"#72767d":"#9a9a9a");
-        return (
-          <button key={it.id} onClick={()=>slideToTab(it.id)} title={it.label} style={{
-            flex:1,display:"flex",alignItems:"center",justifyContent:"center",
-            padding:"4px",border:"none",background:"transparent",cursor:"pointer",fontFamily:F,
-          }}>
-            {it.id==="profile" ? <CompassStar size={25} color={color}/> : <DPadIcon id={it.iconId} color={color} size={25}/>}
-          </button>
-        );
-      })}
+    <div style={{flexShrink:0,display:"flex",alignItems:"center",padding:"9px 8px",paddingBottom:"calc(9px + env(safe-area-inset-bottom, 0px))",background:onLanes?"#36393f":"#fff",borderTop:"1px solid "+(onLanes?"#202225":"#ebebeb"),zIndex:100}}>
+      {TOPNAV_ITEMS.slice(0,2).map(renderTab)}
+      {/* Center Drive button — a gold star inside a rounded square, raised
+          slightly above the bar. The one way into Drive mode now that the
+          Profile "Start Drive" button is gone. White background with a
+          black outline instead of the old solid black square. */}
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <button onClick={()=>{vibrate();playStartupSound(startupSound);go("drive");}} title="Start Drive" style={{
+          width:52,height:52,marginTop:-22,borderRadius:16,border:"2px solid #111",cursor:"pointer",fontFamily:F,
+          background:"#fff",boxShadow:"0 3px 10px rgba(0,0,0,0.25)",
+          display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <CompassStar size={26}/>
+        </button>
+      </div>
+      {TOPNAV_ITEMS.slice(2).map(renderTab)}
     </div>
     );
   };
@@ -8593,7 +8592,7 @@ export default function SonoLane() {
   // than the page drawing a second header row underneath. `back`/`onBack`
   // handlers were hoisted up next to `go()` for exactly this reason.
   const BACK_PAGES = {
-    car:          { onBack: ()=>setSubPanel("garage"), right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
+    car:          { onBack: ()=>setSubPanel(null), right: {icon:"✎", title:"Edit car", onClick:()=>setSubPanel("editcar")} },
     editcar:      { onBack: ()=>setSubPanel("car"), title:"Edit Car", right: {label:"Save", onClick:saveEditCar} },
     createroute:  { onBack: cancelCreateRoute, title: editingRouteId?"Edit Route":"Create Route", right: {label:"Save", onClick:saveCreateRoute} },
     sharedgarage: { onBack: cancelSharedGarage, right: {label:"💬 Chat", onClick:openSharedGarageChat} },
@@ -8603,8 +8602,7 @@ export default function SonoLane() {
     edit:         { onBack: back, title:"Edit Profile", right: {label:"Save", onClick:saveEditProfile} },
     settings:     { onBack: back, title:"⚙️ Settings" },
     rewards:      { onBack: back, title:"🏆 Rewards", dark:true },
-    top3friend:   { onBack: ()=>setSubPanel("garage"), dark:true },
-  };
+    top3friend:   { onBack: ()=>setSubPanel("routes"), dark:true }};
   const TopBar = () => {
     const onLanes = panel==="create";
     // Lanes' chat room is its own full page too (see lanesView) — the
@@ -8612,10 +8610,16 @@ export default function SonoLane() {
     // for Profile sub-pages, even though Lanes isn't driven by subPanel.
     // No title/right action here since the chat room's own header (name,
     // online status, etc.) already renders as page content underneath.
-    const backPage = panel==="profile" ? BACK_PAGES[subPanel]
+    const backPage = (panel==="profile"||panel==="garage") ? BACK_PAGES[subPanel]
       : (onLanes && lanesView==="room") ? { onBack: backFromLanesRoom }
       : null;
-    const dark = onLanes || !!backPage?.dark;
+    const onRadio = panel==="radio";
+    const dark = onLanes || onRadio || !!backPage?.dark;
+    // Filter icon replaces the ☰ menu only on Routes/Events, where there's
+    // something to filter — every other page (Profile, Garage, Lanes,
+    // Radio, every back page) keeps ☰ so Settings/Terms/About stay just as
+    // reachable as before.
+    const onFilterable = !backPage && (panel==="routes" || panel==="events");
     // Top bar icon buttons are transparent now — no circular shading behind
     // them — just the glyph itself, colored for whichever background this
     // page's top bar has.
@@ -8637,11 +8641,12 @@ export default function SonoLane() {
 
           {/* Middle — page-specific content: a back page's own title (when
               it has one — some, like Car Details, keep their title in the
-              page content instead), search on Discover (Routes or Events,
-              whichever tab is active), the username centered on Profile
-              home, or — on Lanes — the page's icon+title centered by
-              default, swapped for the actual search box while search is
-              active (see the 🔍/✕ button on the right). */}
+              page content instead), a plain title on Routes/Events/Radio
+              (search moved down into each page's own body now, alongside
+              the Routes | Events | Radio tab strip), the username centered
+              on Profile home, or — on Lanes — the page's icon+title
+              centered by default, swapped for the actual search box while
+              search is active (see the 🔍/✕ button on the right). */}
           {backPage ? (
             panel==="profile" && subPanel==="friends" ? (
               // Friends page: search box front-and-center instead of a
@@ -8656,15 +8661,16 @@ export default function SonoLane() {
             ) : (
               backPage.title && <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:dark?"#fff":"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{backPage.title}</div>
             )
-          ) : panel==="discover" ? (
-            <input
-              value={discoverTab==="routes" ? feedSearch : evSearch}
-              onChange={e=>discoverTab==="routes" ? setFeedSearch(e.target.value) : setEvSearch(e.target.value)}
-              placeholder={discoverTab==="routes" ? "Search routes…" : "Search events…"}
-              style={{flex:1,minWidth:0,padding:"8px 14px",borderRadius:20,border:"1px solid #ebebeb",background:"#f3f3f3",color:"#111",fontSize:13,fontFamily:F,outline:"none"}}
-            />
+          ) : panel==="routes" ? (
+            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><DPadIcon id="road" color={DPAD_COLORS.road} size={15}/>Routes</div>
+          ) : panel==="events" ? (
+            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/>Events</div>
+          ) : onRadio ? (
+            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><JukeboxIcon size={15} color="#fff"/>Radio</div>
           ) : panel==="profile" ? (
             <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName || "You"}</div>
+          ) : panel==="garage" ? (
+            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>My Garage</div>
           ) : onLanes ? (
             lanesSearchActive ? (
               <input
@@ -8684,9 +8690,12 @@ export default function SonoLane() {
           {/* Right button — the hamburger menu everywhere, except: a back
               page, where it becomes that page's one main action (Save,
               +Add, …) if it has one, or disappears entirely if it doesn't;
-              and Lanes, where it's a SearchIcon that swaps the centered
-              title for the search box above (and back to ✕ to close
-              search and clear it) instead of the menu. */}
+              Lanes, where it's a SearchIcon that swaps the centered title
+              for the search box above (and back to ✕ to close search and
+              clear it) instead of the menu; and Routes/Events, where it's
+              the filter icon that opens each page's own filter side panel
+              instead of the menu (category filtering used to be an inline
+              chip row on those two pages). */}
           {backPage ? (
             backPage.right && (
               <button onClick={backPage.right.onClick} title={backPage.right.title} style={backPage.right.label ? {padding:"6px 14px",borderRadius:20,background:OR,color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F,flexShrink:0} : {width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -8698,6 +8707,8 @@ export default function SonoLane() {
               if(lanesSearchActive){ setLanesSearchActive(false); setLaneUserSearch(""); }
               else setLanesSearchActive(true);
             }} title={lanesSearchActive?"Close search":"Search"} style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{lanesSearchActive?"✕":<SearchIcon size={26} color={btnColor}/>}</button>
+          ) : onFilterable ? (
+            <button onClick={()=>setShowFilterPanel(true)} title="Filter" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FilterIcon size={24} color={btnColor}/></button>
           ) : (
             <button onClick={()=>{setInfoDrawerPage(null);setShowInfoDrawer(true);}} title="Menu" style={{width:44,height:44,borderRadius:"50%",background:"transparent",border:"none",color:btnColor,fontSize:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>☰</button>
           )}
@@ -8711,12 +8722,12 @@ export default function SonoLane() {
             that were already always here. One place to start anything new,
             instead of it being split between the top bar and buried cards. */}
         {showQuickCreate && (
-          <div onClick={()=>setShowQuickCreate(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}}>
-            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:"12px 16px 20px"}}>
+          <div onClick={()=>setShowQuickCreate(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:"12px 16px 20px"}}>
               <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
               <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:12}}>Create</div>
 
-              {panel==="profile" && subPanel==="garage" && (<>
+              {panel==="garage" && !subPanel && (<>
                 {(1+myCars.length) < MAX_CARS && (
                   <button onClick={()=>{setShowQuickCreate(false);addNewCar();setSubPanel("car");}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                     <GarageDoorIcon size={20} color={OR}/>
@@ -8761,7 +8772,7 @@ export default function SonoLane() {
                 setShowQuickCreate(false);
                 setNewPost({title:"",body:"",type:"scenic",distance:"",stops:["",""],highlights:""});
                 setPostPhotos([]); setPostRouteMode("new"); setPostSavedRoute(null); setEditingPostId(null);
-                setShowPost(true); go("discover"); setDiscoverTab("routes");
+                setShowPost(true); go("routes");
               }} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,marginBottom:8,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                 <DPadIcon id="road" color={DPAD_COLORS.road} size={20}/>
                 <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Route Post</div>
@@ -8770,11 +8781,28 @@ export default function SonoLane() {
                 setShowQuickCreate(false);
                 setNewEvent({title:"",type:"car meet",desc:"",address:"",date:""});
                 setEventPhotos([]); setEditingEventId(null);
-                setShowEvent(true); go("discover"); setDiscoverTab("events");
+                setShowEvent(true); go("events");
               }} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,background:"#f8f8f8",border:"1px solid #ebebeb",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
                 <DPadIcon id="event" color={DPAD_COLORS.event} size={20}/>
                 <div style={{fontSize:14,fontWeight:700,color:"#111"}}>Event</div>
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Settings drawer — swipe right from Routes opens this, sliding in
+            from the LEFT (as opposed to the hamburger's Menu drawer, which
+            slides in from the right). Same real Settings content as
+            Profile's full Settings sub-page — see renderSettingsBody above
+            — just reachable as a quick side-drawer from Routes too. */}
+        {showSettingsDrawer && (
+          <div onClick={()=>setShowSettingsDrawer(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:850,display:"flex",justifyContent:"flex-start"}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:"82%",maxWidth:320,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
+              <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+                <div style={{fontSize:17,fontWeight:800,color:"#111"}}>⚙️ Settings</div>
+                <button onClick={()=>setShowSettingsDrawer(false)} style={{background:"none",border:"none",fontSize:20,color:"#111",cursor:"pointer"}}>✕</button>
+              </div>
+              {renderSettingsBody()}
             </div>
           </div>
         )}
@@ -8791,8 +8819,7 @@ export default function SonoLane() {
                 ["Your content","Routes, events, photos, and car avatars you post stay yours. Posting something publicly gives other SonoLane users permission to view it in their feeds. Don't post anything you don't have the rights to."],
                 ["Community conduct","Don't use SonoLane to harass, spam, or scam other drivers. Accounts that break these rules can be suspended."],
                 ["Demo notice","SonoLane is a demo app — this text is placeholder copy, not a binding legal agreement."],
-              ],
-            },
+              ]},
             privacy: {
               title:"Privacy Policy",
               body:[
@@ -8800,27 +8827,23 @@ export default function SonoLane() {
                 ["Location sharing","Live location is only ever shared with a Top 3 Friend after you explicitly turn Share Live Location on for them, and stays off for everyone else by default."],
                 ["Dashcam clips","Dashcam recordings stay on your device/account and are never shared automatically — you choose if and when to share a clip."],
                 ["Demo notice","SonoLane is a demo app — this text is placeholder copy describing intended behavior, not a real data-handling policy."],
-              ],
-            },
+              ]},
             about: {
               title:"About SonoLane",
               body:[
                 ["What it is","SonoLane is a social driving app — track drives, share routes and meetup events, keep a garage of car avatars, and stay in touch with friends over Lanes chat and walkie-talkie voice messages."],
                 ["Version","SonoLane · demo build."],
-              ],
-            },
+              ]},
             help: {
               title:"Help & Support",
               body:[
-                ["Getting started","Set up your profile and car avatar from the Profile tab, then post your first route or event from Discover."],
+                ["Getting started","Set up your profile and car avatar from the Profile tab, then post your first route or event from the Routes/Events tabs."],
                 ["Need something else?","This is a demo build without a live support line — check back here for updates as new features ship."],
-              ],
-            },
-          };
+              ]}};
           const page = infoDrawerPage ? INFO_PAGES[infoDrawerPage] : null;
           return (
-            <div onClick={()=>{setShowInfoDrawer(false);setInfoDrawerPage(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:850,display:"flex",justifyContent:"flex-end"}}>
-              <div onClick={e=>e.stopPropagation()} style={{width:"82%",maxWidth:320,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"-4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box",animation:"drawerInRight 0.36s cubic-bezier(0.34,1.35,0.64,1)"}}>
+            <div onClick={()=>{setShowInfoDrawer(false);setInfoDrawerPage(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:850,display:"flex",justifyContent:"flex-end"}}>
+              <div onClick={e=>e.stopPropagation()} style={{width:"82%",maxWidth:320,height:"100%",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"-4px 0 24px rgba(0,0,0,0.15)",paddingTop:"env(safe-area-inset-top, 0px)",paddingBottom:"env(safe-area-inset-bottom, 0px)",boxSizing:"border-box"}}>
                 {!page ? (<>
                   <div style={{padding:"16px 18px",borderBottom:"1px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
                     <div style={{fontSize:17,fontWeight:800,color:"#111"}}>Menu</div>
@@ -8868,8 +8891,8 @@ export default function SonoLane() {
             confirming a car delete elsewhere in the app, since it's a real
             action (ends the session) rather than just navigating. */}
         {confirmSignOut && (
-          <div onClick={()=>setConfirmSignOut(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:900,display:"flex",alignItems:"flex-end"}}>
-            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",padding:18,paddingBottom:"calc(18px + env(safe-area-inset-bottom, 0px))",boxSizing:"border-box"}}>
+          <div onClick={()=>setConfirmSignOut(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:900,display:"flex",alignItems:"flex-end"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",padding:18,paddingBottom:"calc(18px + env(safe-area-inset-bottom, 0px))",boxSizing:"border-box"}}>
               <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"0 auto 16px"}}/>
               <div style={{fontSize:16,fontWeight:800,color:"#111",marginBottom:6}}>Sign out of SonoLane?</div>
               <div style={{fontSize:13,color:"#111",lineHeight:1.6,marginBottom:16}}>You'll need to sign back in to see your profile, chats, and garage again.</div>
@@ -8929,77 +8952,43 @@ export default function SonoLane() {
           index.css) specifically so it always ships with App.jsx alone —
           this app is hand-delivered as a single file, and a separate CSS
           file is too easy to forget to also upload. */}
-      {/* Shared entrance animations for every popup — bottom sheets
-          (sheetIn), the hamburger side drawer (drawerInRight), the
-          standalone Discovery Radius page (pageInUp), and the dimming
-          backdrop behind all of them (scrimIn, a plain fade — only the
-          actual surface bounces, not the dim layer behind it). All three
-          motion ones share the same slight-overshoot-then-settle shape
-          (~1-2% past resting position before landing) for one consistent
-          "pop up with a little life to it" feel across the app, matching
-          each surface's own entry direction. Neutralized under
-          prefers-reduced-motion, same as `slideUp` below, so a static
-          fade-in is all anyone with that preference ever sees. */}
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}@keyframes scrimIn{0%{opacity:0}100%{opacity:1}}@keyframes sheetIn{0%{transform:translateY(100%)}60%{transform:translateY(-2%)}80%{transform:translateY(1%)}100%{transform:translateY(0)}}@keyframes drawerInRight{0%{transform:translateX(100%)}60%{transform:translateX(-2%)}80%{transform:translateX(1%)}100%{transform:translateX(0)}}@keyframes pageInUp{0%{transform:translateY(100%)}60%{transform:translateY(-2%)}80%{transform:translateY(1%)}100%{transform:translateY(0)}}@media (prefers-reduced-motion: reduce){*{animation-duration:0.001s!important;animation-iteration-count:1!important;}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}img{-webkit-user-drag:none;-webkit-touch-callout:none;}input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
+      {/* Popups (bottom sheets, the hamburger side drawer, the standalone
+          Discovery Radius page, etc.) now just appear instantly, with no
+          entrance animation — removed because of real-device crash
+          reports; only the plain "pulse" spinner keyframe remains. */}
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}@media (prefers-reduced-motion: reduce){*{animation-duration:0.001s!important;animation-iteration-count:1!important;}}html,body{overscroll-behavior:none;background:${panel==="create"?"#36393f":"#fff"};-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}*{box-sizing:border-box;margin:0;padding:0;}button,input,textarea{font-family:inherit;}img{-webkit-user-drag:none;-webkit-touch-callout:none;}input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;}::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px;}`}</style>
 
       {panel!=="drive" && <TopBar/>}
 
-      {(() => {
-        // While a live carousel drag is in progress (swipeDir set — see
-        // onSwipeMove), render the current page AND whichever neighbor tab
-        // is being revealed side by side in a 2x-wide row, and slide that
-        // row by the live drag offset — so the next page visibly follows
-        // the finger in from the edge, proportional to how far it's
-        // dragged, instead of only snapping once the gesture ends.
-        const carouselIdx = CAROUSEL.indexOf(panel);
-        const neighborId = swipeDir==="next" ? CAROUSEL[carouselIdx+1] : swipeDir==="prev" ? CAROUSEL[carouselIdx-1] : null;
-        const NeighborPanel = neighborId ? PANELS[neighborId] : null;
-        const w = typeof window!=="undefined" ? window.innerWidth : 390;
-        return (
-          <div
-            ref={swipeContainerRef}
-            style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative",touchAction:"pan-y",overscrollBehaviorX:"none"}}
-            onMouseDown={onSwipeStart} onMouseMove={onSwipeMove} onMouseUp={onSwipeEnd}
-          >
-            {/* ActivePanel always renders in this SAME first slot, on every
-                render, whether or not a neighbor is showing — this is load-
-                bearing, not cosmetic. The previous version swapped which
-                literal JSX slot ActivePanel occupied depending on swipeDir
-                (so a "prev" drag could put NeighborPanel first), which
-                looked identical when idle but meant the very first
-                touchmove of a real carousel drag (the one that sets
-                swipeDir and mounts the neighbor) changed ActivePanel's
-                position in the tree. React has no way to "move" a subtree
-                across a re-parent like that — it unmounts the old DOM and
-                mounts fresh — and doing that WHILE a finger is still touching
-                an element inside it makes the browser cancel the rest of
-                that touch sequence outright (no touchmove/touchend ever
-                follow — confirmed by dispatching real touch input in
-                Playwright: exactly one touchmove arrived, then silence).
-                That's the actual bug behind "swipe doesn't work" — it fired
-                once, tore itself down, and every gesture died right there.
-                Keeping ActivePanel's slot fixed and using CSS
-                (flexDirection: row-reverse) to flip which SIDE it visually
-                appears on for a "prev" drag gets the same look without ever
-                touching ActivePanel's position in the tree. */}
-            <div ref={swipeWrapperRef} style={{
-              position:"absolute", top:0, left:0, bottom:0, display:"flex",
-              flexDirection: swipeDir==="prev" ? "row-reverse" : "row",
-              width: NeighborPanel ? w*2 : w, willChange:"transform",
-              transform:`translateX(${swipeDir==="prev" ? swipeDXRef.current-w : swipeDXRef.current}px)`,
-            }}>
-              <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                <ActivePanel/>
-              </div>
-              {NeighborPanel && (
-                <div style={{width:w,height:"100%",flexShrink:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                  <NeighborPanel/>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      {/* Discover tab strip — Routes | Events | Radio, right under the
+          shared TopBar. Used to be invisible (swipe-only, with Radio only
+          reachable as a pop-up sheet); now it's a real, visible toggle like
+          Profile's or Lanes' own tab rows, and Radio is a real page in the
+          same sequence (see RadioPanel/PANELS.radio) instead of a pop-up.
+          Swipe between the three still works exactly as before. */}
+      {["routes","events","radio"].includes(panel) && (
+        <div style={{display:"flex",gap:6,padding:"8px 14px",flexShrink:0,background:panel==="radio"?"#0d0d0d":"#fff",borderBottom:"1px solid "+(panel==="radio"?"#202225":"#ebebeb")}}>
+          {[["routes","Routes"],["events","Events"],["radio","Radio"]].map(([id,label])=>(
+            <button key={id} onClick={()=>go(id)} style={{
+              flex:1,padding:"7px 6px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:F,
+              fontSize:13,fontWeight:700,
+              background:panel===id?OR:(panel==="radio"?"#1a1a1a":"#f3f3f3"),
+              color:panel===id?"#fff":(panel==="radio"?"#8e9297":"#555")}}>{label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* No slide/drag rendering here anymore — swipe gestures still work
+          (see onSwipeStart/onSwipeMove/onSwipeEnd above) but switch panels
+          instantly via go(), same as a tap, with nothing visually animated
+          in between. */}
+      <div
+        ref={swipeContainerRef}
+        style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,position:"relative",touchAction:"pan-y",overscrollBehaviorX:"none"}}
+        onMouseDown={onSwipeStart} onMouseMove={onSwipeMove} onMouseUp={onSwipeEnd}
+      >
+        <ActivePanel/>
+      </div>
 
       {panel!=="drive" && <TopNav/>}
 
@@ -9060,8 +9049,8 @@ export default function SonoLane() {
 
       {/* Widget action overlays */}
       {widgetAction && (
-        <div onClick={()=>setWidgetAction(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",animation:"scrimIn 0.18s ease",zIndex:600,display:"flex",alignItems:"flex-end"}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}}>
+        <div onClick={()=>setWidgetAction(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:600,display:"flex",alignItems:"flex-end"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}}>
             <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
             {widgetAction==="weather" && <>
               <div style={{padding:"0 16px 10px",borderBottom:"1px solid #ebebeb",flexShrink:0,display:"flex",alignItems:"center",gap:10}}>
@@ -9125,14 +9114,12 @@ export default function SonoLane() {
                           borderRadius:14,marginBottom:8,
                           background:done?"linear-gradient(135deg,#1a1a2e,#0f3460)":"#f8f8f8",
                           border:"1.5px solid "+(done?"#e9456044":"#ebebeb"),
-                          opacity:done?1:0.7,
-                        }}>
+                          opacity:done?1:0.7}}>
                           <div style={{
                             width:44,height:44,borderRadius:12,flexShrink:0,
                             display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
                             background:done?"linear-gradient(135deg,#e94560,#f5a623)":"#e0e0e0",
-                            filter:done?"none":"grayscale(1)",
-                          }}>{done?ach.icon:"🔒"}</div>
+                            filter:done?"none":"grayscale(1)"}}>{done?ach.icon:"🔒"}</div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:15,fontWeight:800,color:done?"#fff":"#111",marginBottom:2}}>{ach.title}</div>
                             <div style={{fontSize:12,color:done?"#aaa":"#111",lineHeight:1.4}}>{ach.desc}</div>
@@ -9160,8 +9147,7 @@ export default function SonoLane() {
                   width:"100%",display:"flex",alignItems:"center",gap:14,flexShrink:0,
                   padding:"16px 18px",borderRadius:16,marginTop:20,
                   background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
-                  border:"1.5px solid #e94560",cursor:"pointer",textAlign:"left",fontFamily:F,
-                }}>
+                  border:"1.5px solid #e94560",cursor:"pointer",textAlign:"left",fontFamily:F}}>
                   <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#e94560,#f5a623)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🏆</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>SonoLane Rewards</div>
@@ -9222,13 +9208,14 @@ export default function SonoLane() {
       <AddFriendModal/>
       <MusicModal/>
       <WidgetPicker/>
+      <ProfileViewSheet/>
 
       {/* Dashcam widget — one-time inline setup prompt. Condensed version of the
           full ToS screen in Profile → Dashcam; accepting here sets the same
           dashcamConsent flag, so Profile's Dashcam page and this never conflict. */}
       {showDashcamSetup && (
-        <div onClick={()=>setShowDashcamSetup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",animation:"scrimIn 0.18s ease",zIndex:700,display:"flex",alignItems:"flex-end"}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",animation:"sheetIn 0.38s cubic-bezier(0.34,1.35,0.64,1)",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}}>
+        <div onClick={()=>setShowDashcamSetup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:700,display:"flex",alignItems:"flex-end"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"80%",display:"flex",flexDirection:"column"}}>
             <div style={{width:30,height:3,background:"#e0e0e0",borderRadius:2,margin:"12px auto",flexShrink:0}}/>
             <div style={{padding:"4px 20px 24px",overflowY:"auto"}}>
               <div style={{textAlign:"center",marginBottom:14}}>
@@ -9255,21 +9242,18 @@ export default function SonoLane() {
         <div style={{
           position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",
           zIndex:1000,pointerEvents:"none",
-          animation:"slideUp 0.4s ease",
-        }}>
+          animation:"slideUp 0.4s ease"}}>
           <div style={{
             background:"linear-gradient(135deg,#1a1a2e,#0f3460)",
             border:"1.5px solid #e94560",borderRadius:16,
             padding:"12px 16px",display:"flex",alignItems:"center",gap:12,
             boxShadow:"0 8px 32px rgba(233,69,96,0.35), 0 2px 8px rgba(0,0,0,0.5)",
-            minWidth:240,maxWidth:300,pointerEvents:"all",
-          }} onClick={()=>setNewAchQueue(q=>q.slice(1))}>
+            minWidth:240,maxWidth:300,pointerEvents:"all"}} onClick={()=>setNewAchQueue(q=>q.slice(1))}>
             <div style={{
               width:44,height:44,borderRadius:12,
               background:"linear-gradient(135deg,#e94560,#f5a623)",
               display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:24,flexShrink:0,
-            }}>{newAchQueue[0].icon}</div>
+              fontSize:24,flexShrink:0}}>{newAchQueue[0].icon}</div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:11,color:"#e94560",fontWeight:800,letterSpacing:1.2,marginBottom:2}}>ACHIEVEMENT UNLOCKED</div>
               <div style={{fontSize:15,fontWeight:900,color:"#fff",marginBottom:1}}>{newAchQueue[0].title}</div>
