@@ -2546,13 +2546,13 @@ export default function SonoLane() {
     // is its own bottom-nav tab now, so it's no longer Profile's default.
     if(p!==panel) setSubPanel(p==="profile" ? "routes" : null);
     // Landing on Lanes fresh (from another tab) always opens straight into
-    // Nova's AI chat room now — Lanes reads as an open AI chat room with
-    // every other chat as a bubble up top, not a chat-list app — instead of
+    // the Chats list now — a normal messaging-app inbox is the first thing
+    // you see, same as Sono AI and Lanes are a swipe/tap away instead of
     // whatever chat room happened to be open last time. Direct "message
     // so-and-so" entry points still pass lanesRoom:true + activeChan set by
-    // the caller to jump straight into THAT chat's room instead of Nova's.
+    // the caller to jump straight into THAT chat's room instead of Chats.
     if(lanesRoom) setLanesView("room");
-    else if(p!==panel && p==="create"){ setLanesView("room"); setActiveChan("sono"); }
+    else if(p!==panel && p==="create"){ setLanesView("list"); setLanesListTab("chats"); }
     // Landing on Lanes fresh always shows the page title first, not
     // whatever search box was left open last time you were here.
     if(p!==panel && p==="create"){ setLanesSearchActive(false); setLaneUserSearch(""); }
@@ -2670,8 +2670,8 @@ export default function SonoLane() {
     }
   };
 
-  // ── Swipe — Discover (Routes ↔ Events ↔ Radio) and Lanes (Sono ↔ You ↔
-  // Chats ↔ Lanes) both cycle left / open Settings right (see onSwipeEnd
+  // ── Swipe — Discover (Routes ↔ Events ↔ Radio) and Lanes (Chats ↔ Sono ↔
+  // Lanes) both cycle left / open Settings right (see onSwipeEnd
   // below). Profile/Garage stay tap-only; SWIPE_PANELS still has to include
   // them too, just so swipe-to-go-back out of an actual sub-page (Edit
   // Profile, Car Details, …) keeps working there.
@@ -2697,6 +2697,14 @@ export default function SonoLane() {
   // Lanes now means the same thing it means on Discover (cycle tabs / open
   // Settings, see LANES_TABS + onSwipeEnd below); the ← button in the
   // TopBar is still there for the tap-to-go-back case.
+  // Note: Lanes' individual rooms (a friend DM, a lane, the notifications
+  // self-chat) are deliberately NOT part of this — they get their own
+  // direction-aware handling right inside onSwipeEnd's panel==="create"
+  // branch below instead, since swipe-left there needs to keep cycling
+  // Chats/Sono/Lanes (see LANES_TABS) while only swipe-right should go
+  // back; folding them into this single back/no-back flag would make
+  // backAvailable true in both directions and silently swallow that left
+  // swipe (see "leave the page-swipe alone" below) instead of cycling it.
   const backAvailable = ((panel==="profile"||panel==="garage") && !!subPanel && !PROFILE_INLINE_SECTIONS.includes(subPanel)) || (panel==="routes" && !!viewRouteId);
   const runBack = () => {
     if(panel==="routes" && viewRouteId){ setViewRouteId(null); return; }
@@ -2707,24 +2715,26 @@ export default function SonoLane() {
     // Garage's main view either way, never to a blank collapsed Profile).
     if((panel==="profile"||panel==="garage") && subPanel){ (BACK_PAGES[subPanel]?.onBack || (()=>setSubPanel(panel==="garage"?null:"routes")))(); setSelTrip(null); return; }
   };
-  // The fixed, ordered set of Lanes "tabs" swipe-left cycles through — Sono
-  // AI and Notifications are always-there rooms, Chats/Lanes are the two
-  // list sections (see the bubble/tab strip in CreatePanel). An individual
-  // friend DM or a specific lane room isn't part of this fixed cycle (there
-  // could be dozens of those) — swiping left from one of those just starts
-  // the cycle over from Sono, same as landing on Lanes fresh would.
-  const LANES_TABS = ["sono","notifications","chats","lanes"];
+  // The fixed, ordered set of Lanes "tabs" swipe-left cycles through — Chats
+  // is the default/first stop (a normal messaging app inbox), then Sono AI,
+  // then Lanes. Notifications used to be a fourth always-there room here —
+  // it's now a chat bubble with yourself at the top of the Chats list
+  // instead (see the "Notifications" row in CreatePanel), so it's an
+  // individual room like a friend DM rather than one of these fixed tabs.
+  // An individual friend DM/lane/notifications room isn't part of this fixed
+  // cycle (there could be dozens of those) — swiping left from one of those
+  // just starts the cycle over from Chats, same as landing on Lanes fresh
+  // would.
+  const LANES_TABS = ["chats","sono","lanes"];
   const curLanesTab = () => {
     if(lanesView==="room"){
       if(activeChan==="sono") return "sono";
-      if(activeChan==="notifications") return "notifications";
-      return null; // an individual DM/lane room — not one of the fixed tabs
+      return null; // an individual DM/lane/notifications room — not one of the fixed tabs
     }
     return lanesListTab==="lanes" ? "lanes" : "chats";
   };
   const goLanesTab = (tab) => {
     if(tab==="sono"){ setLanesView("room"); setActiveChan("sono"); }
-    else if(tab==="notifications"){ setLanesView("room"); setActiveChan("notifications"); }
     else { setLanesListTab(tab); setLanesView("list"); }
   };
   const cycleLanesTab = (dir) => {
@@ -2805,25 +2815,41 @@ export default function SonoLane() {
     if(dx > 0 && backAvailable) { runBack(); return; }               // swipe right → back out of this sub-page, not to another tab
     if(backAvailable) return;                                         // a back page is open — leave the page-swipe alone
     // One shared gesture contract for both swipeable "tab strip" pages —
-    // Discover (Routes|Events|Radio) and Lanes (Sono|You|Chats|Lanes):
-    // swipe left always cycles forward to the next tab (wrapping back to
-    // the first), swipe right always opens the left-side Settings drawer,
-    // no matter which tab you're currently on. Profile/Garage stay tap-
-    // only, same as before.
+    // Discover (Routes|Events|Radio) and Lanes (Chats|Sono|Lanes): swipe
+    // left always cycles forward to the next tab (wrapping back to the
+    // first). Swipe right controls that same toggle, cycling backward to
+    // the PREVIOUS tab — except on Routes/Chats specifically (the first,
+    // default tab in each strip, with no "previous" one before it), where
+    // swipe right instead opens the left-side Settings drawer, same as
+    // swiping right on Profile/Garage's home screen would if they were
+    // swipeable. So the Settings-drawer gesture only ever fires from the
+    // very first stop in either sequence, never from Events/Radio or
+    // Sono/Lanes.
     if(panel==="routes" || panel==="events" || panel==="radio"){
-      if(dx < 0){
-        vibrate();
-        const order = ["routes","events","radio"];
-        go(order[(order.indexOf(panel) + 1) % order.length]);
-      } else {
-        vibrate();
-        setShowSettingsDrawer(true);
-      }
+      vibrate();
+      const order = ["routes","events","radio"];
+      const i = order.indexOf(panel);
+      if(dx < 0) go(order[(i + 1) % order.length]);
+      else if(panel==="routes") setShowSettingsDrawer(true);
+      else go(order[(i - 1 + order.length) % order.length]);
       return;
     }
     if(panel==="create"){
+      // Swipe left always cycles Chats/Sono/Lanes forward, same as the
+      // Discover strip above, even from inside an individual room (an
+      // individual friend DM, lane, or the notifications self-chat isn't
+      // one of the three, so this just starts the cycle over from Chats —
+      // see curLanesTab()/cycleLanesTab). Swipe right is more layered:
+      // from one of those individual rooms it's the same "go back" gesture
+      // as everywhere else a back button shows (the composer's own ☰
+      // button, or the plain footer one for notifications); from Chats
+      // (the first/default tab) it opens the Settings drawer; from Sono or
+      // Lanes it cycles backward to the previous tab, same as Events/Radio
+      // do above.
       if(dx < 0){ vibrate(); cycleLanesTab(1); }
-      else { vibrate(); setShowSettingsDrawer(true); }
+      else if(lanesView==="room" && activeChan!=="sono"){ vibrate(); backFromLanesRoom(); }
+      else if(curLanesTab()==="chats"){ vibrate(); setShowSettingsDrawer(true); }
+      else { vibrate(); cycleLanesTab(-1); }
       return;
     }
   };
@@ -3586,15 +3612,15 @@ export default function SonoLane() {
       {isBroad ? (
         <div style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:14,padding:"14px",display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
           <div style={{width:12,height:12,borderRadius:"50%",background:"#ef4444",animation:"pulse 1s infinite",flexShrink:0}}/>
-          <div style={{flex:1}}><div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:12,color:"#666"}}>Broadcasting live now</div></div>
-          <button onClick={()=>setIsBroad(false)} style={{padding:"6px 14px",borderRadius:20,background:"#2a2a2a",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
+          <div style={{flex:1}}><div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>{broadName}</div><div style={{fontSize:12,color:"#8a8f98"}}>Broadcasting live now</div></div>
+          <button onClick={()=>setIsBroad(false)} style={{padding:"6px 14px",borderRadius:20,background:"#ef444422",border:"none",color:"#ef4444",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>⏹ End</button>
         </div>
       ) : radioHosts.length>0 ? (
         <div style={{marginBottom:18}}>
           {radioHosts.map((h,i)=>(
-            <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:11,background:OR+"22",border:"1px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={20} color={OR}/></div>
-              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{h.name}</div><div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div></div>
+            <div key={i} style={{background:"#f8f8f8",borderRadius:14,padding:"14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:44,height:44,borderRadius:11,background:OR+"15",border:"1px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={20} color={OR}/></div>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"#111"}}>{h.name}</div><div style={{fontSize:12,color:"#8a8f98"}}>{h.genre} · @{h.handle}</div></div>
               <button onClick={()=>{setBroadName(h.name);setIsBroad(true);}} style={{padding:"6px 12px",borderRadius:20,background:"#ef4444",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Go Live</button>
             </div>
           ))}
@@ -3604,19 +3630,19 @@ export default function SonoLane() {
       ) : null}
 
       {showReg && (
-        <div style={{background:"#181818",borderRadius:14,padding:"16px",marginBottom:18}}>
-          <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:12}}>Host Registration</div>
-          <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
+        <div style={{background:"#f8f8f8",borderRadius:14,padding:"16px",marginBottom:18}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#111",marginBottom:12}}>Host Registration</div>
+          <input value={hostForm.name} onChange={e=>setHostForm(f=>({...f,name:e.target.value}))} placeholder="Station name *" style={{...INP,background:"#fff",border:"1px solid #ebebeb",color:"#111",marginBottom:8}}/>
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
             {["Hip-Hop","Lo-Fi","Rock","R&B","Electronic","Pop","Jazz","Talk"].map(g=>(
-              <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#222",color:hostForm.genre===g?"#fff":"#666",border:"none",fontFamily:F}}>{g}</button>
+              <button key={g} onClick={()=>setHostForm(f=>({...f,genre:g}))} style={{padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:hostForm.genre===g?OR:"#ebebeb",color:hostForm.genre===g?"#fff":"#555",border:"none",fontFamily:F}}>{g}</button>
             ))}
           </div>
-          <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",marginBottom:8}}/>
-          <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,background:"#222",border:"1px solid #333",color:"#fff",resize:"none",marginBottom:12}}/>
+          <input value={hostForm.handle} onChange={e=>setHostForm(f=>({...f,handle:e.target.value}))} placeholder="@handle" style={{...INP,background:"#fff",border:"1px solid #ebebeb",color:"#111",marginBottom:8}}/>
+          <textarea value={hostForm.bio} onChange={e=>setHostForm(f=>({...f,bio:e.target.value}))} placeholder="Short bio…" rows={2} style={{...INP,background:"#fff",border:"1px solid #ebebeb",color:"#111",resize:"none",marginBottom:12}}/>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{if(!hostForm.name.trim())return;setRadioHosts(h=>[...h,{...hostForm}]);setHostForm({name:"",genre:"",bio:"",handle:""});setShowReg(false);}} style={{flex:1,padding:"11px",borderRadius:10,background:OR,color:"#fff",border:"none",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:F}}>Register</button>
-            <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#222",border:"1px solid #333",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
+            <button onClick={()=>setShowReg(false)} style={{padding:"11px 16px",borderRadius:10,background:"#fff",border:"1px solid #ebebeb",color:"#555",cursor:"pointer",fontFamily:F}}>Cancel</button>
           </div>
         </div>
       )}
@@ -3625,23 +3651,23 @@ export default function SonoLane() {
         {radiusActive ? "RADIO HOSTS · "+appRadius+" MI" : "ALL RADIO HOSTS"}
       </div>
       {radioHosts.length===0 ? (
-        <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
-          <div style={{marginBottom:10,display:"flex",justifyContent:"center"}}><JukeboxIcon size={38} color="#444"/></div>
-          <div style={{fontSize:15,fontWeight:700,color:"#666",marginBottom:6}}>No stations nearby yet</div>
-          <div style={{fontSize:13,color:"#444",marginBottom:14}}>Be the first to register a station above.</div>
+        <div style={{textAlign:"center",padding:"40px 20px",color:"#8a8f98"}}>
+          <div style={{marginBottom:10,display:"flex",justifyContent:"center"}}><JukeboxIcon size={38} color="#8a8f98"/></div>
+          <div style={{fontSize:15,fontWeight:700,color:"#555",marginBottom:6}}>No stations nearby yet</div>
+          <div style={{fontSize:13,color:"#8a8f98",marginBottom:14}}>Be the first to register a station above.</div>
         </div>
       ) : radioHosts.map((h,i)=>(
-        <div key={i} style={{background:"#181818",borderRadius:14,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:48,height:48,borderRadius:12,background:OR+"22",border:"1.5px solid "+OR+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={22} color={OR}/></div>
+        <div key={i} style={{background:"#f8f8f8",borderRadius:14,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:48,height:48,borderRadius:12,background:OR+"15",border:"1.5px solid "+OR+"33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><JukeboxIcon size={22} color={OR}/></div>
           <div style={{flex:1}}>
-            <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{h.name}</div>
-            <div style={{fontSize:12,color:"#555"}}>{h.genre} · @{h.handle}</div>
-            {h.bio && <div style={{fontSize:12,color:"#444",marginTop:3}}>{h.bio}</div>}
+            <div style={{fontSize:16,fontWeight:800,color:"#111"}}>{h.name}</div>
+            <div style={{fontSize:12,color:"#8a8f98"}}>{h.genre} · @{h.handle}</div>
+            {h.bio && <div style={{fontSize:12,color:"#8a8f98",marginTop:3}}>{h.bio}</div>}
           </div>
-          <button onClick={()=>toggleSavedStation(h.name)} title={savedStations.includes(h.name)?"Remove from saved stations":"Save station"} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#555",fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
+          <button onClick={()=>toggleSavedStation(h.name)} title={savedStations.includes(h.name)?"Remove from saved stations":"Save station"} style={{background:"none",border:"none",color:savedStations.includes(h.name)?OR:"#8a8f98",fontSize:18,cursor:"pointer",padding:4,flexShrink:0}}>{savedStations.includes(h.name)?"★":"☆"}</button>
           {isBroad&&broadName===h.name
             ? (<div style={{display:"flex",alignItems:"center",gap:4,background:"#ef444422",borderRadius:20,padding:"4px 10px"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#ef4444"}}/><span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>LIVE</span></div>)
-            : (<button style={{padding:"6px 12px",borderRadius:20,background:"#2a2a2a",color:"#888",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Listen</button>)}
+            : (<button style={{padding:"6px 12px",borderRadius:20,background:"#f3f3f3",color:"#555",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>▶ Listen</button>)}
         </div>
       ))}
     </div>
@@ -3668,7 +3694,7 @@ export default function SonoLane() {
               <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Say "Sono" to Wake</div>
               <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Keep voice control on everywhere outside Drive mode, so you can talk to your Co-Pilot hands-free without tapping the mic first. This setting saves.</div>
             </div>
-            <button onClick={()=>setSayWakeEnabled(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:sayWakeEnabled?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+            <button onClick={()=>{vibrate();setSayWakeEnabled(v=>!v);}} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:sayWakeEnabled?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
               <div style={{position:"absolute",top:2,left:sayWakeEnabled?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
             </button>
           </div>
@@ -3676,7 +3702,7 @@ export default function SonoLane() {
           <div style={{fontSize:12,color:"#111",marginBottom:10,lineHeight:1.5}}>Choose who talks back when you say "Sono" or tap the car avatar while driving.</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             {AI_PALS.map(p=>(
-              <button key={p.id} onClick={()=>setAiPalId(p.id)} style={{
+              <button key={p.id} onClick={()=>{vibrate();setAiPalId(p.id);}} style={{
                 display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
                 cursor:"pointer",fontFamily:F,textAlign:"left",
                 border:"1.5px solid "+(aiPalId===p.id?p.color:"#ebebeb"),
@@ -3704,7 +3730,7 @@ export default function SonoLane() {
               <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Show online status</div>
               <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Let others see the "● Online" indicator next to your name in Lanes.</div>
             </div>
-            <button onClick={()=>setShowOnlineStatus(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+            <button onClick={()=>{vibrate();setShowOnlineStatus(v=>!v);}} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:showOnlineStatus?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
               <div style={{position:"absolute",top:2,left:showOnlineStatus?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
             </button>
           </div>
@@ -3713,7 +3739,7 @@ export default function SonoLane() {
               <div style={{fontSize:13,fontWeight:700,color:"#111"}}>Lanes notifications</div>
               <div style={{fontSize:12,color:"#111",marginTop:2,lineHeight:1.5}}>Get badge alerts for new messages and activity in Lanes.</div>
             </div>
-            <button onClick={()=>setLanesNotifications(v=>!v)} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
+            <button onClick={()=>{vibrate();setLanesNotifications(v=>!v);}} style={{width:38,height:22,borderRadius:11,border:"none",cursor:"pointer",background:lanesNotifications?OR:"#d8d8d8",position:"relative",flexShrink:0,padding:0}}>
               <div style={{position:"absolute",top:2,left:lanesNotifications?18:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.15s ease"}}/>
             </button>
           </div>
@@ -4972,9 +4998,19 @@ export default function SonoLane() {
 
         {/* ── Car hero — standalone car banner/avatar; tap for details.
              Uses the same banner (custom photo or preset) set on the car
-             detail page, so any banner edit shows up here immediately. ── */}
+             detail page, so any banner edit shows up here immediately.
+             Car Details itself (subPanel==="car") lives under the Garage
+             tab now (see GaragePanel), not here on Profile — so this has to
+             actually switch panels first, same as every other "jump to a
+             specific subPanel on another tab" link in the app (go() resets
+             subPanel the instant the panel changes, so setting the real
+             target has to happen a tick later or it just gets clobbered).
+             Tapping this used to only call setSubPanel("car") while staying
+             on the Profile tab, which left ProfilePanel with no matching
+             case to render — the screen never changed, even though
+             BACK_PAGES.car still made the TopBar show a back button. ── */}
         <div style={{margin:"14px 16px 0",borderRadius:18,overflow:"hidden",background:carBannerPhoto ? "url("+carBannerPhoto+") center/cover no-repeat" : (CAR_BANNERS.find(b=>b.id===carBannerPreset)||CAR_BANNERS[0]).css,flexShrink:0}}>
-          <button onClick={()=>setSubPanel("car")} style={{width:"100%",padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
+          <button onClick={()=>{go("garage");setTimeout(()=>setSubPanel("car"),100);}} style={{width:"100%",padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",background:"none",border:"none",cursor:"pointer",fontFamily:F}}>
             {carAvatarMode==="photo" && carAvatarPhoto
               ? <img src={carAvatarPhoto} alt="" style={{width:104,height:104,borderRadius:16,objectFit:"cover",border:"2px solid rgba(255,255,255,0.85)",boxShadow:"0 6px 20px rgba(0,0,0,0.4)"}}/>
               : <CarSVG color={carColor} mods={carMods} size={140} styleId={carBodyStyle}/>}
@@ -5191,12 +5227,14 @@ export default function SonoLane() {
               still lands here. Trophies moved into the Points detail page;
               Settings is still reachable from the ☰ menu. Garage and
               History moved out to their own dedicated Garage bottom-nav
-              tab (see GaragePanel) — only Radio/Routes/Events remain here. */}
+              tab (see GaragePanel) — only Routes/Events/Radio remain here,
+              in that order, with Routes always the one that opens by
+              default (see go()'s p==="profile" ? "routes" : null). */}
           <div style={{display:"flex",margin:"0 -14px",borderTop:"1px solid #ebebeb",borderBottom:"1px solid #ebebeb",overflowX:"auto"}}>
             {[
-              {id:"radiostations", label:"Radio",    icon:<JukeboxIcon size={22} color={subPanel==="radiostations"?OR:"#8a8f98"}/>},
               {id:"routes",        label:"Routes",   icon:<DPadIcon id="road" color={subPanel==="routes"?OR:DPAD_COLORS.road} size={22}/>},
               {id:"myevents",      label:"Events",   icon:<DPadIcon id="event" color={subPanel==="myevents"?OR:DPAD_COLORS.event} size={22}/>},
+              {id:"radiostations", label:"SonoLane Radio", icon:<JukeboxIcon size={22} color={subPanel==="radiostations"?OR:"#8a8f98"}/>},
             ].map(t=>{
               const active = subPanel===t.id;
               // Tapping the already-active tab is a no-op now, not a close —
@@ -5650,7 +5688,7 @@ export default function SonoLane() {
           <div style={SEC}>CAR AVATAR</div>
           <div style={{display:"flex",gap:8,marginBottom:12}}>
             {[["avatar","🎨","Custom Avatar"],["photo","📷","Upload Photo"]].map(([id,ic,label])=>(
-              <button key={id} onClick={()=>setCarAvatarMode(id)} style={{
+              <button key={id} onClick={()=>{vibrate();setCarAvatarMode(id);}} style={{
                 flex:1,padding:"10px 8px",borderRadius:12,cursor:"pointer",fontFamily:F,textAlign:"center",
                 border:"1.5px solid "+(carAvatarMode===id?OR:"#ebebeb"),
                 background:carAvatarMode===id?OR+"0f":"#f8f8f8"}}>
@@ -5863,7 +5901,7 @@ export default function SonoLane() {
           <div style={{display:"flex",gap:14,overflowX:"auto",padding:"4px 14px 14px",scrollSnapType:"x proximity"}}>
             {myGarageCards.map(c=>(
               <div key={c.key} style={{position:"relative",flexShrink:0,width:158,scrollSnapAlign:"start"}}>
-                <button onClick={()=>{if(!c.isActive)switchToCar(c.id);setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"22px 12px 16px",borderRadius:20,border:c.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:c.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
+                <button onClick={()=>{if(!c.isActive){vibrate();switchToCar(c.id);}setSubPanel("car");}} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:"22px 12px 16px",borderRadius:20,border:c.saved?"1.5px solid "+OR+"44":"1.5px solid #ebebeb",background:c.saved?"#fff9f5":"#f8f8f8",cursor:"pointer",fontFamily:F}}>
                   <div style={{width:118,height:118,borderRadius:"50%",background:"#fff",border:"1.5px solid #ebebeb",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",marginBottom:10,flexShrink:0}}>
                     {c.avatarMode==="photo" && c.avatarPhoto
                       ? <img src={c.avatarPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
@@ -5875,7 +5913,7 @@ export default function SonoLane() {
                 {c.isActive ? (
                   <div title="Displayed at the top of your profile" style={{position:"absolute",top:8,left:8,width:26,height:26,borderRadius:"50%",background:OR,color:"#fff",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.25)"}}>★</div>
                 ) : (
-                  <button onClick={e=>{e.stopPropagation();switchToCar(c.id);}} title="Display This Car" style={{position:"absolute",top:8,left:8,width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ccc",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>★</button>
+                  <button onClick={e=>{e.stopPropagation();vibrate();switchToCar(c.id);}} title="Display This Car" style={{position:"absolute",top:8,left:8,width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ccc",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>★</button>
                 )}
                 <button onClick={e=>{e.stopPropagation();setConfirmDeleteCar({id:c.id,name:c.name||c.model||"this car"});}} title="Delete car" style={{position:"absolute",top:8,right:8,width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,0.9)",border:"1px solid #ebebeb",color:"#ef4444",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
               </div>
@@ -7005,9 +7043,12 @@ export default function SonoLane() {
      left past Events. Used to only be reachable as a pop-up sheet (see
      renderNearbyStationsSection, extracted from the old MusicModal "nearby"
      tab) — same content, now a real page like Routes/Events instead of an
-     overlay. Kept dark-themed since that content was designed dark. ── */
+     overlay. White now like every other page outside Drive mode — this used
+     to be dark-themed, but Drive mode's own inline Radio widget (a separate
+     dark-themed block, see driveApp==="radio") is the only place SonoLane
+     Radio still looks like a cockpit dashboard. ── */
   const RadioPanel = useStablePanel(() => (
-    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#0d0d0d"}}>
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#fff"}}>
       {renderNearbyStationsSection()}
     </div>
   ));
@@ -7016,9 +7057,9 @@ export default function SonoLane() {
   const CreatePanel = useStablePanel(() => {
     const unreadNotifs = notifications.filter(n=>!n.read).length;
     const curFriend = friends.find(f=>f.id===activeChan);
-    // Self-chat avatar/initials — "You" (notifications) uses the same
-    // initials fallback as everywhere else your own avatar shows without a
-    // photo (see the old notes-lane bubble this replaced).
+    // Self-chat avatar/initials — the Notifications row in the Chats list
+    // (a chat bubble with yourself) uses the same initials fallback as
+    // everywhere else your own avatar shows without a photo.
     const myInitials = userName ? userName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "ME";
     const [pinnedChans, setPinnedChans] = usePersistedState("sl_pinnedChans", []);
     // lanesListTab/setLanesListTab now live at the top level (see near
@@ -7339,11 +7380,32 @@ export default function SonoLane() {
 
             {/* Chats — friends' DMs, filtered by the "Find users…" search in
                 the shared TopBar (see laneUserSearch). Bigger avatars, one
-                real messaging-app-style row per friend. "You" (notifications)
-                and your AI pal used to also have permanent rows up here —
-                they're pinned bubbles up top now instead (see the bubble
-                row above), so they don't appear twice. */}
+                real messaging-app-style row per friend. Your AI pal has its
+                own fixed tab up in the strip instead of a row here — but
+                Notifications is a real chat bubble with yourself, always
+                pinned at the top (unless actively searching for a friend),
+                same avatar treatment as any other row just using your own
+                initials instead of a friend's photo. */}
             {lanesListTab==="chats" && (<>
+              {!laneUserSearch.trim() && (
+                <div style={{display:"flex",alignItems:"center",gap:2}}>
+                  <button onClick={()=>{setActiveChan("notifications");setLanesView("room");}} style={{
+                    flex:1,minWidth:0,display:"flex",alignItems:"center",gap:12,
+                    padding:"8px 8px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:F,textAlign:"left",
+                    background:(activeChan==="notifications"&&lanesView==="room")?"#f5f5f5":"transparent"}}>
+                    <div style={{position:"relative",flexShrink:0}}>
+                      <div style={{width:54,height:54,borderRadius:"50%",background:"linear-gradient(135deg,"+OR+",#fb923c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,fontWeight:800,color:"#fff"}}>{myInitials}</div>
+                      {unreadNotifs>0 && (
+                        <div style={{position:"absolute",top:-2,right:-2,minWidth:18,height:18,borderRadius:9,background:"#ef4444",border:"2.5px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#fff",padding:"0 4px"}}>{unreadNotifs}</div>
+                      )}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:15,fontWeight:700,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Notifications</div>
+                      <div style={{fontSize:12,color:"#8a8f98",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{unreadNotifs>0 ? unreadNotifs+" new" : "SonoLane activity"}</div>
+                    </div>
+                  </button>
+                </div>
+              )}
               {friends.length===0 ? (
                 !laneUserSearch.trim() && (
                   <div style={{textAlign:"center",color:"#8a8f98",padding:"30px 20px"}}>
@@ -7590,8 +7652,12 @@ export default function SonoLane() {
             </>)}
           </div>
 
-          {/* Input bar */}
-          {activeChan!=="notifications"&&(
+          {/* Input bar — notifications is a plain feed (no composer at all),
+              but it's now an individual room like a friend DM rather than a
+              fixed tab (see the "notifications as a chat bubble with
+              yourself" row in the Chats list below), so it still needs its
+              own way back — just the ☰ button, with nothing to type into. */}
+          {activeChan!=="notifications" ? (
             <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#fff"}}>
 
               {/* Voice chat banner — shows when VC is active in this channel */}
@@ -7623,7 +7689,7 @@ export default function SonoLane() {
                   circle, with a keyboard icon in the corner to switch to typing. */}
               {isLaneChat && chatInputMode==="voice" ? (
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative",padding:"4px 0 2px",opacity:laneLocked?0.6:1}}>
-                  <button onClick={()=>setChatInputMode("text")} title="Type a message instead" style={{position:"absolute",left:4,bottom:0,width:34,height:34,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,color:"#8a8f98"}}>⌨️</button>
+                  <button onClick={()=>{vibrate();setChatInputMode("text");}} title="Type a message instead" style={{position:"absolute",left:4,bottom:0,width:34,height:34,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,color:"#8a8f98"}}>⌨️</button>
                   <button disabled={laneLocked} onClick={()=>{
                     if(laneLocked) return;
                     if(voiceChatActive===activeChan){setVoiceChatActive(null);clearInterval(vcTimerRef.current);}
@@ -7727,10 +7793,16 @@ export default function SonoLane() {
 
                 {/* Voice message button — hold-to-talk voice notes, lane chats only */}
                 {isLaneChat && (
-                  <button onClick={()=>setChatInputMode("voice")} title="Switch to hold-to-talk" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>🎙</button>
+                  <button onClick={()=>{vibrate();setChatInputMode("voice");}} title="Switch to hold-to-talk" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>🎙</button>
                 )}
               </div>
               )}
+            </div>
+          ) : (
+            <div style={{padding:"4px 10px 6px",flexShrink:0,background:"#fff"}}>
+              <button onClick={backFromLanesRoom} title="Back" style={{width:34,height:34,borderRadius:8,background:"#f3f3f3",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8a8f98",flexShrink:0}}>
+                ☰
+              </button>
             </div>
           )}
         </div>
@@ -8051,7 +8123,7 @@ export default function SonoLane() {
         {DRIVE_APPS.map(a=>{
           const active = driveApp===a.id;
           return (
-            <button key={a.id} onClick={()=>setDriveApp(a.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",border:"none",cursor:"pointer",fontFamily:F,background:active?OR+"22":"transparent"}}>
+            <button key={a.id} onClick={()=>{vibrate();setDriveApp(a.id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",border:"none",cursor:"pointer",fontFamily:F,background:active?OR+"22":"transparent"}}>
               <span style={{fontSize:19}}>{a.icon}</span>
               <span style={{fontSize:10,fontWeight:active?800:600,color:active?OR:"#8e9297"}}>{a.label}</span>
             </button>
@@ -8065,7 +8137,7 @@ export default function SonoLane() {
         {DRIVE_APPS.map(a=>{
           const active = driveApp===a.id;
           return (
-            <button key={a.id} onClick={()=>setDriveApp(a.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"8px 2px",border:"none",cursor:"pointer",fontFamily:F,background:active?OR+"22":"transparent"}}>
+            <button key={a.id} onClick={()=>{vibrate();setDriveApp(a.id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"8px 2px",border:"none",cursor:"pointer",fontFamily:F,background:active?OR+"22":"transparent"}}>
               <span style={{fontSize:19}}>{a.icon}</span>
               <span style={{fontSize:9,fontWeight:active?800:600,color:active?OR:"#8e9297",textAlign:"center"}}>{a.label}</span>
             </button>
@@ -8681,7 +8753,7 @@ export default function SonoLane() {
       const active = it.activeIds ? it.activeIds.includes(panel) : panel===it.id;
       const color = active ? DPAD_COLORS[it.iconId] : "#9a9a9a";
       return (
-        <button key={it.id} onClick={()=>go(it.id)} title={it.label} style={{
+        <button key={it.id} onClick={()=>{vibrate();go(it.id);}} title={it.label} style={{
           flex:1,display:"flex",alignItems:"center",justifyContent:"center",
           padding:"4px",border:"none",background:"transparent",cursor:"pointer",fontFamily:F}}>
           {it.id==="profile" ? <ProfileIcon id="person" size={25} color={color}/> : it.iconId==="garage" ? <GarageDoorIcon size={25} color={color}/> : <DPadIcon id={it.iconId} color={color} size={25}/>}
@@ -8734,18 +8806,20 @@ export default function SonoLane() {
     top3friend:   { onBack: ()=>setSubPanel("routes"), dark:true }};
   const TopBar = () => {
     const onLanes = panel==="create";
-    // Lanes no longer has its own back button here — the Sono | You | Chats
-    // | Lanes tab strip under this bar (see LANES_TABS/goLanesTab) is the
-    // real way to move between its rooms/lists now, the same way tapping
+    // Lanes no longer has its own back button here — the Sono | Notifications
+    // | Chats | Lanes tab strip under this bar (see LANES_TABS/goLanesTab) is
+    // the real way to move between its rooms/lists now, the same way tapping
     // Routes/Events/Radio in that strip works, so a redundant ← that only
     // ever led back to the chat list would just be one more thing to tap.
     const backPage = (panel==="profile"||panel==="garage") ? BACK_PAGES[subPanel] : null;
     const onRadio = panel==="radio";
-    // Lanes is a plain white page like everywhere else now — it used to
-    // force the whole top bar (and the chat below it) into a dark Discord-
-    // style theme; only Radio and the handful of `dark:true` BACK_PAGES
-    // entries still do that.
-    const dark = onRadio || !!backPage?.dark;
+    // Lanes and the top-level SonoLane Radio page are plain white pages like
+    // everywhere else now — Radio used to force the whole top bar (and the
+    // page below it) into a dark Discord-style theme; only the handful of
+    // `dark:true` BACK_PAGES entries still do that. Drive mode's own inline
+    // Radio widget (driveApp==="radio") is separate code and stays dark,
+    // since Drive mode's whole dashboard is a dark cockpit UI.
+    const dark = !!backPage?.dark;
     // Filter icon replaces the ☰ menu only on Routes/Events, where there's
     // something to filter — every other page (Profile, Garage, Lanes,
     // Radio, every back page) keeps ☰ so Settings/Terms/About stay just as
@@ -8801,7 +8875,7 @@ export default function SonoLane() {
             // under backPage since Lanes doesn't use that anymore.
             <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,overflowX:"auto"}}>
               {AI_PALS.map(p=>(
-                <button key={p.id} onClick={()=>setAiPalId(p.id)} title={p.name} style={{width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",background:aiPalId===p.id?p.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}>
+                <button key={p.id} onClick={()=>{vibrate();setAiPalId(p.id);}} title={p.name} style={{width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",background:aiPalId===p.id?p.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}>
                   <CompassStar size={aiPalId===p.id?16:13} color={p.color}/>
                 </button>
               ))}
@@ -8811,7 +8885,7 @@ export default function SonoLane() {
           ) : panel==="events" ? (
             <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><DPadIcon id="event" color={DPAD_COLORS.event} size={15}/>Events</div>
           ) : onRadio ? (
-            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><JukeboxIcon size={15} color="#fff"/>Radio</div>
+            <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",display:"flex",alignItems:"center",justifyContent:"center",gap:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><JukeboxIcon size={15} color={OR}/>SonoLane Radio</div>
           ) : panel==="profile" ? (
             <div style={{flex:1,minWidth:0,textAlign:"center",fontSize:15,fontWeight:800,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{userName || "You"}</div>
           ) : panel==="garage" ? (
@@ -9112,29 +9186,32 @@ export default function SonoLane() {
           same sequence (see RadioPanel/PANELS.radio) instead of a pop-up.
           Swipe between the three still works exactly as before. */}
       {["routes","events","radio"].includes(panel) && (
-        <div style={{display:"flex",gap:6,padding:"8px 14px",flexShrink:0,background:panel==="radio"?"#0d0d0d":"#fff",borderBottom:"1px solid "+(panel==="radio"?"#202225":"#ebebeb")}}>
-          {[["routes","Routes"],["events","Events"],["radio","Radio"]].map(([id,label])=>(
-            <button key={id} onClick={()=>go(id)} style={{
+        <div style={{display:"flex",gap:6,padding:"8px 14px",flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
+          {[["routes","Routes"],["events","Events"],["radio","SonoLane Radio"]].map(([id,label])=>(
+            <button key={id} onClick={()=>{vibrate();go(id);}} style={{
               flex:1,padding:"7px 6px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:F,
               fontSize:13,fontWeight:700,
-              background:panel===id?OR:(panel==="radio"?"#1a1a1a":"#f3f3f3"),
-              color:panel===id?"#fff":(panel==="radio"?"#8e9297":"#555")}}>{label}</button>
+              background:panel===id?OR:"#f3f3f3",
+              color:panel===id?"#fff":"#555"}}>{label}</button>
           ))}
         </div>
       )}
 
-      {/* Lanes tab strip — Sono | You | Chats | Lanes, right under the
-          shared TopBar, styled to match the Discover strip above. Replaces
-          the old first-four "toggle" bubbles inside the chat itself (see
+      {/* Lanes tab strip — Chats | Sono | Lanes, right under the shared
+          TopBar, styled to match the Discover strip above. Chats is the
+          default/first stop (a normal messaging-app inbox), matching the
+          order landing on Lanes opens in. Replaces the old first-few
+          "toggle" bubbles inside the chat itself (see
           LANES_TABS/goLanesTab/cycleLanesTab above) — swipe left on any
-          Lanes screen cycles through these same four in the same order. An
-          individual friend DM or specific lane room isn't one of the four,
-          so none show as active there (matches curLanesTab() returning
-          null), but the strip still lets you jump straight to one. */}
+          Lanes screen cycles through these same three in the same order. An
+          individual friend DM, lane, or notifications room isn't one of the
+          three, so none show as active there (matches curLanesTab()
+          returning null), but the strip still lets you jump straight back
+          to Chats/Sono/Lanes from any of those. */}
       {panel==="create" && (
         <div style={{display:"flex",gap:6,padding:"8px 14px",flexShrink:0,background:"#fff",borderBottom:"1px solid #ebebeb"}}>
           {LANES_TABS.map(id=>{
-            const label = id==="sono" ? pal.name : id==="notifications" ? "You" : id==="chats" ? "Chats" : "Lanes";
+            const label = id==="sono" ? pal.name : id==="chats" ? "Chats" : "Lanes";
             const active = curLanesTab()===id;
             return (
               <button key={id} onClick={()=>{vibrate();goLanesTab(id);}} style={{
